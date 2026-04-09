@@ -2,98 +2,60 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
 
-# 1. CONFIGURAZIONE TITANIUM ITALIA
-st.set_page_config(page_title="COIN-NEXUS TITANIUM", layout="wide")
+# ... (Mantieni il CSS e il setup precedente) ...
 
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
-    .main { background: radial-gradient(circle at 50% 50%, #020617, #000000); color: #f1f5f9; font-family: 'Space Grotesk', sans-serif; }
-    [data-testid="stSidebar"] { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(20px); border-right: 1px solid #00d4ff; }
-    .stMetric { background: rgba(30, 41, 59, 0.7); border: 1px solid #00d4ff; border-radius: 15px; padding: 20px; box-shadow: 0 0 20px rgba(0, 212, 255, 0.2); }
-    h1 { text-shadow: 0 0 15px #00d4ff; color: #ffffff; letter-spacing: -1px; }
-    .status-tag { padding: 5px 15px; border-radius: 20px; background: #00d4ff; color: #000; font-weight: bold; font-size: 12px; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# 2. SIDEBAR IN ITALIANO
-st.sidebar.title("⚡ COIN-NEXUS CORE")
-menu = st.sidebar.radio("MODULI OPERATIVI", ["💎 RIEPILOGO ESECUTIVO", "🛡️ SCUDO DI RISCHIO", "📈 PROIEZIONI FLUSSI"])
-uploaded_file = st.sidebar.file_uploader("📥 CARICA BILANCIO (XLSX/CSV)", type=['xlsx', 'csv'])
-
-# --- LOGICA DATI ---
-if uploaded_file:
-    try:
-        if uploaded_file.name.endswith('.xlsx'): df = pd.read_excel(uploaded_file)
-        else: df = pd.read_csv(uploaded_file, sep=None, engine='python')
-        df.columns = [str(c).upper() for c in df.columns]
-        demo_mode = False
-    except: demo_mode = True
-else:
-    demo_data = {
-        'VOCE': ['Liquidità', 'Crediti Clienti', 'Rimanenze', 'Immobilizzazioni', 'Debiti Fornitori', 'Debiti Bancari'],
-        'VALORE': [450000, 320000, 150000, 80000, 210000, 120000]
-    }
-    df = pd.DataFrame(demo_data)
-    demo_mode = True
+# AGGIUNGI QUESTO NUOVO MODULO AL MENU DELLA SIDEBAR
+# menu = st.sidebar.radio("MODULI OPERATIVI", ["💎 RIEPILOGO ESECUTIVO", "🕵️ RISCHIO REVISIONE (BIG4)", "🛡️ SCUDO DI RISCHIO", "📈 PROIEZIONI FLUSSI"])
 
 # ==========================================
-# MODULO 1: RIEPILOGO ESECUTIVO
+# MODULO NUOVO: RISCHIO REVISIONE (STILE DELOITTE)
 # ==========================================
-if menu == "💎 RIEPILOGO ESECUTIVO":
-    st.markdown(f"<h1>💎 Riepilogo Esecutivo {'<span class="status-tag">MODALITÀ DEMO</span>' if demo_mode else ''}</h1>", unsafe_allow_html=True)
-    
-    v_col = 'VALORE' if 'VALORE' in df.columns else df.columns[1]
-    tot_attivo = df[v_col].sum()
-    
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("TOTALE ATTIVO", f"€ {tot_attivo:,.0f}", "+3.2%")
-    col2.metric("PUNTEGGIO SALUTE", "94/100", "ECCELLENTE")
-    col3.metric("FLUSSO DI CASSA", "€ 42.1K", "+12%")
-    col4.metric("LIVELLO RISCHIO", "BASSO", "-5%", delta_color="inverse")
-
+if menu == "🕵️ RISCHIO REVISIONE (BIG4)":
+    st.title("🕵️ Valutazione Professionale del Rischio di Revisione")
     st.markdown("---")
     
-    c_left, c_right = st.columns([2, 1])
-    with c_left:
-        st.subheader("📊 Mappa Patrimoniale Avanzata")
-        fig = px.sunburst(df, path=[df.columns[0]], values=v_col, color=v_col, 
-                         color_continuous_scale='GnBu', template='plotly_dark')
-        fig.update_layout(margin=dict(t=10, l=10, r=10, b=10), paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
+    col_input, col_viz = st.columns([1, 1])
     
-    with c_right:
-        st.subheader("🕵️ Verdetto IA")
-        st.write("Analisi automatizzata del merito creditizio:")
-        st.info("✅ La struttura finanziaria è solida. Gli indici di liquidità sono ampiamente sopra le soglie d'allerta del Codice della Crisi.")
-        st.warning("⚠️ Nota: Ottimizzare la gestione dei crediti verso clienti per migliorare ulteriormente la velocità di incasso.")
+    with col_input:
+        st.subheader("Parametri di Valutazione")
+        ir = st.select_slider("Rischio Intrinseco (Inherent Risk)", 
+                              options=[0.1, 0.3, 0.5, 0.8, 1.0], value=0.5,
+                              help="Rischio legato alla natura dell'attività e al settore.")
+        
+        cr = st.select_slider("Rischio di Controllo (Control Risk)", 
+                              options=[0.1, 0.3, 0.5, 0.8, 1.0], value=0.3,
+                              help="Efficacia dei sistemi di controllo interno dell'azienda.")
+        
+        # Calcolo Detection Risk necessario per mantenere un Audit Risk accettabile (es. 5%)
+        audit_risk_target = 0.05
+        dr_necessario = round(audit_risk_target / (ir * cr), 2)
+        
+    with col_viz:
+        st.subheader("Matrice di Rischio Professionale")
+        # Formula: AR = IR * CR * DR
+        rischio_totale = ir * cr
+        
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = rischio_totale * 100,
+            title = {'text': "Rischio Combinato (IR x CR) %"},
+            gauge = {
+                'axis': {'range': [0, 100]},
+                'bar': {'color': "#00d4ff"},
+                'steps': [
+                    {'range': [0, 20], 'color': "green"},
+                    {'range': [20, 50], 'color': "yellow"},
+                    {'range': [50, 100], 'color': "red"}]}))
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white')
+        st.plotly_chart(fig, use_container_width=True)
 
-# ==========================================
-# MODULO 2: SCUDO DI RISCHIO
-# ==========================================
-elif menu == "🛡️ SCUDO DI RISCHIO":
-    st.title("🛡️ Scudo di Rischio (Radar)")
-    categorie = ['Liquidità', 'Solvibilità', 'Redditività', 'Efficienza', 'Patrimonio Netto']
-    fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(r=[5, 4.2, 4.5, 3.8, 5], theta=categorie, fill='toself', 
-                                 line_color='#00d4ff', fillcolor='rgba(0, 212, 255, 0.3)'))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), 
-                      paper_bgcolor='rgba(0,0,0,0)', font_color='white')
-    st.plotly_chart(fig, use_container_width=True)
-
-# ==========================================
-# MODULO 3: PROIEZIONI FLUSSI
-# ==========================================
-else:
-    st.title("📈 Proiezione Flussi di Cassa")
-    mesi = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu"]
-    valori = [100, 115, 105, 145, 140, 165]
-    fig = px.area(x=mesi, y=valori, title="Previsione Liquidità a 6 Mesi", template='plotly_dark')
-    fig.update_traces(line_color='#00d4ff', fillcolor='rgba(0, 212, 255, 0.2)')
-    fig.update_layout(xaxis_title="Mesi", yaxis_title="Indice di Cassa")
-    st.plotly_chart(fig, use_container_width=True)
-
-st.sidebar.markdown("---")
-st.sidebar.caption(f"🔒 SESSIONE SICURA ATTIVA | {datetime.now().strftime('%H:%M')}")
+    st.markdown("---")
+    st.subheader("📝 Strategia di Revisione Consigliata")
+    
+    if dr_necessario < 0.2:
+        st.error(f"⚠️ **ATTENZIONE:** Il rischio combinato è altissimo. È necessario un Detection Risk molto basso ({dr_necessario}). Richieste procedure di revisione massive e campionamento esteso.")
+    elif dr_necessario < 0.5:
+        st.warning(f"🟡 **PROCEDURE STANDARD:** Detection Risk richiesto: {dr_necessario}. Si consigliano test di sostanza moderati sui saldi di bilancio.")
+    else:
+        st.success(f"✅ **PROCEDURE ANALITICHE:** Detection Risk richiesto: {dr_necessario}. È possibile fare affidamento sui controlli interni e limitare i test diretti.")
