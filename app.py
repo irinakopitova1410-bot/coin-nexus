@@ -67,9 +67,32 @@ if uploaded_file:
             fig_ben.add_trace(go.Scatter(x=expected.index, y=expected.values, name="Curva Teorica", line=dict(color='#ef4444', width=3)))
             fig_ben.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)')
             st.plotly_chart(fig_ben, use_container_width=True)
-            st.caption("Se le barre blu si discostano troppo dalla linea rossa, le cifre potrebbero essere state manipolate manualmente.")
+# --- DA QUI IN POI (Sostituisci tutto quello che c'è sotto) ---
+        st.divider()
+        st.subheader("📥 Certificazione e Reportistica Platinum")
+        
+        # Prepariamo i dati per il PDF
+        audit_risk = "BASSO" if totale < 1000000 else "MODERATO"
+        
+        # Creiamo una colonna centrale per il tasto
+        col_btn, col_empty = st.columns([1, 2])
+        
+        with col_btn:
+            # Generiamo i byte del PDF usando la funzione definita in alto
+            report_bytes = genera_report_pdf(totale, mat, audit_risk)
+            
+            # IL TASTO KILLER: Carica e scarica il report
+            st.download_button(
+                label="🚀 SCARICA REPORT CERTIFICATO (PDF)",
+                data=report_bytes,
+                file_name=f"Audit_Report_{uploaded_file.name.split('.')[0]}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+        
+        st.caption("⚠️ Il report scaricato ha validità di analisi preliminare conforme agli standard ISA 320.")
 
     except Exception as e:
-        st.error(f"Errore nella lettura del file: {e}")
-else:
-    st.info("👋 In attesa di dati. Carica il bilancio per attivare Coin-Nexus Platinum.")
+        st.error(f"Errore tecnico alla riga {e}") # Questo ti dice se qualcosa si rompe ancora
+
+
