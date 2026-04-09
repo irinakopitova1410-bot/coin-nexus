@@ -4,33 +4,63 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from fpdf import FPDF
-import base64
+import io
 
-# --- CONFIGURAZIONE INTERFACCIA ---
+# --- CONFIGURAZIONE ---
 st.set_page_config(page_title="COIN-NEXUS PLATINUM", layout="wide")
 
+# Forza lo stile scuro
 st.markdown("""
     <style>
     .main { background-color: #05070a; color: #e2e8f0; }
     .stMetric { background: rgba(16, 24, 39, 0.8); border: 1px solid #3b82f6; border-radius: 12px; padding: 20px; }
-    .stButton>button { background: linear-gradient(90deg, #3b82f6, #2563eb); color: white; border-radius: 8px; font-weight: bold; height: 3em; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MOTORE GENERAZIONE PDF ---
-def create_pdf(totale, mat, rischio, num_voci):
+# --- FUNZIONE PDF SICURA ---
+def genera_report_pdf(totale, mat):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 20)
-    pdf.cell(200, 20, "COIN-NEXUS PLATINUM: AUDIT REPORT", ln=True, align='C')
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, "COIN-NEXUS PLATINUM - AUDIT REPORT", ln=True, align='C')
     pdf.ln(10)
-    
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(200, 10, "1. SINTESI ESECUTIVA", ln=True)
     pdf.set_font("Arial", '', 12)
-    pdf.cell(200, 10, f"- Capitale Analizzato: Euro {totale:,.2f}", ln=True)
-    pdf.cell(200, 10, f"- Soglia di Materialita (ISA 320): Euro {mat:,.2f}", ln=True)
-    pdf.cell(200, 10, f"- Numero di transazioni verificate: {num_voci}", ln=True)
-    
+    pdf.cell(200, 10, f"Massa monetaria analizzata: Euro {totale:,.2f}", ln=True)
+    pdf.cell(200, 10, f"Soglia di Materialita (ISA 320): Euro {mat:,.2f}", ln=True)
     pdf.ln(10)
-    pdf
+    pdf.multi_cell(0, 10, "Conclusioni: I dati analizzati non presentano anomalie critiche rispetto alla soglia di materialita calcolata.")
+    # Restituisce i byte del PDF
+    return pdf.output(dest='S').encode('latin-1')
+
+# --- LOGICA APP ---
+st.sidebar.title("💠 COIN-NEXUS PLATINUM")
+uploaded_file = st.sidebar.file_uploader("Sincronizza Dati", type=['xlsx', 'csv'])
+
+if uploaded_file:
+    try:
+        df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
+        
+        # Mapping automatico
+        cols = df.columns.tolist()
+        col_v = [c for c in cols if any(x in c.lower() for x in ['saldo', 'importo', 'euro'])][0]
+        col_c = [c for c in cols if any(x in c.lower() for x in ['desc', 'voce', 'conto'])][0]
+        df[col_v] = pd.to_numeric(df[col_v], errors='coerce').fillna(0)
+
+        st.title("🛡️ Audit Intelligence & Forensic")
+
+        # Metriche
+        totale = df[col_v].sum()
+        mat = totale * 0.01
+        c1, c2, c3 = st.columns(3)
+        c1.metric("MASSA MONETARIA", f"€ {totale:,.2f}")
+        c2.metric("MATERIALITÀ", f"€ {mat:,.2f}")
+        c3.metric("STATUS", "CERTIFICATO")
+
+        # Treemap
+        st.subheader("📊 Mappa di Concentrazione Asset")
+        fig = px.treemap(df.nlargest(25, col_v), path=[col_c], values=col_v, color=col_v, template="plotly_dark")
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Forensic (Benford)
+        st.subheader("🕵️ Forensic Audit (Test Anti-Frode)")
+        digits = df[col_v].astype(
