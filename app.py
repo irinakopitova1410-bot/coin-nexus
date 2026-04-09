@@ -1,76 +1,107 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import numpy as np
 
-# 1. CONFIGURAZIONE & STILE
+# 1. SETUP & STILE ELITE
 st.set_page_config(page_title="COIN-NEXUS Intelligence", layout="wide")
+
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; color: #e2e8f0; }
-    .stMetric { background-color: #161e2d !important; border: 1px solid #1e293b; padding: 15px; border-radius: 12px; }
-    .sidebar .sidebar-content { background-image: linear-gradient(#161e2d,#0b0f19); }
+    .stMetric { background-color: #161e2d !important; border: 1px solid #1e293b; padding: 20px; border-radius: 12px; }
+    .sidebar .sidebar-content { background-color: #111827; }
+    .reportview-container .main .block-container { padding-top: 2rem; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. SIDEBAR DI NAVIGAZIONE (Le tue 4 App)
-st.sidebar.title("🛡️ COIN-NEXUS MENU")
-app_mode = st.sidebar.selectbox("Seleziona Area di Analisi:", 
-    ["🕵️ Audit Revisore", "📈 Analisi Trend", "📉 Simulatore Stress-Test", "📁 Gestione Documenti"])
+# 2. MENU LATERALE (NAVIGAZIONE)
+st.sidebar.title("🛡️ COIN-NEXUS SYSTEM")
+st.sidebar.subheader("Menu Navigazione")
+app_mode = st.sidebar.radio("Seleziona il Modulo:", 
+    ["🕵️ Audit & Revisore", "🏦 Rating Basilea", "📊 Analisi Centrale Rischi", "📉 Stress Test & What-If"])
 
-# --- FUNZIONE DI CARICAMENTO COMUNE ---
-def load_data():
-    uploaded_file = st.sidebar.file_uploader("Carica Bilancio", type=['xlsx', 'csv'])
-    if uploaded_file:
-        try:
-            if uploaded_file.name.endswith('.xlsx'):
-                return pd.read_excel(uploaded_file, engine='openpyxl')
-            return pd.read_csv(uploaded_file, sep=None, engine='python', encoding='latin1')
-        except Exception as e:
-            st.error(f"Errore caricamento: {e}")
-    return None
+# --- CARICAMENTO FILE UNIVERSALE ---
+st.sidebar.markdown("---")
+file = st.sidebar.file_uploader("📂 Carica Bilancio (XLSX/CSV)", type=['xlsx', 'csv'])
 
-df = load_data()
-
-# ==========================================
-# APP 1: AUDIT REVISORE (Logica che abbiamo perfezionato)
-# ==========================================
-if app_mode == "🕵️ Audit Revisore":
-    st.title("🕵️ Audit & Revisore Legale")
-    if df is not None:
-        # (Qui inseriamo la logica dei KPI che abbiamo scritto prima)
-        st.success("Analisi automatica completata. Gli indici di liquidità sono stabili.")
-        # Esempio rapido KPI
-        c1, c2 = st.columns(2)
-        c1.metric("Indice Liquidità", "1.45", "Target > 1.2")
-        c2.metric("Solvibilità", "42%", "Ottimale")
+def clean_data(file):
+    if file.name.endswith('.xlsx'):
+        df = pd.read_excel(file, engine='openpyxl')
     else:
-        st.info("Carica un file dalla sidebar per avviare l'Audit.")
+        df = pd.read_csv(file, sep=None, engine='python', encoding='latin1')
+    df.columns = [str(c).strip() for c in df.columns]
+    return df
 
 # ==========================================
-# APP 2: ANALISI TREND
+# MODULO 1: AUDIT & REVISORE
 # ==========================================
-elif app_mode == "📈 Analisi Trend":
-    st.title("📈 Analisi Storica e Trend")
-    st.write("Confronto delle performance mensili o annuali.")
-    # Esempio grafico placeholder
-    chart_data = pd.DataFrame({'Mese': ['Gen', 'Feb', 'Mar'], 'Fatturato': [10, 15, 12]})
-    fig = px.line(chart_data, x='Mese', y='Fatturato', template="plotly_dark")
-    st.plotly_chart(fig)
+if app_mode == "🕵️ Audit & Revisore":
+    st.title("🕵️ Audit Professionale & Revisione")
+    if file:
+        df = clean_data(file)
+        c_col = [c for c in df.columns if any(x in c.lower() for x in ['voce', 'desc', 'conto'])][0]
+        v_col = [c for c in df.columns if any(x in c.lower() for x in ['valore', 'importo', 'saldo'])][0]
+        df[v_col] = pd.to_numeric(df[v_col].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
+        
+        # Logica Revisore
+        liq = df[df[c_col].str.contains('cassa|banca|liquid', case=False, na=False)][v_col].sum()
+        deb = df[df[c_col].str.contains('fornitori|tributari|breve', case=False, na=False)][v_col].sum()
+        ratio = round(liq/deb, 2) if deb > 0 else 0
+        
+        m1, m2 = st.columns(2)
+        m1.metric("Cash Ratio", ratio, "Soglia sicura > 0.2")
+        m2.metric("Liquidità Immediata", f"€ {liq:,.0f}")
+        
+        st.plotly_chart(px.bar(df.nlargest(10, v_col), x=v_col, y=c_col, orientation='h', template="plotly_dark"))
+    else:
+        st.info("Carica un bilancio per iniziare l'audit.")
 
 # ==========================================
-# APP 3: SIMULATORE STRESS-TEST
+# MODULO 2: RATING BASILEA (Dal tuo Colab)
 # ==========================================
-elif app_mode == "📉 Simulatore Stress-Test":
-    st.title("📉 Simulatore di Scenario (What-If)")
-    st.write("Cosa succede se il fatturato cala del 20%?")
-    calo = st.slider("Seleziona calo fatturato (%)", 0, 100, 20)
-    st.warning(f"Simulazione: con un calo del {calo}%, la liquidità scenderà a livelli critici tra 4 mesi.")
+elif app_mode == "🏦 Rating Basilea":
+    st.title("🏦 Simulatore Rating Bancario (Basilea 4)")
+    st.write("Valutazione del merito creditizio basata su algoritmi bancari.")
+    
+    col1, col2 = st.columns(2)
+    ebitda = col1.number_input("EBITDA (€)", value=50000)
+    pfm = col2.number_input("Posizione Finanziaria Netta (€)", value=150000)
+    
+    score = round(pfm / ebitda, 2) if ebitda > 0 else 10
+    
+    if score < 3:
+        st.success(f"Rating: EXCELLENT (PFN/EBITDA: {score})")
+    elif score < 6:
+        st.warning(f"Rating: WATCHLIST (PFN/EBITDA: {score})")
+    else:
+        st.error(f"Rating: HIGH RISK (PFN/EBITDA: {score})")
 
 # ==========================================
-# APP 4: GESTIONE DOCUMENTI
+# MODULO 3: CENTRALE RISCHI
+# ==========================================
+elif app_mode == "📊 Analisi Centrale Rischi":
+    st.title("📊 Analisi Centrale Rischi")
+    st.write("Monitoraggio segnalazioni e sconfinamenti.")
+    
+    accordato = st.slider("Fidi Accordati (€)", 10000, 500000, 100000)
+    utilizzato = st.slider("Fidi Utilizzati (€)", 10000, 600000, 80000)
+    
+    tensione = (utilizzato / accordato) * 100
+    st.progress(min(tensione/100, 1.0))
+    st.metric("Tensione Finanziaria", f"{tensione:.1f}%", delta="-5% rispetto a ieri")
+
+# ==========================================
+# MODULO 4: STRESS TEST
 # ==========================================
 else:
-    st.title("📁 Gestione Documenti & Export")
-    st.write("Genera report PDF per la banca o i soci.")
-    if st.button("Genera Report Audit PDF"):
-        st.write("Generazione in corso...")
+    st.title("📉 Stress Test & What-If")
+    st.write("Simulazione impatto calo fatturato sulla cassa.")
+    
+    calo_fatturato = st.select_slider("Scenario Calo Fatturato:", options=[0, 10, 20, 30, 40, 50])
+    
+    st.error(f"In caso di calo del {calo_fatturato}%, l'azienda necessita di € {calo_fatturato * 1500:,.0f} di nuova finanza.")
+    
+    # Grafico Stress
+    stress_df = pd.DataFrame({'Scenario': ['Attuale', 'Stress'], 'Cassa': [100, 100 - calo_fatturato]})
+    st.plotly_chart(px.area(stress_df, x='Scenario', y='Cassa', title="Erosione della Cassa", template="plotly_dark"))
