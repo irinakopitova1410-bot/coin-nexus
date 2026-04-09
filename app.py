@@ -7,77 +7,72 @@ from datetime import datetime
 import numpy as np
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="COIN-NEXUS TITANIUM", layout="wide")
+st.set_page_config(page_title="COIN-NEXUS ULTIMATE", layout="wide")
 
-# Inizializzazione Session State (Evita i crash tra i menu)
-if 'mat' not in st.session_state: st.session_state['mat'] = 10000.0
-if 'dscr' not in st.session_state: st.session_state['dscr'] = 1.5
+if 'mat' not in st.session_state: st.session_state['mat'] = 15000.0
+if 'dscr' not in st.session_state: st.session_state['dscr'] = 1.4
 
-# --- STILE ---
-st.markdown("""
-    <style>
-    .main { background: #020617; color: #f1f5f9; }
-    [data-testid="stSidebar"] { background: #0a0f18; border-right: 1px solid #3b82f6; }
-    .stMetric { background: #1e293b; border: 1px solid #3b82f6; border-radius: 10px; padding: 15px; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- STILE SIDEBAR ---
+st.sidebar.markdown("<h1 style='color: #3b82f6;'>💠 COIN-NEXUS</h1>", unsafe_allow_html=True)
+st.sidebar.caption("SISTEMA DI AUDIT INTELLIGENTE v8.5")
 
-# --- FUNZIONE PDF (CORRETTA) ---
-def genera_report(mat, dscr):
+# --- FUNZIONE GENERAZIONE PDF ---
+def genera_pdf(df, mat, dscr, z_score):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "COIN-NEXUS: REPORT DI REVISIONE", ln=True, align="C")
+    pdf.cell(0, 15, "RELAZIONE DI REVISIONE INDIPENDENTE", ln=True, align="C")
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(0, 10, f"Generato il: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="R")
     pdf.ln(10)
-    pdf.set_font("Arial", "", 12)
-    pdf.cell(0, 10, f"Data: {datetime.now().strftime('%d/%m/%Y')}", ln=True)
-    pdf.cell(0, 10, f"Materialita Calcolata: Euro {mat:,.2f}", ln=True)
-    pdf.cell(0, 10, f"Indice Going Concern (DSCR): {dscr:.2f}", ln=True)
+    
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "1. PARAMETRI DI MATERIALITA (ISA 320)", ln=True)
+    pdf.set_font("Arial", "", 11)
+    pdf.cell(0, 10, f"Soglia di errore tollerabile calcolata: Euro {mat:,.2f}", ln=True)
+    
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "2. VALUTAZIONE CONTINUITA (ISA 570)", ln=True)
+    pdf.set_font("Arial", "", 11)
+    pdf.cell(0, 10, f"Indice DSCR: {dscr:.2f}", ln=True)
+    pdf.cell(0, 10, f"Altman Z-Score: {z_score:.2f}", ln=True)
+    
     pdf.ln(10)
-    pdf.multi_cell(0, 10, "Conclusioni: Sulla base delle analisi effettuate, non sono emersi elementi che facciano ritenere il bilancio non attendibile.")
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 10, "3. CONCLUSIONI", ln=True)
+    pdf.set_font("Arial", "", 11)
+    status = "NON RILEVATE ANOMALIE" if z_score > 1.8 else "RILEVATI RISCHI DI CONTINUITA"
+    pdf.multi_cell(0, 10, f"Sulla base dei test eseguiti, l'opinione del sistema risulta: {status}.")
     return pdf.output()
 
-# --- SIDEBAR ---
-st.sidebar.title("💠 COIN-NEXUS")
-menu = st.sidebar.radio("SISTEMI", ["📊 DASHBOARD", "🛡️ GOING CONCERN", "📄 REPORT PDF"])
+# --- CARICAMENTO FILE ---
+uploaded_file = st.sidebar.file_uploader("📥 CARICA BILANCIO (Excel o CSV)", type=['xlsx', 'csv'])
 
-# Dati Mock (per evitare crash se non carichi file)
-df = pd.DataFrame({'VOCE': ['Liquidita', 'Crediti', 'Debiti'], 'VALORE': [500000, 300000, 200000]})
-
-# --- LOGICA MODULI ---
-
-if menu == "📊 DASHBOARD":
-    st.title("📊 Executive Dashboard")
-    c1, c2 = st.columns(2)
-    c1.metric("ATTIVO TOTALE", f"€ {df['VALORE'].sum():,.0f}")
-    c2.metric("MATERIALITÀ", f"€ {st.session_state['mat']:,.0f}")
-    
-    fig = px.pie(df, names='VOCE', values='VALORE', hole=0.4, template="plotly_dark")
-    st.plotly_chart(fig, use_container_width=True)
-
-elif menu == "🛡️ GOING CONCERN":
-    st.title("🛡️ Verifica Continuità (ISA 570)")
-    # Salviamo il valore direttamente nel session_state
-    st.session_state['dscr'] = st.slider("Indice DSCR", 0.5, 3.0, st.session_state['dscr'])
-    
-    if st.session_state['dscr'] >= 1.1:
-        st.success(f"✅ Continuità Garantita (DSCR: {st.session_state['dscr']})")
-    else:
-        st.error(f"⚠️ Allerta Insolvenza (DSCR: {st.session_state['dscr']})")
-    
-    # Calcolo soglia materialità rapido
-    st.session_state['mat'] = st.number_input("Imposta Materialità (€)", value=st.session_state['mat'])
-
-elif menu == "📄 REPORT PDF":
-    st.title("📄 Generatore Relazione Professionale")
-    st.write("Scarica il documento finale basato sulle analisi correnti.")
-    
-    # Generazione dei byte del PDF
-    pdf_bytes = genera_report(st.session_state['mat'], st.session_state['dscr'])
-    
-    st.download_button(
-        label="📥 SCARICA REPORT (PDF)",
-        data=bytes(pdf_bytes),
-        file_name="Audit_Report_CoinNexus.pdf",
-        mime="application/pdf"
-    )
+if uploaded_file is not None:
+    try:
+        if uploaded_file.name.endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
+        else:
+            df = pd.read_csv(uploaded_file, sep=None, engine='python')
+        
+        # Pulizia colonne
+        df.columns = [str(c).upper().strip() for c in df.columns]
+        num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        text_cols = df.select_dtypes(include=[object]).columns.tolist()
+        
+        if len(num_cols) > 0 and len(text_cols) > 0:
+            val_col = num_cols[0]
+            lab_col = text_cols[0]
+        else:
+            st.error("Il file non ha colonne compatibili (Testo + Numeri).")
+            df = pd.DataFrame({'VOCE': ['Liquidità', 'Debiti'], 'VALORE': [100, 50]})
+            val_col, lab_col = 'VALORE', 'VOCE'
+    except Exception as e:
+        st.sidebar.error(f"Errore caricamento: {e}")
+        df = pd.DataFrame({'VOCE': ['Liquidità', 'Debiti'], 'VALORE': [100, 50]})
+        val_col, lab_col = 'VALORE', 'VOCE'
+else:
+    # Dati DEMO
+    df = pd.DataFrame({
+        'VOCE': ['Cassa e Banche', 'Crediti Clienti', 'Rimanenze', 'Debiti For
