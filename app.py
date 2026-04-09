@@ -4,12 +4,10 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from fpdf import FPDF
-import io
 
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="COIN-NEXUS PLATINUM", layout="wide")
 
-# Forza lo stile scuro
 st.markdown("""
     <style>
     .main { background-color: #05070a; color: #e2e8f0; }
@@ -17,7 +15,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNZIONE PDF SICURA ---
+# --- FUNZIONE PDF ---
 def genera_report_pdf(totale, mat):
     pdf = FPDF()
     pdf.add_page()
@@ -28,8 +26,7 @@ def genera_report_pdf(totale, mat):
     pdf.cell(200, 10, f"Massa monetaria analizzata: Euro {totale:,.2f}", ln=True)
     pdf.cell(200, 10, f"Soglia di Materialita (ISA 320): Euro {mat:,.2f}", ln=True)
     pdf.ln(10)
-    pdf.multi_cell(0, 10, "Conclusioni: I dati analizzati non presentano anomalie critiche rispetto alla soglia di materialita calcolata.")
-    # Restituisce i byte del PDF
+    pdf.multi_cell(0, 10, "Conclusioni: I dati analizzati sono stati sottoposti a verifica forense e test di materialita standard.")
     return pdf.output(dest='S').encode('latin-1')
 
 # --- LOGICA APP ---
@@ -40,27 +37,12 @@ if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
         
-        # Mapping automatico
         cols = df.columns.tolist()
-        col_v = [c for c in cols if any(x in c.lower() for x in ['saldo', 'importo', 'euro'])][0]
-        col_c = [c for c in cols if any(x in c.lower() for x in ['desc', 'voce', 'conto'])][0]
+        col_v = [c for c in cols if any(x in c.lower() for x in ['saldo', 'importo', 'euro', 'valore'])][0]
+        col_c = [c for c in cols if any(x in c.lower() for x in ['desc', 'voce', 'conto', 'account'])][0]
         df[col_v] = pd.to_numeric(df[col_v], errors='coerce').fillna(0)
 
         st.title("🛡️ Audit Intelligence & Forensic")
 
         # Metriche
-        totale = df[col_v].sum()
-        mat = totale * 0.01
-        c1, c2, c3 = st.columns(3)
-        c1.metric("MASSA MONETARIA", f"€ {totale:,.2f}")
-        c2.metric("MATERIALITÀ", f"€ {mat:,.2f}")
-        c3.metric("STATUS", "CERTIFICATO")
-
-        # Treemap
-        st.subheader("📊 Mappa di Concentrazione Asset")
-        fig = px.treemap(df.nlargest(25, col_v), path=[col_c], values=col_v, color=col_v, template="plotly_dark")
-        st.plotly_chart(fig, use_container_width=True)
-
-        # Forensic (Benford)
-        st.subheader("🕵️ Forensic Audit (Test Anti-Frode)")
-        digits = df[col_v].astype(
+        totale
