@@ -93,25 +93,37 @@ if search:
 if "CRITICO" in search.upper() or (not df.empty and any(df['Stato'] == 'CRITICO')):
     st.error("⚠️ Rilevate anomalie bloccanti. Seguire le procedure di rettifica bilancio.")
 # ==========================================
-# RIGA 95: SEZIONE BILANCIO E RISCHI AZIENDALI
-# ==========================================
+# Riga 90: Titolo della sezione (già presente o da aggiungere)
 st.markdown("---")
-st.markdown("<h2 style='color: white;'>🛡️ Analisi Solvibilità e Rischi Aziendali</h2>", unsafe_allow_html=True)
+st.header("🛡️ Analisi Solvibilità e Rischi")
 
-# 1. Caricamento del File (Bilancio)
-st.markdown("<p style='color: #94a3b8;'>Carica il file Excel o CSV del bilancio per calcolare gli indici in tempo reale.</p>", unsafe_allow_html=True)
-uploaded_file =st.file_uploader ("", type=["xlsx", "csv"], key="bilancio_upload")
+# --- RIGA 95: INIZIO CODICE "INTELLIGENTE" ---
+# 1. Caricamento del file
+uploaded_file = st.file_uploader("Carica il Bilancio (Excel)", type=["xlsx"])
 
-# Logica di calcolo dinamica
+# 2. Logica di calcolo (Pandas)
 if uploaded_file:
-    # Qui inseriremo la lettura pandas, per ora usiamo valori di test positivi
-    liq_val, solv_val, stato_rischio = 1.85, 0.42, "BASSO"
-    color_border = "#10b981" # Verde
+    import pandas as pd
+    df = pd.read_excel(uploaded_file)
+    
+    # Esempio di calcolo dinamico dai dati Excel
+    try:
+        attivo = df[df['Categoria'] == 'Attività Correnti']['Valore (€)'].sum()
+        passivo = df[df['Categoria'] == 'Passività Correnti']['Valore (€)'].sum()
+        liq_val = round(attivo / passivo, 2)
+    except:
+        liq_val = 0.95 # Fallback se il file ha nomi diversi
+    
+    stato_rischio = "BASSO" if liq_val > 1.2 else "CRITICO"
+    color_border = "#10b981" if liq_val > 1.2 else "#ef4444"
 else:
-    # Valori di default (basati sui tuoi dati SAP/Docfinance precedenti)
+    # Dati statici finché non carichi il file
     liq_val, solv_val, stato_rischio = 0.95, 0.85, "CRITICO"
-    color_border = "#ef4444" # Rosso (per via del sottoscorta acciaio)
+    color_border = "#ef4444"
 
+# --- RIGA 120 (circa): VISUALIZZAZIONE ---
+# Qui metti il codice delle Card (col1, col2, col3) che usano le variabili 
+# liq_val, solv_val e color_border definite sopra.
 # 2. Visualizzazione Card KPI Finanziari
 col1, col2, col3 = st.columns(3)
 
