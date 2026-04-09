@@ -66,33 +66,3 @@ with col_i3:
     st.metric("Indice Liquidità", "1.8", delta="Ottimale")
 
 st.markdown("---")
-
-# SEZIONE 3: RICERCA E CARD
-search = st.text_input("🔍 Cerca nei sistemi (SAP, Docfinance, Stato...)", "")
-df_filtered = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df
-
-cols = st.columns(3)
-for i, row in df_filtered.reset_index().iterrows():
-    with cols[i % 3]:
-        color = "#ef4444" if row['Stato'] == "CRITICO" else "#38bdf8"
-        st.markdown(f"""
-            <div style="background:#1e293b; padding:15px; border-radius:10px; border-left: 5px solid {color}; border: 1px solid #f97316; margin-bottom:10px;">
-                <small style='color:#94a3b8'>{row['Sistema']}</small><br>
-                <b>{row['ID_Operazione']}</b><br>
-                <span style="font-size:12px; color:#cbd5e1;">{row['Descrizione']}</span><br>
-                <div style="margin-top:10px;"><b>€ {row['Valore_Euro']:,}</b> | <small>{row['Stato']}</small></div>
-            </div>
-        """, unsafe_allow_html=True)
-        .card-monitoraggio {
-    background-color: #334155; /* Blu-grigio scuro */
-    color: #ffffff;            /* Testo bianco */
-    padding: 20px;
-    border-radius: 8px;
-    border-left: 5px solid #3b82f6; /* Accento blu */
-    font-family: sans-serif;
-}
-
-.critical {
-    color: #f87171; /* Rosso chiaro per visibilità su scuro */
-    font-weight: bold;
-}
