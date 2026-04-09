@@ -92,7 +92,44 @@ if search:
 # --- ANALISI CRITICITÀ ---
 if "CRITICO" in search.upper() or (not df.empty and any(df['Stato'] == 'CRITICO')):
     st.error("⚠️ Rilevate anomalie bloccanti. Seguire le procedure di rettifica bilancio.")
+# --- RIGA 95: INIZIO SEZIONE ANALISI RISCHI ---
+st.markdown("---")
+st.subheader("🛡️ Analisi Solvibilità e Indicatori di Rischio")
 
+# Layout a 3 colonne per gli indici finanziari
+r_col1, r_col2, r_col3 = st.columns(3)
+
+with r_col1:
+    # Indice di Liquidità (Current Ratio)
+    st.markdown('''
+        <div style="background-color: #334155; padding: 20px; border-radius: 10px; border-left: 5px solid #10b981; color: white;">
+            <small style="color: #94a3b8; text-transform: uppercase;">Liquidità Corrente</small>
+            <div style="font-size: 28px; font-weight: bold;">1.85</div>
+            <div style="color: #10b981; font-size: 13px;">🟢 Solvibilità a breve garantita</div>
+        </div>
+    ''', unsafe_allow_html=True)
+
+with r_col2:
+    # Indice di Solvibilità (Debt to Equity)
+    st.markdown('''
+        <div style="background-color: #334155; padding: 20px; border-radius: 10px; border-left: 5px solid #3b82f6; color: white;">
+            <small style="color: #94a3b8; text-transform: uppercase;">Solvibilità Totale</small>
+            <div style="font-size: 28px; font-weight: bold;">0.42</div>
+            <div style="color: #3b82f6; font-size: 13px;">🔵 Struttura finanziaria solida</div>
+        </div>
+    ''', unsafe_allow_html=True)
+
+with r_col3:
+    # Allerta Rischio Operativo (Basato su STK-1105)
+    st.markdown('''
+        <div style="background-color: #451a1a; padding: 20px; border-radius: 10px; border-left: 5px solid #ef4444; color: white;">
+            <small style="color: #f87171; text-transform: uppercase;">Rischio Operativo</small>
+            <div style="font-size: 28px; font-weight: bold;">ALTO</div>
+            <div style="color: #f87171; font-size: 13px;">🔴 Sottoscorta critico: Acciaio</div>
+        </div>
+    ''', unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
 # --- DASHBOARD ---
 if not df.empty:
     col1, col2 = st.columns(2)
