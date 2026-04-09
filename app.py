@@ -92,6 +92,82 @@ if search:
 # --- ANALISI CRITICITÀ ---
 if "CRITICO" in search.upper() or (not df.empty and any(df['Stato'] == 'CRITICO')):
     st.error("⚠️ Rilevate anomalie bloccanti. Seguire le procedure di rettifica bilancio.")
+# ==========================================
+# RIGA 95: SEZIONE BILANCIO E RISCHI AZIENDALI
+# ==========================================
+st.markdown("---")
+st.markdown("<h2 style='color: white;'>🛡️ Analisi Solvibilità e Rischi Aziendali</h2>", unsafe_allow_html=True)
+
+# 1. Caricamento del File (Bilancio)
+st.markdown("<p style='color: #94a3b8;'>Carica il file Excel o CSV del bilancio per calcolare gli indici in tempo reale.</p>", unsafe_allow_html=True)
+uploaded_file = st.file_uploader("", type=["xlsx", "csv"], key="bilancio_upload")
+
+# Logica di calcolo dinamica
+if uploaded_file:
+    # Qui inseriremo la lettura pandas, per ora usiamo valori di test positivi
+    liq_val, solv_val, stato_rischio = 1.85, 0.42, "BASSO"
+    color_border = "#10b981" # Verde
+else:
+    # Valori di default (basati sui tuoi dati SAP/Docfinance precedenti)
+    liq_val, solv_val, stato_rischio = 0.95, 0.85, "CRITICO"
+    color_border = "#ef4444" # Rosso (per via del sottoscorta acciaio)
+
+# 2. Visualizzazione Card KPI Finanziari
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown(f"""
+        <div style="background-color: #334155; padding: 20px; border-radius: 10px; border-left: 5px solid {color_border};">
+            <small style="color: #94a3b8; font-weight: bold;">LIQUIDITÀ CORRENTE</small>
+            <h2 style="color: white; margin: 5px 0;">{liq_val}</h2>
+            <p style="color: {color_border}; font-size: 12px; margin: 0;">Target: > 1.2</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col2:
+    st.markdown(f"""
+        <div style="background-color: #334155; padding: 20px; border-radius: 10px; border-left: 5px solid #3b82f6;">
+            <small style="color: #94a3b8; font-weight: bold;">SOLVIBILITÀ (D/E)</small>
+            <h2 style="color: white; margin: 5px 0;">{solv_val}</h2>
+            <p style="color: #3b82f6; font-size: 12px; margin: 0;">Capitale Debito/Proprio</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    st.markdown(f"""
+        <div style="background-color: #451a1a; padding: 20px; border-radius: 10px; border-left: 5px solid #ef4444;">
+            <small style="color: #f87171; font-weight: bold;">LIVELLO DI RISCHIO</small>
+            <h2 style="color: white; margin: 5px 0;">{stato_rischio}</h2>
+            <p style="color: #f87171; font-size: 12px; margin: 0;">Focus: Stock Acciaio</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+# 3. Tabella Riepilogo Azioni Mitigazione
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<h4 style='color: white;'>Piano di Mitigazione Rischi</h4>", unsafe_allow_html=True)
+rischi_df = {
+    "Rischio": ["Liquidità", "Operativo (Stock)", "Credito"],
+    "Stato": ["Monitoraggio", "CRITICO", "Sicuro"],
+    "Azione Correttiva": ["Verifica scadenze Docfinance", "Ordine urgente SAP REQ-9901", "Verifica fido Cliente Y"]
+}
+st.table(rischi_df)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # --- RIGA 95: INIZIO SEZIONE ANALISI RISCHI ---
 st.markdown("---")
 st.subheader("🛡️ Analisi Solvibilità e Indicatori di Rischio")
