@@ -83,3 +83,16 @@ for i, row in df_filtered.reset_index().iterrows():
                 <div style="margin-top:10px;"><b>€ {row['Valore_Euro']:,}</b> | <small>{row['Stato']}</small></div>
             </div>
         """, unsafe_allow_html=True)
+        .card-monitoraggio {
+    background-color: #334155; /* Blu-grigio scuro */
+    color: #ffffff;            /* Testo bianco */
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 5px solid #3b82f6; /* Accento blu */
+    font-family: sans-serif;
+}
+
+.critical {
+    color: #f87171; /* Rosso chiaro per visibilità su scuro */
+    font-weight: bold;
+}
