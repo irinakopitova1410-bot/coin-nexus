@@ -49,10 +49,43 @@ if uploaded_file:
         patrimonio = get_v(['patrimonio netto', 'capitale sociale', 'riserve', 'utile'])
         debiti_tot = get_v(['passività', 'totale debiti', 'mutui', 'tfr'])
 
-        # --- INDICI CHIAVE (CORREZIONE ERRORE RIGA 54) ---
+        # --- INDICI CHIAVE ---
         liq_index = round((liquidita + crediti + magazzino) / passivo_breve, 2) if passivo_breve > 0 else 0
         solv_index = round(patrimonio / (patrimonio + debiti_tot), 2) if (patrimonio + debiti_tot) > 0 else 0
 
-        # --- DASHBOARD KPI ---
+        # --- DASHBOARD KPI (CORRETTO) ---
         k1, k2, k3 = st.columns(3)
-        status_l = "✅ OK" if liq_index > 1.2
+        
+        # Correzione SyntaxError Riga 58
+        status_l = "✅ OK" if liq_index > 1.2 else "⚠️ TENSIONE" if liq_index > 1 else "🚨 ALLERTA"
+        k1.metric("Indice Liquidità", liq_index, status_l)
+        
+        # Correzione SyntaxError Riga 61
+        status_s = "✅ SOLIDO" if solv_index > 0.25 else "⚠️ DEBOLE"
+        k2.metric("Solvibilità", f"{solv_index*100:.1f}%", status_s)
+        
+        k3.metric("Patrimonio Netto", f"€ {patrimonio:,.0f}")
+
+        st.markdown("---")
+
+        # --- ANALISI VISIVA & VERDETTO ---
+        col_left, col_right = st.columns([1, 1])
+        
+        with col_left:
+            st.subheader("🕵️ Verdetto Revisione")
+            if liq_index < 1:
+                st.error("🚨 SQUILIBRIO RILEVATO: Rischio crisi imminente (Le passività superano le attività correnti).")
+            elif solv_index < 0.15:
+                st.warning("⚠️ STRUTTURA DEBOLE: L'azienda è eccessivamente indebitata rispetto ai mezzi propri.")
+            else:
+                st.success("✅ EQUILIBRIO: Gli indicatori non mostrano segnali di crisi immediata.")
+
+        with col_right:
+            st.subheader("📊 Analisi Asset Correnti")
+            asset_data = pd.DataFrame({
+                'Voce': ['Liquidità', 'Crediti', 'Magazzino'],
+                'Valore': [liquidita, crediti, magazzino]
+            })
+            fig = px.pie(asset_data, names='Voce', values='Valore', hole=0.5, 
+                         template="plotly_dark", 
+                         color_discrete_sequence=px.
