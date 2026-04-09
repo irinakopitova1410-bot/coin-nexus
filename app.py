@@ -96,10 +96,20 @@ if "CRITICO" in search.upper() or (not df.empty and any(df['Stato'] == 'CRITICO'
 # Riga 90: Titolo della sezione (già presente o da aggiungere)
 st.markdown("---")
 st.header("🛡️ Analisi Solvibilità e Rischi")
+# Modifica il type per accettare sia Excel che CSV
+uploaded_file = st.file_uploader("Carica il Bilancio", type=["csv", "xlsx"])
 
-# --- RIGA 95: INIZIO CODICE "INTELLIGENTE" ---
-# 1. Caricamento del file
-uploaded_file = st.file_uploader("Carica il Bilancio (Excel)", type=["xlsx"])
+if uploaded_file:
+    import pandas as pd
+    
+    # Logica per leggere correttamente entrambi i formati
+    if uploaded_file.name.endswith('.csv'):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
+    
+    # ... resto del tuo codice per i calcoli ...
+
 
 # 2. Logica di calcolo (Pandas)
 if uploaded_file:
