@@ -2,111 +2,91 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. SETUP INTERFACCIA ELITE
-st.set_page_config(page_title="Coin-Nexus Audit", layout="wide", initial_sidebar_state="collapsed")
+# 1. DESIGN & INTERFACCIA ELITE
+st.set_page_config(page_title="Coin-Nexus Audit", layout="wide")
 
 st.markdown("""
     <style>
     .main { background-color: #0b0f19; color: #e2e8f0; }
     .stMetric { background-color: #161e2d !important; border: 1px solid #1e293b; padding: 20px; border-radius: 12px; }
-    .audit-card {
-        background-color: #161e2d; padding: 20px; border-radius: 12px;
-        border-left: 5px solid #3b82f6; margin-bottom: 20px;
-    }
-    .status-ok { color: #10b981; font-weight: bold; }
-    .status-risk { color: #ef4444; font-weight: bold; }
+    .audit-card { background-color: #161e2d; padding: 20px; border-radius: 12px; border-left: 5px solid #3b82f6; }
+    header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🛡️ COIN-NEXUS: AUDIT & REVISIONE")
-st.caption("Sistema Integrato di Analisi Solvibilità e Indicatori della Crisi d'Impresa")
+st.title("🛡️ COIN-NEXUS: AUDIT INTELLIGENCE")
+st.caption("Analisi Solvibilità & Indicatori della Crisi d'Impresa (CCII)")
 
 # --- CARICAMENTO ---
-uploaded_file = st.file_uploader("Trascina qui il Bilancio di Verifica (Excel o CSV)", type=['xlsx', 'csv'])
+uploaded_file = st.file_uploader("📂 Carica Bilancio (XLSX o CSV)", type=['xlsx', 'csv'])
 
 if uploaded_file:
     try:
-        # Lettura Intelligente
-        if uploaded_file.name.lower().endswith('.xlsx'):
+        # Lettura automatica
+        if uploaded_file.name.endswith('.xlsx'):
             df = pd.read_excel(uploaded_file, engine='openpyxl')
         else:
             df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='latin1')
         
+        # Pulizia colonne
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Identificazione Automatica Colonne
-        c_col = [c for c in df.columns if any(x in c.lower() for x in ['voce', 'descrizione', 'conto', 'categoria'])][0]
-        v_col = [c for c in df.columns if any(x in c.lower() for x in ['valore', 'importo', 'saldo', 'fine'])][0]
+        # Identificazione Colonne (Flessibile)
+        c_col = [c for c in df.columns if any(x in c.lower() for x in ['voce', 'desc', 'conto', 'cat'])][0]
+        v_col = [c for c in df.columns if any(x in c.lower() for x in ['valore', 'importo', 'saldo', 'euro'])][0]
         
-        # Pulizia Valori
+        # Pulizia Valori Numerici
         df[v_col] = pd.to_numeric(df[v_col].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
 
-        # --- LOGICA DEL REVISORE (Mapping termini di bilancio) ---
-        def audit_sum(keywords):
-            pattern = '|'.join(keywords)
-            return df[df[c_col].str.contains(pattern, na=False, case=False)][v_col].sum()
+        # --- LOGICA DEL REVISORE (Somma Masse Patrimoniali) ---
+        def get_v(keywords):
+            mask = df[c_col].str.contains('|'.join(keywords), na=False, case=False)
+            return df[mask][v_col].sum()
 
-        # Estrazione Masse Patrimoniali
-        liquidita = audit_sum(['cassa', 'banca', 'disponibilità liquide', 'tesoreria'])
-        crediti_breve = audit_sum(['clienti', 'crediti v/clienti', 'crediti commerciali'])
-        rimanenze = audit_sum(['rimanenze', 'magazzino', 'scorte'])
-        attivo_corr = liquidita + crediti_breve + rimanenze
-        
-        debiti_breve = audit_sum(['fornitori', 'banche c/c', 'debiti tributari', 'debiti commerciali', 'passività correnti'])
-        patrimonio = audit_sum(['patrimonio netto', 'capitale sociale', 'riserve', 'utile d\'esercizio'])
-        debiti_tot = audit_sum(['passività', 'totale debiti', 'tfr', 'mutui', 'fondi rischi'])
+        # Calcolo Masse per Indici di Allerta
+        liquidita = get_v(['cassa', 'banca', 'disponibilità'])
+        crediti = get_v(['clienti', 'crediti v/clienti'])
+        magazzino = get_v(['rimanenze', 'magazzino', 'scorte'])
+        passivo_breve = get_v(['fornitori', 'banche c/c', 'debiti tributari', 'debiti a breve'])
+        patrimonio = get_v(['patrimonio netto', 'capitale sociale', 'riserve', 'utile'])
+        debiti_tot = get_v(['passività', 'totale debiti', 'mutui', 'tfr'])
 
-        # --- CALCOLO INDICI REVISIONE ---
-        # 1. Indice di Liquidità (Current Ratio)
-        liq_index = round(attivo_corr / debiti_breve, 2) if debiti_breve != 0 else 0
+        # --- INDICI CHIAVE ---
+        # 1. Liquidità Corrente (Target > 1.2)
+        liq_index = round((liquidita + crediti + magazzino) / passivo_breve, 2) if passivo_breve > 0 else 0
         
-        # 2. Indice di Solvibilità (Autonomia Finanziaria)
-        solv_index = round(patrimonio / (patrimonio + debiti_tot), 2) if (patrimonio + debiti_tot) != 0 else 0
-        
-        # --- VISUALIZZAZIONE KPI ---
+        # 2. Solvibilità (Patrimonio su Totale Debiti)
+        solv_index = round(patrimonio / (patrimonio + debiti_tot), 2) if (patrimonio + debiti_tot) > 0 else 0
+
+        # --- DASHBOARD KPI ---
         k1, k2, k3 = st.columns(3)
         
-        status_liq = "✅ OTTIMALE" if liq_index > 1.2 else "⚠️ TENSIONE" if liq_index > 1 else "🚨 CRITICO"
-        k1.metric("Liquidità Corrente", liq_index, status_liq)
+        status_l = "✅ OK" if liq_index > 1.2 else "⚠️ TENSIONE" if liq_index > 1 else "🚨 ALLERTA"
+        k1.metric("Indice Liquidità", liq_index, status_l)
         
-        status_solv = "✅ SOLIDO" if solv_index > 0.3 else "⚠️ LEVERAGE ALTO"
-        k2.metric("Indipendenza Fin.", f"{solv_index*100:.1f}%", status_solv)
+        status_s = "✅ SOLIDO" if solv_index > 0.25 else "⚠️ DEBOLE"
+        k2.metric("Solvibilità (Grado Autonomia)", f"{solv_index*100:.1f}%", status_s)
         
         k3.metric("Patrimonio Netto", f"€ {patrimonio:,.0f}")
 
         st.markdown("---")
 
-        # --- SEZIONE REVISORE: VERDETTO ---
-        col_a, col_b = st.columns([1, 2])
+        # --- ANALISI VISIVA ---
+        col_left, col_right = st.columns([1, 1])
         
-        with col_a:
-            st.subheader("🕵️ Verdetto Revisore")
+        with col_left:
+            st.subheader("🕵️ Verdetto Revisione")
             if liq_index < 1:
-                st.error("ATTENZIONE: Squilibrio finanziario rilevato. Le passività a breve termine superano le attività liquide.")
-            elif solv_index < 0.1:
-                st.warning("RISCHIO: Sottopatrimonializzazione. L'azienda dipende troppo da capitali esterni.")
+                st.error("SQUILIBRIO RILEVATO: Le attività correnti non coprono i debiti a breve termine. Rischio crisi imminente.")
+            elif solv_index < 0.15:
+                st.warning("STRUTTURA DEBOLE: L'azienda è fortemente indebitata verso terzi. Necessaria ricapitalizzazione.")
             else:
-                st.success("STABILITÀ: Non si rilevano segnali di allerta ai sensi del Codice della Crisi.")
+                st.success("EQUILIBRIO: Gli indicatori non mostrano segnali di crisi ai sensi del CCII.")
 
-        with col_b:
-            st.subheader("📊 Composizione Attivo Circolante")
-            fig_data = pd.DataFrame({
-                'Voce': ['Liquidità', 'Crediti', 'Rimanenze'],
-                'Valore': [liquidita, crediti_breve, rimanenze]
+        with col_right:
+            st.subheader("📊 Analisi Asset Correnti")
+            asset_df = pd.DataFrame({
+                'Voce': ['Liquidità', 'Crediti', 'Magazzino'],
+                'Valore': [liquidita, crediti, magazzino]
             })
-            fig = px.donut(fig_data, names='Voce', values='Valore', hole=0.4, 
-                           color_discrete_sequence=px.colors.sequential.Blues_r,
-                           template="plotly_dark")
-            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(t=0, b=0, l=0, r=0))
-            st.plotly_chart(fig, use_container_width=True)
-
-        # Tabella di Analisi per controllo umano
-        with st.expander("🔍 Esamina Bilancio di Verifica Completo"):
-            st.dataframe(df[[c_col, v_col]], use_container_width=True)
-
-    except Exception as e:
-        st.error(f"Errore di lettura: {e}")
-        st.info("Assicurati che il file abbia una colonna 'Descrizione' e una colonna 'Saldo' o 'Valore'.")
-
-else:
-    st.info("👋 In attesa del caricamento del Bilancio di Verifica per l'Audit.")
+            fig = px.pie(asset
