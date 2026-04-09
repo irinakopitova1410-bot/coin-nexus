@@ -1,129 +1,61 @@
-mport streamlit as st
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# 1. SETUP INTERFACCIA HIGH-END
-st.set_page_config(page_title="COIN-NEXUS ELITE", layout="wide", initial_sidebar_state="expanded")
+# ... (Mantieni il CSS e il setup precedente) ...
 
-# CSS Custom per effetto Glassmorphism e Neon
-st.markdown("""
-    <style>
-    .main { background-color: #05070a; color: #e2e8f0; }
-    [data-testid="stSidebar"] { background-color: #0a0f18; border-right: 1px solid #1e293b; }
-    .stMetric { 
-        background: rgba(16, 24, 39, 0.7); 
-        border: 1px solid #3b82f6; 
-        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
-        border-radius: 15px; padding: 25px;
-    }
-    h1, h2, h3 { font-family: 'Inter', sans-serif; letter-spacing: -1px; color: #f8fafc; }
-    .stButton>button { 
-        background: linear-gradient(90deg, #3b82f6, #2563eb); 
-        color: white; border: none; border-radius: 8px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# 2. NAVIGAZIONE
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/584/584704.png", width=80) # Icona placeholder elite
-st.sidebar.title("COIN-NEXUS | ELITE")
-app_mode = st.sidebar.selectbox("COMMAND CENTER", 
-    ["🛡️ AUDIT INTELLIGENCE", "💎 RATING BASILEA IV", "🛰️ CENTRALE RISCHI", "🌪️ STRESS TEST PRO"])
-
-# 3. LOGICA DI CARICAMENTO
-file = st.sidebar.file_uploader("UPLOAD DATASET", type=['xlsx', 'csv'])
-
-def load_data(file):
-    if file.name.endswith('.xlsx'): return pd.read_excel(file, engine='openpyxl')
-    return pd.read_csv(file, sep=None, engine='python', encoding='latin1')
+# AGGIUNGI QUESTO NUOVO MODULO AL MENU DELLA SIDEBAR
+# menu = st.sidebar.radio("MODULI OPERATIVI", ["💎 RIEPILOGO ESECUTIVO", "🕵️ RISCHIO REVISIONE (BIG4)", "🛡️ SCUDO DI RISCHIO", "📈 PROIEZIONI FLUSSI"])
 
 # ==========================================
-# MODULO 1: AUDIT INTELLIGENCE
+# MODULO NUOVO: RISCHIO REVISIONE (STILE DELOITTE)
 # ==========================================
-if app_mode == "🛡️ AUDIT INTELLIGENCE":
-    st.title("🛡️ Audit Intelligence Engine")
-    if file:
-        df = load_data(file)
-        v_col = [c for c in df.columns if any(x in c.lower() for x in ['valore', 'saldo', 'euro'])][0]
-        c_col = [c for c in df.columns if any(x in c.lower() for x in ['voce', 'desc', 'conto'])][0]
-        df[v_col] = pd.to_numeric(df[v_col].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("CAPITALE RILEVATO", f"€ {df[v_col].sum():,.0f}", "+2.4%")
-        c2.metric("INDICE LIQUIDITÀ", "1.82", "Safe Range", delta_color="normal")
-        c3.metric("RISCHIO FALLIMENTO", "LOW", "-12%", delta_color="inverse")
-
-        fig = px.sunburst(df.nlargest(15, v_col), path=[c_col], values=v_col,
-                          color=v_col, color_continuous_scale='Blues',
-                          template="plotly_dark")
-        fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Sincronizzazione file richiesta per attivare l'Audit.")
-
-# ==========================================
-# MODULO 2: RATING BASILEA IV
-# ==========================================
-elif app_mode == "💎 RATING BASILEA IV":
-    st.title("💎 Advanced Credit Scoring")
+if menu == "🕵️ RISCHIO REVISIONE (BIG4)":
+    st.title("🕵️ Valutazione Professionale del Rischio di Revisione")
+    st.markdown("---")
     
-    col_a, col_b = st.columns([1, 2])
-    with col_a:
-        ebitda = st.number_input("EBITDA NOMINALE", value=500000)
-        pfn = st.number_input("POSIZIONE FINANZIARIA NETTA", value=1200000)
-        score = round(pfn/ebitda, 2)
+    col_input, col_viz = st.columns([1, 1])
     
-    with col_b:
+    with col_input:
+        st.subheader("Parametri di Valutazione")
+        ir = st.select_slider("Rischio Intrinseco (Inherent Risk)", 
+                              options=[0.1, 0.3, 0.5, 0.8, 1.0], value=0.5,
+                              help="Rischio legato alla natura dell'attività e al settore.")
+        
+        cr = st.select_slider("Rischio di Controllo (Control Risk)", 
+                              options=[0.1, 0.3, 0.5, 0.8, 1.0], value=0.3,
+                              help="Efficacia dei sistemi di controllo interno dell'azienda.")
+        
+        # Calcolo Detection Risk necessario per mantenere un Audit Risk accettabile (es. 5%)
+        audit_risk_target = 0.05
+        dr_necessario = round(audit_risk_target / (ir * cr), 2)
+        
+    with col_viz:
+        st.subheader("Matrice di Rischio Professionale")
+        # Formula: AR = IR * CR * DR
+        rischio_totale = ir * cr
+        
         fig = go.Figure(go.Indicator(
-            mode = "gauge+number+delta",
-            value = score,
-            domain = {'x': [0, 1], 'y': [0, 1]},
-            title = {'text': "PFN / EBITDA (RISK RATIO)", 'font': {'size': 24}},
-            delta = {'reference': 3, 'increasing': {'color': "#ef4444"}, 'decreasing': {'color': "#10b981"}},
+            mode = "gauge+number",
+            value = rischio_totale * 100,
+            title = {'text': "Rischio Combinato (IR x CR) %"},
             gauge = {
-                'axis': {'range': [None, 8], 'tickwidth': 1},
-                'bar': {'color': "#3b82f6"},
-                'bgcolor': "rgba(0,0,0,0)",
+                'axis': {'range': [0, 100]},
+                'bar': {'color': "#00d4ff"},
                 'steps': [
-                    {'range': [0, 2], 'color': "#065f46"},
-                    {'range': [2, 4], 'color': "#1e3a8a"},
-                    {'range': [4, 8], 'color': "#7f1d1d"}]}))
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "Inter"})
+                    {'range': [0, 20], 'color': "green"},
+                    {'range': [20, 50], 'color': "yellow"},
+                    {'range': [50, 100], 'color': "red"}]}))
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white')
         st.plotly_chart(fig, use_container_width=True)
 
-# ==========================================
-# MODULO 3: CENTRALE RISCHI🛰️
-# ==========================================
-elif app_mode == "🛰️ CENTRALE RISCHI":
-    st.title("🛰️ Deep Web Banking Analysis")
-    data = {"Banca": ["Intesa", "UniCredit", "BPM", "MPS"], "Utilizzo": [80, 45, 92, 30], "Fido": [100, 100, 100, 100]}
-    df_cr = pd.DataFrame(data)
+    st.markdown("---")
+    st.subheader("📝 Strategia di Revisione Consigliata")
     
-    fig = px.bar(df_cr, x="Banca", y=["Utilizzo", "Fido"], 
-                 barmode="group", template="plotly_dark",
-                 color_discrete_sequence=['#3b82f6', '#1e293b'])
-    fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-    st.plotly_chart(fig, use_container_width=True)
-
-# ==========================================
-# MODULO 4: STRESS TEST PRO
-# ==========================================
-else:
-    st.title("🌪️ Predictive Stress Simulation")
-    impact = st.select_slider("INTENSITÀ SHOCK ECONOMICO", options=["Lieve", "Moderato", "Severo", "Catastrofico"])
-    
-    # Grafico di Stress Interattivo
-    x = list(range(12))
-    y_base = [100 + i*2 for i in x]
-    drop = {"Lieve": 10, "Moderato": 30, "Severo": 60, "Catastrofico": 95}[impact]
-    y_stress = [100 + i*2 - (drop if i > 3 else 0) for i in x]
-    
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=x, y=y_base, name="SCENARIO AS-IS", line=dict(color='#3b82f6', width=4)))
-    fig.add_trace(go.Scatter(x=x, y=y_stress, name="SCENARIO SHOCK", line=dict(color='#ef4444', width=4, dash='dot')))
-    fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-    st.plotly_chart(fig, use_container_width=True)
-
-st.sidebar.markdown("---")
-st.sidebar.caption("SISTEMA CRIPTATO | SESSIONE ELITE ATTIVA")
+    if dr_necessario < 0.2:
+        st.error(f"⚠️ **ATTENZIONE:** Il rischio combinato è altissimo. È necessario un Detection Risk molto basso ({dr_necessario}). Richieste procedure di revisione massive e campionamento esteso.")
+    elif dr_necessario < 0.5:
+        st.warning(f"🟡 **PROCEDURE STANDARD:** Detection Risk richiesto: {dr_necessario}. Si consigliano test di sostanza moderati sui saldi di bilancio.")
+    else:
+        st.success(f"✅ **PROCEDURE ANALITICHE:** Detection Risk richiesto: {dr_necessario}. È possibile fare affidamento sui controlli interni e limitare i test diretti.")
