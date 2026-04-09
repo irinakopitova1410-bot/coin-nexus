@@ -1,79 +1,87 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
-# 1. CONFIGURAZIONE E BLOCCO INTERFACCIA
-st.set_page_config(page_title="Coin-Nexus Elite", layout="wide", initial_sidebar_state="collapsed")
+# 1. SETUP PAGINA
+st.set_page_config(page_title="COIN-NEXUS Intelligence", layout="wide")
 
-# CSS Avanzato per nascondere header, menu e pulsanti di share
-hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            header {visibility: hidden;}
-            footer {visibility: hidden;}
-            .stDeployButton {display:none;}
-            #stDecoration {display:none;}
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
-
-# 2. STILE DARK ELITE
+# 2. DESIGN ELEGANTE (DARK MODE ELITE)
 st.markdown("""
     <style>
-    .main { background-color: #0f172a; }
-    [data-testid="stMetric"] { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
-    .analysis-box { background-color: #1e293b; border-left: 5px solid #ef4444; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+    .main { background-color: #0b0f19; color: #e2e8f0; }
+    .stMetric { background-color: #161e2d; padding: 15px; border-radius: 10px; border: 1px solid #1e293b; }
+    .indicator-card {
+        background-color: #161e2d; padding: 20px; border-radius: 12px;
+        border-left: 5px solid #3b82f6; margin-bottom: 20px;
+    }
+    header, footer {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-st.title("COIN-NEXUS ELITE")
-st.caption("Sistema Gestionale Riservato | Accesso Operatore")
+st.title("🛡️ COIN-NEXUS: AUDIT INTELLIGENCE")
+st.caption("Analisi Predittiva Solvibilità & Indicatori della Crisi d'Impresa")
 
-# --- IL TUO DATABASE (Qui modifichi solo tu i dati) ---
-data = {
-    'ID_Operazione': ['REQ-9901', 'PAY-4402', 'STK-1105', 'REQ-9905', 'PAY-4409', 'PRAT-001'],
-    'Sistema': ['SAP', 'Docfinance', 'SO99+', 'SAP', 'Docfinance', 'Telemaco'],
-    'Descrizione': ['Acquisto Materie Prime', 'Saldi Fornitore X', 'Sottoscorta Acciaio', 'Ordine Cliente Y', 'Riba in Scadenza', 'Visura Camerale'],
-    'Valore_Euro': [15000, 4500, 0, 12000, 8900, 50],
-    'Stato': ['In Approvazione', 'In Attesa', 'CRITICO', 'Spedito', 'Da Pagare', 'Inviata']
-}
-df = pd.DataFrame(data)
-
-# --- MOTORE DI RICERCA ---
-search = st.text_input("🔍 Inserisci termine di ricerca (Sistema, ID o Stato)...", "")
-
-if search:
-    mask = df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)
-    df = df[mask]
-
-# --- ANALISI CRITICITÀ ---
-if "CRITICO" in search.upper() or (not df.empty and any(df['Stato'] == 'CRITICO')):
-    st.error("⚠️ Rilevate anomalie bloccanti. Seguire le procedure di rettifica bilancio.")
-
-# --- DASHBOARD ---
-if not df.empty:
-    col1, col2 = st.columns(2)
-    with col1:
-        fig_pie = px.pie(df, names='Sistema', title='Carico Sistemi', hole=0.4)
-        fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
-        st.plotly_chart(fig_pie, use_container_width=True)
-    with col2:
-        fig_bar = px.bar(df, x='ID_Operazione', y='Valore_Euro', color='Stato', title='Impatto Economico')
-        fig_bar.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
-        st.plotly_chart(fig_bar, use_container_width=True)
+# --- DASHBOARD STATICA (OPERATIVO) ---
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Esposizione Bancaria", "€ 412k", "-2%")
+c2.metric("Rating Creditizio", "A+", "Stabile")
+c3.metric("DSCR Stimato", "1.45", "Sicuro")
+c4.metric("Allerta Revisori", "ZERO", "Ottimale", delta_color="normal")
 
 st.markdown("---")
-cols = st.columns(3)
-for i, row in df.iterrows():
-    with cols[i % 3]:
-        color = "#ef4444" if row['Stato'] == "CRITICO" else "#38bdf8"
-        st.markdown(f"""
-            <div style="background:#1e293b; padding:20px; border-radius:15px; border-left: 5px solid {color}; border: 1px solid #334155; margin-bottom:10px;">
-                <small style='color:#94a3b8'>{row['Sistema']}</small>
-                <div style="font-weight:bold; font-size:18px; color:white;">{row['ID_Operazione']}</div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px">
-                    <span style="font-weight:bold; color:white">€ {row['Valore_Euro']:,}</span>
-                    <span style="background:{color}; padding:2px 8px; border-radius:5px; font-size:10px; color:white">{row['Stato']}</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
+
+# --- CARICAMENTO DATI ---
+st.subheader("📂 Caricamento Bilancio di Verifica")
+file = st.file_uploader("Trascina qui il file (Excel/CSV)", type=['xlsx', 'csv'])
+
+if file:
+    try:
+        # Lettura Intelligente
+        if file.name.endswith('.csv'):
+            df = pd.read_csv(file, sep=None, engine='python', on_bad_lines='skip')
+        else:
+            df = pd.read_excel(file)
+            
+        df.columns = df.columns.str.strip()
+        
+        # Identificazione Colonne
+        cat_col = [c for c in df.columns if 'Categoria' in c or 'Voce' in c][0]
+        val_col = [c for c in df.columns if 'Valore' in c or 'Importo' in c][0]
+        
+        # LOGICA REVISORI (Calcolo Indici)
+        def get_v(name):
+            return pd.to_numeric(df[df[cat_col].str.contains(name, na=False, case=False)][val_col], errors='coerce').sum()
+
+        att_corr = get_v("Attività Correnti")
+        pass_corr = get_v("Passività Correnti")
+        patrimonio = get_v("Patrimonio Netto")
+        debiti_tot = get_v("Passività")
+        
+        # CALCOLO INDICI CHIAVE
+        liq_index = round(att_corr / pass_corr, 2) if pass_corr > 0 else 0
+        solv_index = round(patrimonio / debiti_tot, 2) if debiti_tot > 0 else 0
+        
+        # COLORAZIONE RISCHIO
+        risk_color = "#10b981" if liq_index > 1.1 else "#ef4444"
+        risk_status = "STABILE" if liq_index > 1.1 else "SOTTO OSSERVAZIONE"
+
+        # VISUALIZZAZIONE RISULTATI
+        res1, res2, res3 = st.columns(3)
+        with res1:
+            st.markdown(f'<div class="indicator-card" style="border-left-color: {risk_color}"><h4>Indice Liquidità</h4><h2>{liq_index}</h2><p>Capacità di pagare i debiti a breve</p></div>', unsafe_allow_html=True)
+        with res2:
+            st.markdown(f'<div class="indicator-card" style="border-left-color: #3b82f6"><h4>Solvibilità Generale</h4><h2>{solv_index}</h2><p>Indice di indipendenza finanziaria</p></div>', unsafe_allow_html=True)
+        with res3:
+            st.markdown(f'<div class="indicator-card" style="border-left-color: {risk_color}"><h4>Stato Allerta</h4><h2>{risk_status}</h2><p>Protocollo Crisi d\'Impresa</p></div>', unsafe_allow_html=True)
+
+        # GRAFICO PROFESSIONALE
+        st.markdown("### 📊 Analisi Patrimoniale")
+        fig = px.bar(df, x=cat_col, y=val_col, color=val_col, template="plotly_dark", color_continuous_scale="Blues")
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Struttura file non riconosciuta. Errore: {e}")
+else:
+    st.info("👋 In attesa del bilancio. Carica un file per attivare l'analisi dei rischi.")
