@@ -76,7 +76,7 @@ for i, row in df_filtered.reset_index().iterrows():
     with cols[i % 3]:
         color = "#ef4444" if row['Stato'] == "CRITICO" else "#38bdf8"
         st.markdown(f"""
-            <div style="background:#1e293b; padding:15px; border-radius:10px; border-left: 5px solid {color}; border: 1px solid #334155; margin-bottom:10px;">
+            <div style="background:#1e293b; padding:15px; border-radius:10px; border-left: 5px solid {color}; border: 1px solid #f97316; margin-bottom:10px;">
                 <small style='color:#94a3b8'>{row['Sistema']}</small><br>
                 <b>{row['ID_Operazione']}</b><br>
                 <span style="font-size:12px; color:#cbd5e1;">{row['Descrizione']}</span><br>
