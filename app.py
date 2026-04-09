@@ -136,25 +136,43 @@ elif menu == "⚖️ CALCOLO MATERIALITÀ":
         st.metric("SOGLIA MATERIALITÀ GLOBALE", f"€ {mat_calc:,.2f}")
         st.write("> **Significato:** Ogni errore superiore a questa cifra deve essere obbligatoriamente rettificato, altrimenti il giudizio del revisore sarà 'negativo'.")
 
-# ==========================================
-# MODULO 3: GOING CONCERN (ISA 570)
-# ==========================================
+# SOTTO IL MODULO GOING CONCERN (ISA 570)
 elif menu == "🛡️ GOING CONCERN (ISA 570)":
-    st.title("🛡️ Scudo di Continuità Aziendale")
+    st.title("🛡️ Analisi Solvibilità Avanzata")
     
-    dscr = st.slider("Indice di Copertura del Debito (DSCR)", 0.5, 3.0, 1.4)
-    
-    if dscr >= 1.1:
-        st.success(f"✅ GOING CONCERN CONFERMATO: L'azienda ha flussi sufficienti (DSCR {dscr}) per i prossimi 12 mesi.")
-    else:
-        st.error(f"⚠️ ALLERTA CRISI: Segnali di potenziale insolvenza. Richiesta informativa supplementare.")
+    # Calcolo Z-Score Semplificato per Audit
+    st.subheader("Altman Z-Score (Predizione Fallimento)")
+    c1, c2 = st.columns(2)
+    with c1:
+        attivo_circolante = st.number_input("Attivo Circolante (€)", value=200000.0)
+        passivo_corrente = st.number_input("Passivo Corrente (€)", value=150000.0)
+        tot_attivo = df[val_col].sum()
+        
+        # Esempio formula semplificata: (Attivo Circ - Pass Cor) / Tot Attivo
+        z_score = (attivo_circolante - passivo_corrente) / tot_attivo * 1.2 # Peso arbitrario per demo
+        
+    with c2:
+        if z_score > 2.6:
+            st.success(f"Z-Score: {z_score:.2f} (Safe Zone)")
+        elif z_score > 1.1:
+            st.warning(f"Z-Score: {z_score:.2f} (Grey Zone)")
+        else:
+            st.error(f"Z-Score: {z_score:.2f} (Distress Zone)")
 
-    # Radar Risk
-    cat = ['Liquidità', 'Solvibilità', 'Redditività', 'Efficienza', 'Patrimonio']
-    valori_radar = [4.8, 4.2, 3.9, 4.5, 5.0]
-    fig = go.Figure(go.Scatterpolar(r=valori_radar, theta=cat, fill='toself', line_color='#3b82f6', fillcolor='rgba(59, 130, 246, 0.2)'))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), paper_bgcolor='rgba(0,0,0,0)')
-    st.plotly_chart(fig, use_container_width=True)
+    # Test di Benford (Forensic Audit)
+    st.markdown("---")
+    st.subheader("🕵️ Forensic Check (Benford's Law)")
+    def get_benford(data):
+        digits = [int(str(abs(x))[0]) for x in data if x != 0]
+        actual = np.histogram(digits, bins=range(1, 11))[0] / len(digits)
+        expected = [np.log10(1 + 1/d) for d in range(1, 10)]
+        return actual, expected
+
+    actual, expected = get_benford(df[val_col])
+    fig_ben = go.Figure()
+    fig_ben.add_trace(go.Bar(x=list(range(1,10)), y=actual, name='Reale'))
+    fig_ben.add_trace(go.Scatter(x=list(range(1,10)), y=expected, name='Standard', line=dict(color='red')))
+    st.plotly_chart(fig_ben, use_container_width=True)
 
 # ==========================================
 # MODULO 4: GENERATORE RELAZIONE
