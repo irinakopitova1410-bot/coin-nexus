@@ -53,14 +53,12 @@ if uploaded_file:
         liq_index = round((liquidita + crediti + magazzino) / passivo_breve, 2) if passivo_breve > 0 else 0
         solv_index = round(patrimonio / (patrimonio + debiti_tot), 2) if (patrimonio + debiti_tot) > 0 else 0
 
-        # --- DASHBOARD KPI (CORRETTO) ---
+        # --- DASHBOARD KPI ---
         k1, k2, k3 = st.columns(3)
         
-        # Correzione SyntaxError Riga 58
         status_l = "✅ OK" if liq_index > 1.2 else "⚠️ TENSIONE" if liq_index > 1 else "🚨 ALLERTA"
         k1.metric("Indice Liquidità", liq_index, status_l)
         
-        # Correzione SyntaxError Riga 61
         status_s = "✅ SOLIDO" if solv_index > 0.25 else "⚠️ DEBOLE"
         k2.metric("Solvibilità", f"{solv_index*100:.1f}%", status_s)
         
@@ -86,6 +84,16 @@ if uploaded_file:
                 'Voce': ['Liquidità', 'Crediti', 'Magazzino'],
                 'Valore': [liquidita, crediti, magazzino]
             })
+            # Completamento del grafico e chiusura funzione
             fig = px.pie(asset_data, names='Voce', values='Valore', hole=0.5, 
                          template="plotly_dark", 
-                         color_discrete_sequence=px.
+                         color_discrete_sequence=px.colors.sequential.Blues_r)
+            
+            fig.update_layout(showlegend=True, margin=dict(t=0, b=0, l=0, r=0))
+            st.plotly_chart(fig, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Errore tecnico: {e}")
+        st.info("Assicurati che il file caricato contenga le colonne 'Descrizione' e 'Saldo'.")
+else:
+    st.info("👋 In attesa del caricamento del Bilancio per l'Audit.")
