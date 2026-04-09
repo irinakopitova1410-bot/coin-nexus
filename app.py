@@ -1,86 +1,74 @@
-
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.express as px
 
-# 1. SETUP E STILE
+# 1. CONFIGURAZIONE (Deve essere la prima riga assoluta)
 st.set_page_config(page_title="Coin-Nexus Elite", layout="wide", initial_sidebar_state="collapsed")
 
+# 2. STILE CSS ELITE
 st.markdown("""
     <style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    .main { background-color: #0f172a; }
-    [data-testid="stMetric"] { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
+    .main { background-color: #0f172a; color: white; }
+    .metric-card { 
+        background-color: #1e293b; 
+        padding: 20px; 
+        border-radius: 12px; 
+        border: 1px solid #334155; 
+        margin-bottom: 15px; 
+    }
+    #MainMenu, header, footer {visibility: hidden;}
+    .stTable { background-color: #1e293b; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DATASET OPERATIVO
-data = {
-    'ID_Operazione': ['REQ-9901', 'PAY-4402', 'STK-1105', 'REQ-9905', 'PAY-4409', 'PRAT-001'],
-    'Sistema': ['SAP', 'Docfinance', 'SO99+', 'SAP', 'Docfinance', 'Telemaco'],
-    'Descrizione': ['Acquisto Materie Prime', 'Saldi Fornitore X', 'Sottoscorta Acciaio', 'Ordine Cliente Y', 'Riba in Scadenza', 'Visura Camerale'],
-    'Valore_Euro': [15000, 4500, 0, 12000, 8900, 50],
-    'Stato': ['In Approvazione', 'In Attesa', 'CRITICO', 'Spedito', 'Da Pagare', 'Inviata']
-}
-df = pd.DataFrame(data)
-
-# 3. DATI PER INDICI (Simulati)
-utile_netto = 45000
-capitale_proprio = 150000
-vendite_totali = 280000
-cassa_reale = st.sidebar.number_input("Liquidità Attuale (€)", value=35000)
-
-# --- INIZIO LAYOUT ---
 st.title("COIN-NEXUS ELITE")
+st.caption("Intelligence Finanziaria & Gestione Rischi | Sistema Integrato")
 
-# SEZIONE 1: TACHIMETRO (Rischio Immediato)
-totale_debiti = df['Valore_Euro'].sum()
-indice_solidita = (cassa_reale / totale_debiti * 100) if totale_debiti > 0 else 100
-
-col_t1, col_t2 = st.columns([1, 1])
-with col_t1:
-    st.metric("Liquidità in Cassa", f"€ {cassa_reale:,}")
-    if indice_solidita > 100: st.success("✅ POSIZIONE SOLIDA")
-    else: st.error("🚨 COPERTURA INSUFFICIENTE")
-
-with col_t2:
-    fig = go.Figure(go.Indicator(
-        mode = "gauge+number", value = indice_solidita,
-        number = {'suffix': "%", 'font': {'size': 40}},
-        gauge = {'axis': {'range': [0, 200]}, 'bar': {'color': "white"},
-                 'steps' : [{'range': [0, 80], 'color': "#ff4b4b"}, {'range': [80, 120], 'color': "#ffa500"}, {'range': [120, 200], 'color': "#00cc96"}]}))
-    fig.update_layout(height=250, margin=dict(l=10, r=10, t=30, b=10), paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
-    st.plotly_chart(fig, use_container_width=True)
+# --- SEZIONE 1: KPI OPERATIVI ---
+k1, k2, k3, k4 = st.columns(4)
+k1.metric("Acquisti Mese", "€ 27.450", "+5.2%")
+k2.metric("Richieste SAP", "2 Pendenti", "In approvazione")
+k3.metric("Stock Acciaio", "SOTTOSCORTA", "-12%", delta_color="inverse")
+k4.metric("Scadenze Docfinance", "€ 13.400", "Settimana prox")
 
 st.markdown("---")
 
-# SEZIONE 2: NUOVA SEZIONE INDICI CONTABILI
-st.subheader("📊 Indici di Performance Aziendale")
-col_i1, col_i2, col_i3 = st.columns(3)
-with col_i1:
-    st.metric("ROE (Rendimento Capitale)", f"{(utile_netto/capitale_proprio)*100:.1f}%")
-with col_i2:
-    st.metric("ROS (Margine Vendite)", f"{(utile_netto/vendite_totali)*100:.1f}%")
-with col_i3:
-    st.metric("Indice Liquidità", "1.8", delta="Ottimale")
+# --- SEZIONE 2: UPLOAD E ANALISI ROBUSTA ---
+st.header("🛡️ Analisi Solvibilità e Bilancio")
+uploaded_file = st.file_uploader("Carica Bilancio (CSV o Excel)", type=["csv", "xlsx"])
 
-st.markdown("---")
+# Inizializzazione variabili di sicurezza
+liq_val, solv_val, stato_rischio, color_border = 0.0, 0.0, "ATTESA DATI", "#94a3b8"
+df_bil = None
 
-# SEZIONE 3: RICERCA E CARD
-search = st.text_input("🔍 Cerca nei sistemi (SAP, Docfinance, Stato...)", "")
-df_filtered = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df
+if uploaded_file:
+    try:
+        # Lettura file con protezione per righe sporche (errore riga 7)
+        if uploaded_file.name.endswith('.csv'):
+            try:
+                # Prova UTF-8, salta righe con troppe colonne, rileva separatore
+                df_bil = pd.read_csv(uploaded_file, sep=None, engine='python', on_bad_lines='skip', encoding='utf-8')
+            except:
+                uploaded_file.seek(0)
+                df_bil = pd.read_csv(uploaded_file, sep=None, engine='python', on_bad_lines='skip', encoding='latin1')
+        else:
+            df_bil = pd.read_excel(uploaded_file)
+        
+        # Pulizia nomi colonne
+        df_bil.columns = df_bil.columns.str.strip()
 
-cols = st.columns(3)
-for i, row in df_filtered.reset_index().iterrows():
-    with cols[i % 3]:
-        color = "#ef4444" if row['Stato'] == "CRITICO" else "#38bdf8"
-        st.markdown(f"""
-            <div style="background:#1e293b; padding:15px; border-radius:10px; border-left: 5px solid {color}; border: 1px solid #334155; margin-bottom:10px;">
-                <small style='color:#94a3b8'>{row['Sistema']}</small><br>
-                <b>{row['ID_Operazione']}</b><br>
-                <span style="font-size:12px; color:#cbd5e1;">{row['Descrizione']}</span><br>
-                <div style="margin-top:10px;"><b>€ {row['Valore_Euro']:,}</b> | <small>{row['Stato']}</small></div>
-            </div>
-        """, unsafe_allow_html=True)
+        # Ricerca colonne Categoria e Valore
+        poss_cat = [c for c in df_bil.columns if 'Categoria' in c or 'Voce' in c]
+        poss_val = [c for c in df_bil.columns if 'Valore' in c or 'Importo' in c]
+
+        if poss_cat and poss_val:
+            c_cat, c_val = poss_cat[0], poss_val[0]
+            
+            # Funzione di calcolo sicura
+            def get_v(label):
+                mask = df_bil[c_cat].str.contains(label, na=False, case=False)
+                return pd.to_numeric(df_bil[mask][c_val], errors='coerce').sum()
+
+            a_corr = get_v('Attività Correnti')
+            p_corr = get_v('Passività Correnti')
+            patrim = get_v('
