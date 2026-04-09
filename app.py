@@ -2,8 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. CONFIGURAZIONE (Deve essere la prima riga)
-st.set_page_config(page_title="Coin-Nexus Elite", layout="wide", initial_sidebar_state="collapsed")
+# 1. CONFIGURAZIONE
+st.set_page_config(page_title="Coin-Nexus Elite", layout="wide")
 
 st.markdown("""
     <style>
@@ -28,40 +28,56 @@ st.header("🛡️ Analisi Solvibilità")
 
 uploaded_file = st.file_uploader("Carica Bilancio (CSV o Excel)", type=["csv", "xlsx"])
 
-# Inizializzazione variabili
+# Inizializzazione variabili di sicurezza
 liq_val, solv_val, stato_rischio, color_border = 0.0, 0.0, "ATTESA DATI", "#94a3b8"
-df_bil = None 
+df = None 
 
 if uploaded_file:
     try:
+        # Gestione robusta della lettura file
         if uploaded_file.name.endswith('.csv'):
             try:
-                df_bil = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8')
-            except:
+                df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8')
+            except UnicodeDecodeError:
                 uploaded_file.seek(0)
-                df_bil = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='ISO-8859-1')
+                df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='ISO-8859-1')
         else:
-            df_bil = pd.read_excel(uploaded_file)
+            df = pd.read_excel(uploaded_file)
         
-        df_bil.columns = df_bil.columns.str.strip()
-        poss_cat = [c for c in df_bil.columns if 'Categoria' in c or 'Voce' in c]
-        poss_val = [c for c in df_bil.columns if 'Valore' in c or 'Importo' in c]
+        # Pulizia nomi colonne
+        df.columns = df.columns.str.strip()
 
-        if poss_cat and poss_val:
-            c_cat, c_val = poss_cat[0], poss_val[0]
-            def g_v(l): return df_bil[df_bil[c_cat].str.contains(l, na=False, case=False)][c_val].sum()
+        # Identificazione colonne Categoria e Valore
+        col_cat = [c for c in df.columns if 'Categoria' in c or 'Voce' in c]
+        col_val = [c for c in df.columns if 'Valore' in c or 'Importo' in c]
 
-            liq_val = round(g_v('Attività Correnti') / g_v('Passività Correnti'), 2) if g_v('Passività Correnti') > 0 else 0.0
-            solv_val = round(g_v('Patrimonio Netto') / g_v('Passività'), 2) if g_v('Passività') > 0 else 0.0
+        if col_cat and col_val:
+            c_name, v_name = col_cat[0], col_val[0]
+            
+            # Calcolo indici con gestione errori
+            def get_sum(label):
+                return df[df[c_name].str.contains(label, na=False, case=False)][v_name].sum()
+
+            attivo_c = get_sum('Attività Correnti')
+            passivo_c = get_sum('Passività Correnti')
+            patrimonio = get_sum('Patrimonio Netto')
+            passivo_t = get_sum('Passività')
+
+            liq_val = round(attivo_c / passivo_c, 2) if passivo_c > 0 else 0.0
+            solv_val = round(patrimonio / passivo_t, 2) if passivo_t > 0 else 0.0
+            
             stato_rischio = "BASSO" if liq_val > 1.2 else "CRITICO"
             color_border = "#10b981" if liq_val > 1.2 else "#ef4444"
-            st.success("✅ Analisi completata")
+            st.success("✅ Analisi completata!")
         else:
-            st.error("⚠️ Colonne 'Categoria' o 'Valore' non trovate.")
-    except Exception as e:
-        st.error(f"Errore: {e}")
+            st.error("⚠️ Il file deve contenere le colonne 'Categoria' e 'Valore'.")
+            df = None
 
-# --- CARD RISULTATI ---
+    except Exception as e:
+        st.error(f"Errore durante l'elaborazione: {e}")
+        df = None
+
+# --- VISUALIZZAZIONE CARD ---
 c1, c2, c3 = st.columns(3)
 with c1:
     st.markdown(f'<div class="metric-card" style="border-top: 5px solid {color_border}"><strong>LIQUIDITÀ</strong><h2>{liq_val}</h2></div>', unsafe_allow_html=True)
@@ -69,3 +85,9 @@ with c2:
     st.markdown(f'<div class="metric-card" style="border-top: 5px solid #3b82f6;"><strong>SOLVIBILITÀ</strong><h2>{solv_val}</h2></div>', unsafe_allow_html=True)
 with c3:
     st.markdown(f'<div class="metric-card" style="border-top: 5px solid {color_border}"><strong>RISCHIO</strong><h2>{stato_rischio}</h2></div>', unsafe_allow_html=True)
+
+# --- GRAFICO ---
+if df is not None:
+    st.markdown("### 📈 Ripartizione Voci di Bilancio")
+    fig = px.bar(df, x=df.columns[0], y=df.columns[1], template="plotly_dark")
+    st.plotly_chart(fig, use_container_width=True)
