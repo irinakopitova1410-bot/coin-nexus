@@ -100,7 +100,7 @@ st.markdown("<h2 style='color: white;'>🛡️ Analisi Solvibilità e Rischi Azi
 
 # 1. Caricamento del File (Bilancio)
 st.markdown("<p style='color: #94a3b8;'>Carica il file Excel o CSV del bilancio per calcolare gli indici in tempo reale.</p>", unsafe_allow_html=True)
-uploaded_file = st.file_uploader("", type=["xlsx", "csv"], key="bilancio_upload")
+uploaded_file = sthttps://docs.google.com/spreadsheets/d/1eR9JAPSDHVStJ7B1-f1SDlm6VqoDZwM9BDmGDXjEZWU/edit?pli=1&gid=1552175328#gid=1552175328("", type=["xlsx", "csv"], key="bilancio_upload")
 
 # Logica di calcolo dinamica
 if uploaded_file:
