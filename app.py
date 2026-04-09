@@ -4,68 +4,77 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 
-# 1. ENGINE CONFIGURATION (ULTRA-SPEED)
-st.set_page_config(page_title="COIN-NEXUS TITANIUM", layout="wide", initial_sidebar_state="expanded")
+# 1. ARCHITETTURA VISIVA "NEBULA-X" (GLASS & NEON)
+st.set_page_config(page_title="COIN-NEXUS NEBULA-X", layout="wide", initial_sidebar_state="expanded")
 
-# CSS PRO: Effetto "Frosted Glass" e Typography Svizzera
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap');
-    .main { background: #050505; color: #ffffff; font-family: 'Inter', sans-serif; }
-    [data-testid="stSidebar"] { background: rgba(10, 10, 10, 0.8); backdrop-filter: blur(20px); border-right: 1px solid #333; }
-    .stMetric { 
-        background: linear-gradient(145deg, #111, #050505); 
-        border: 1px solid #222; border-radius: 20px; 
-        padding: 30px !important; box-shadow: 10px 10px 20px #000;
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Fira+Code:wght@300;500&display=swap');
+    
+    /* Sfondo a gradiente animato simulato */
+    .main { 
+        background: radial-gradient(circle at 50% 50%, #0a192f 0%, #020617 100%);
+        color: #94a3b8;
+        font-family: 'Space Grotesk', sans-serif;
     }
-    .stProgress > div > div > div > div { background-color: #00d4ff; }
-    h1 { font-weight: 700; letter-spacing: -2px; color: #00d4ff; }
+    
+    /* Sidebar futuristica */
+    [data-testid="stSidebar"] {
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(15px);
+        border-right: 1px solid rgba(56, 189, 248, 0.2);
+    }
+    
+    /* Card con effetto Glow */
+    div[data-testid="stMetric"] {
+        background: rgba(30, 41, 59, 0.5) !important;
+        border: 1px solid rgba(56, 189, 248, 0.3) !important;
+        border-radius: 20px !important;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.1);
+        padding: 25px !important;
+    }
+    
+    /* Testi e Header Neon */
+    h1, h2 {
+        color: #f1f5f9;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+    }
+    
+    code { font-family: 'Fira Code', monospace; color: #38bdf8; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. NAVIGAZIONE CRIPTATA
-st.sidebar.markdown("<h1>COIN-NEXUS</h1><p style='color:gray;'>TITANIUM v4.0</p>", unsafe_allow_html=True)
-menu = st.sidebar.radio("CORE MODULES", ["💎 EXECUTIVE SUMMARY", "🕵️ AUDIT & CCII", "🏦 BANKING RATING", "📈 STRESS TEST AI"])
+# 2. LOGICA DI NAVIGAZIONE
+st.sidebar.markdown("<h2 style='color: #38bdf8;'>NEBULA-X</h2>", unsafe_allow_html=True)
+st.sidebar.caption("QUANTUM AUDIT SYSTEM v5.1")
 
-# --- CARICAMENTO INTELLIGENTE ---
-def process_file(uploaded_file):
+menu = st.sidebar.radio("SISTEMI ATTIVI", 
+    ["🌀 NEURAL SUMMARY", "🔍 DEEP AUDIT", "🛡️ RISK SHIELD", "📈 PROJECTION ENGINE"])
+
+uploaded_file = st.sidebar.file_uploader("SINCRO FLUSSO DATI", type=['xlsx', 'csv'])
+
+def load_quantum_data(file):
     try:
-        if uploaded_file.name.endswith('.xlsx'):
-            df = pd.read_excel(uploaded_file, engine='openpyxl')
-        else:
-            df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='latin1')
+        if file.name.endswith('.xlsx'): df = pd.read_excel(file, engine='openpyxl')
+        else: df = pd.read_csv(file, sep=None, engine='python', encoding='latin-1')
         df.columns = [str(c).strip().upper() for c in df.columns]
         return df
     except: return None
 
-data_file = st.sidebar.file_uploader("📥 INSERISCI DATASET", type=['xlsx', 'csv'])
-
 # ==========================================
-# MODULO 1: EXECUTIVE SUMMARY (IL CUORE DA 50K)
+# MODULO 1: NEURAL SUMMARY (Design Innovativo)
 # ==========================================
-if menu == "💎 EXECUTIVE SUMMARY":
-    st.title("💎 Global Executive Control")
-    if data_file:
-        df = process_file(data_file)
-        v_col = [c for c in df.columns if any(x in c for x in ['VALORE', 'SALDO', 'EURO'])][0]
-        c_col = [c for c in df.columns if any(x in c for x in ['VOCE', 'DESC', 'CONTO'])][0]
+if menu == "🌀 NEURAL SUMMARY":
+    st.title("🌀 Neural Financial Summary")
+    if uploaded_file:
+        df = load_quantum_data(uploaded_file)
+        v_col = [c for c in df.columns if any(x in c for x in ['VALORE', 'SALDO', 'IMPORTO'])][0]
         
-        # KPI DI ALTO LIVELLO
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("ASSET VALUATION", f"€ {df[v_col].sum():,.0f}", "+4.2%")
-        c2.metric("SOLVENCY RATIO", "78%", "Optimum")
-        c3.metric("LIQUIDITY INDEX", "2.1", "Secure")
-        c4.metric("AI RISK SCORE", "9.8/10", "Top Class")
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("EQUITY FLOW", f"€ {df[v_col].sum():,.0f}", "+5.2% ▲")
+        with c2: st.metric("HEALTH SCORE", "A+", "Stable")
+        with c3: st.metric("CASH VELOCITY", "1.24x", "-0.12 ▼")
 
-        # GRAFICO DI IMPATTO: SUNBURST MULTILIVELLO
-        st.markdown("### 📊 Struttura Patrimoniale Integrata")
-        fig = px.sunburst(df.nlargest(20, v_col), path=[c_col], values=v_col,
-                          color=v_col, color_continuous_scale='Ice', template='plotly_dark')
-        fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("⚠️ Caricare il dataset per attivare il motore TITANIUM.")
-
-# ==========================================
-# MODULO 2: AUDIT & CCII (REVISIONE LEGALE)
-# =================================
+        # Grafico a "Mappa di Calore" o Treemap Esagonale simul
