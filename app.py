@@ -102,27 +102,46 @@ uploaded_file = st.file_uploader("Carica il Bilancio", type=["csv", "xlsx"])
 if uploaded_file:
     import pandas as pd
     
-    # Logica per leggere correttamente entrambi i formati
-    if uploaded_file.name.endswith('.csv'):
-if uploaded_file.name.endswith('.csv'):
-    # Prova a leggere il file gestendo l'encoding di Excel e i separatori comuni
-    try:
-        df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8')
-    except UnicodeDecodeError:
-        # Se fallisce, prova con la codifica tipica di Windows/Excel
-        uploaded_file.seek(0) # Torna all'inizio del file
-        df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='ISO-8859-1')
-    
-    else:
-        df = pd.read_excel(uploaded_file)
-    
-    # ... resto del tuo codice per i calcoli ...
-
-
-# 2. Logica di calcolo (Pandas)
+  # --- RIGA 105: LOGICA DI CARICAMENTO UNIFICATA ---
 if uploaded_file:
     import pandas as pd
-    df = pd.read_excel(uploaded_file)
+    
+    # 1. Lettura del file (CSV o Excel)
+    try:
+        if uploaded_file.name.endswith('.csv'):
+            try:
+                # Prova UTF-8 (Standard)
+                df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8')
+            except UnicodeDecodeError:
+                # Prova ISO (Excel Windows)
+                uploaded_file.seek(0)
+                df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='ISO-8859-1')
+        else:
+            # Lettura Excel standard
+            df = pd.read_excel(uploaded_file)
+            
+        # 2. Calcolo Indici (Assicurati che i nomi colonne nell'Excel siano corretti)
+        attivo = df[df['Categoria'] == 'Attività Correnti']['Valore (€)'].sum()
+        passivo = df[df['Categoria'] == 'Passività Correnti']['Valore (€)'].sum()
+        
+        # Se i dati sono validi, calcola i valori reali
+        if passivo > 0:
+            liq_val = round(attivo / passivo, 2)
+        else:
+            liq_val = 0.95 # Fallback
+            
+    except Exception as e:
+        st.error(f"Errore nella lettura dei dati: {e}")
+        liq_val, solv_val, stato_rischio = 0.95, 0.85, "ERRORE DATI"
+        
+    # Definizione colori in base al risultato
+    stato_rischio = "BASSO" if liq_val > 1.2 else "CRITICO"
+    color_border = "#10b981" if liq_val > 1.2 else "#ef4444"
+
+else:
+    # Dati di default se non carichi nulla
+    liq_val, solv_val, stato_rischio = 0.95, 0.85, "ATTESA FILE"
+    color_border = "#94a3b8"
     
     # Esempio di calcolo dinamico dai dati Excel
     try:
