@@ -9,7 +9,7 @@ st.set_page_config(page_title="COIN-NEXUS TITANIUM", layout="wide")
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Inter:wght@400;700&display=swap');
     .main { background: radial-gradient(circle at 50% 50%, #020617, #000000); color: #f1f5f9; font-family: 'Space Grotesk', sans-serif; }
     [data-testid="stSidebar"] { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); border-right: 1px solid #00d4ff; }
     .stMetric { background: rgba(30, 41, 59, 0.7); border: 1px solid #00d4ff; border-radius: 15px; padding: 25px !important; box-shadow: 0 0 20px rgba(0, 212, 255, 0.2); }
@@ -32,23 +32,21 @@ uploaded_file = st.sidebar.file_uploader("📥 CARICA DATASET BILANCIO", type=['
 # --- GESTIONE DATI ---
 if uploaded_file:
     try:
-        if uploaded_file.name.endswith('.xlsx'): df = pd.read_excel(uploaded_file)
-        else: df = pd.read_csv(uploaded_file, sep=None, engine='python')
+        if uploaded_file.name.endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
+        else:
+            df = pd.read_csv(uploaded_file, sep=None, engine='python')
         df.columns = [str(c).upper() for c in df.columns]
         demo = False
-    except: demo = True
+    except:
+        demo = True
 else:
-    df = pd.DataFrame({'VOCE': ['Liquidità', 'Crediti', 'Immobilizzazioni', 'Debiti', 'Patrimonio'], 
-                       'VALORE': [450000, 320000, 800000, 250000, 1320000]})
+    df = pd.DataFrame({
+        'VOCE': ['Liquidità', 'Crediti', 'Immobilizzazioni', 'Debiti', 'Patrimonio'], 
+        'VALORE': [450000, 320000, 800000, 250000, 1320000]
+    })
     demo = True
 
 # ==========================================
 # MODULO 1: DASHBOARD ESECUTIVA
 # ==========================================
-if menu == "💎 DASHBOARD ESECUTIVA":
-    st.markdown(f"<h1>💎 Analisi Patrimoniale {'<span style="font-size:12px; color:#00d4ff;">(DEMO)</span>' if demo else ''}</h1>", unsafe_allow_html=True)
-    v_col = 'VALORE' if 'VALORE' in df.columns else df.columns[1]
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric("TOTALE ATTIVO", f"€ {df[v_col].sum():,.0f}", "+4.1%")
-    c2.metric("HEALTH SCORE IA", "96
