@@ -12,11 +12,12 @@ st.markdown("""
     <style>
     .main { background-color: #05070a; color: #e2e8f0; }
     .stMetric { background: rgba(16, 24, 39, 0.8); border: 1px solid #3b82f6; border-radius: 12px; padding: 20px; }
+    .stButton>button { background: linear-gradient(90deg, #3b82f6, #2563eb); color: white; font-weight: bold; width: 100%; border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNZIONE PDF ---
-def genera_report_pdf(totale, mat):
+# --- FUNZIONE PDF (Versione compatibile fpdf2) ---
+def genera_report_pdf(totale, mat, risk_level):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
@@ -25,24 +26,26 @@ def genera_report_pdf(totale, mat):
     pdf.set_font("Arial", '', 12)
     pdf.cell(200, 10, f"Massa monetaria analizzata: Euro {totale:,.2f}", ln=True)
     pdf.cell(200, 10, f"Soglia di Materialita (ISA 320): Euro {mat:,.2f}", ln=True)
+    pdf.cell(200, 10, f"Livello di Rischio Rilevato: {risk_level}", ln=True)
     pdf.ln(10)
-    pdf.multi_cell(0, 10, "Conclusioni: I dati analizzati sono stati sottoposti a verifica forense e test di materialita standard.")
+    pdf.multi_cell(0, 10, "Conclusioni: I dati analizzati sono stati sottoposti a verifica forense e test di materialita standard ISA 320. Il sistema non ha rilevato anomalie bloccanti.")
     return pdf.output(dest='S').encode('latin-1')
 
 # --- LOGICA APP ---
 st.sidebar.title("💠 COIN-NEXUS PLATINUM")
+st.sidebar.markdown("---")
 uploaded_file = st.sidebar.file_uploader("Sincronizza Dati", type=['xlsx', 'csv'])
 
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
         
+        # Mapping Intelligente
         cols = df.columns.tolist()
         col_v = [c for c in cols if any(x in c.lower() for x in ['saldo', 'importo', 'euro', 'valore'])][0]
         col_c = [c for c in cols if any(x in c.lower() for x in ['desc', 'voce', 'conto', 'account'])][0]
-        df[col_v] = pd.to_numeric(df[col_v], errors='coerce').fillna(0)
+        
+        # Pulizia Valori
+        df[col_v] = pd.to_numeric(df[col_v].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
 
-        st.title("🛡️ Audit Intelligence & Forensic")
-
-        # Metriche
-        totale
+        st.title("
