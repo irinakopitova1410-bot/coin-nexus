@@ -50,3 +50,13 @@ else:
     st.title("📈 Proiezioni")
     fig = px.line(x=[1,2,3,4,5], y=[10,15,13,18,20], title="Trend Previsto")
     st.plotly_chart(fig, use_container_width=True)
+    elif menu == "💎 MATERIALITÀ (ISA 320)":
+    st.title("💎 Calcolo della Materialità Professionale")
+    benchmark = st.selectbox("Seleziona Benchmark", ["Fatturato", "Totale Attivo", "Utile Ante Imposte"])
+    valore_base = st.number_input(f"Inserisci Valore {benchmark}", value=1000000)
+    
+    perc = st.slider("% di Sensibilità", 0.5, 5.0, 1.0)
+    mat_globale = valore_base * (perc / 100)
+    
+    st.metric("Materialità Globale (Overall Materiality)", f"€ {mat_globale:,.0f}")
+    st.info(f"Ogni errore superiore a € {mat_globale:,.0f} richiede una rettifica obbligatoria del bilancio.")
