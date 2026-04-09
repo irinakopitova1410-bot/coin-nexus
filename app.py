@@ -1,85 +1,142 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.express as px
 
-# 1. SETUP E STILE
+# 1. CONFIGURAZIONE GENERALE (Deve essere la prima riga)
 st.set_page_config(page_title="Coin-Nexus Elite", layout="wide", initial_sidebar_state="collapsed")
 
+# 2. STILE CSS PERSONALIZZATO
 st.markdown("""
     <style>
+    .main { background-color: #0f172a; color: white; }
+    .metric-card {
+        background-color: #1e293b;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #334155;
+        margin-bottom: 15px;
+        transition: 0.3s;
+    }
+    .metric-card:hover { border-color: #3b82f6; }
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
-    .main { background-color: #0f172a; }
-    [data-testid="stMetric"] { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #06b6d4; }
+    .stTable { background-color: #1e293b; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DATASET OPERATIVO
-data = {
-    'ID_Operazione': ['REQ-9901', 'PAY-4402', 'STK-1105', 'REQ-9905', 'PAY-4409', 'PRAT-001'],
-    'Sistema': ['SAP', 'Docfinance', 'SO99+', 'SAP', 'Docfinance', 'Telemaco'],
-    'Descrizione': ['Acquisto Materie Prime', 'Saldi Fornitore X', 'Sottoscorta Acciaio', 'Ordine Cliente Y', 'Riba in Scadenza', 'Visura Camerale'],
-    'Valore_Euro': [15000, 4500, 0, 12000, 8900, 50],
-    'Stato': ['In Approvazione', 'In Attesa', 'CRITICO', 'Spedito', 'Da Pagare', 'Inviata']
-}
-df = pd.DataFrame(data)
-
-# 3. DATI PER INDICI (Simulati)
-utile_netto = 45000
-capitale_proprio = 150000
-vendite_totali = 280000
-cassa_reale = st.sidebar.number_input("Liquidità Attuale (€)", value=35000)
-
-# --- INIZIO LAYOUT ---
+# --- HEADER ---
 st.title("COIN-NEXUS ELITE")
+st.caption("Intelligence Finanziaria & Gestione Rischi | Operatore Autorizzato")
 
-# SEZIONE 1: TACHIMETRO (Rischio Immediato)
-totale_debiti = df['Valore_Euro'].sum()
-indice_solidita = (cassa_reale / totale_debiti * 100) if totale_debiti > 0 else 100
+# --- SEZIONE 1: KPI OPERATIVI FISSI ---
+st.markdown("### 📊 Overview Operativa")
+k1, k2, k3, k4 = st.columns(4)
+k1.metric("Acquisti Mese", "€ 27.450", "+5.2%")
+k2.metric("Richieste SAP", "2 Pendenti", "In approvazione")
+k3.metric("Stock Acciaio", "SOTTOSCORTA", "-12%", delta_color="inverse")
+k4.metric("Scadenze Docfinance", "€ 13.400", "Settimana prox")
 
-col_t1, col_t2 = st.columns([1, 1])
-with col_t1:
-    st.metric("Liquidità in Cassa", f"€ {cassa_reale:,}")
-    if indice_solidita > 100: st.success("✅ POSIZIONE SOLIDA")
-    else: st.error("🚨 COPERTURA INSUFFICIENTE")
+st.markdown("---")
 
-with col_t2:
-    fig = go.Figure(go.Indicator(
-        mode = "gauge+number", value = indice_solidita,
-        number = {'suffix': "%", 'font': {'size': 40}},
-        gauge = {'axis': {'range': [0, 200]}, 'bar': {'color': "white"},
-                 'steps' : [{'range': [0, 80], 'color': "#ff4b4b"}, {'range': [80, 120], 'color': "#ffa500"}, {'range': [120, 200], 'color': "#00cc96"}]}))
-    fig.update_layout(height=250, margin=dict(l=10, r=10, t=30, b=10), paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+# --- SEZIONE 2: UPLOAD E ANALISI BILANCIO ---
+st.header("🛡️ Analisi Solvibilità e Indicatori di Bilancio")
+st.info("Trascina qui il file Excel o CSV del bilancio per calcolare gli indici in tempo reale.")
+
+uploaded_file = st.file_uploader("Carica Bilancio", type=["csv", "xlsx"])
+
+# Inizializzazione variabili (Valori di fallback se non c'è file)
+liq_val, solv_val, stato_rischio, color_border = 0.0, 0.0, "ATTESA DATI", "#94a3b8"
+
+if uploaded_file:
+    try:
+        # Lettura Intelligente
+        if uploaded_file.name.endswith('.csv'):
+            try:
+                df_bil = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8')
+            except:
+                uploaded_file.seek(0)
+                df_bil = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='latin1')
+        else:
+            df_bil = pd.read_excel(uploaded_file)
+        
+        # Logica di Analisi Bilancio
+        # Cerchiamo colonne che contengono 'Categoria' e 'Valore'
+        col_cat = [c for c in df_bil.columns if 'Categoria' in c or 'Voce' in c][0]
+        col_val = [c for c in df_bil.columns if 'Valore' in c or 'Importo' in c][0]
+
+        # Calcolo Indici
+        def get_sum(label):
+            return df_bil[df_bil[col_cat].str.contains(label, na=False, case=False)][col_val].sum()
+
+        attivo_corr = get_sum('Attività Correnti')
+        passivo_corr = get_sum('Passività Correnti')
+        patrimonio = get_sum('Patrimonio Netto')
+        passiv_tot = get_sum('Passività')
+
+        # Calcolo Indice Liquidità (Current Ratio)
+        liq_val = round(attivo_corr / passivo_corr, 2) if passivo_corr > 0 else 0.0
+        # Calcolo Indice Solvibilità
+        solv_val = round(patrimonio / passiv_tot, 2) if passiv_tot > 0 else 0.0
+        
+        # Alert Dinamici
+        if liq_val > 1.2:
+            stato_rischio = "BASSO"
+            color_border = "#10b981" # Verde
+        elif liq_val > 0.8:
+            stato_rischio = "MEDIO"
+            color_border = "#fbbf24" # Giallo
+        else:
+            stato_rischio = "CRITICO"
+            color_border = "#ef4444" # Rosso
+
+        st.success(f"✅ Analisi completata per {uploaded_file.name}")
+
+    except Exception as e:
+        st.error(f"Errore nella struttura del file: Assicurati che ci siano le colonne 'Categoria' e 'Valore'.")
+
+# --- VISUALIZZAZIONE CARD FINANZIARIE ---
+c1, c2, c3 = st.columns(3)
+
+with c1:
+    st.markdown(f'''
+        <div class="metric-card" style="border-left: 8px solid {color_border};">
+            <small style="color: #94a3b8;">LIQUIDITÀ CORRENTE</small>
+            <h2 style="margin: 5px 0;">{liq_val}</h2>
+            <p style="color: {color_border}; font-size: 0.8rem;">Target: > 1.2</p>
+        </div>
+    ''', unsafe_allow_html=True)
+
+with c2:
+    st.markdown(f'''
+        <div class="metric-card" style="border-left: 8px solid #3b82f6;">
+            <small style="color: #94a3b8;">SOLVIBILITÀ (D/E)</small>
+            <h2 style="margin: 5px 0;">{solv_val}</h2>
+            <p style="color: #3b82f6; font-size: 0.8rem;">Solidità Patrimoniale</p>
+        </div>
+    ''', unsafe_allow_html=True)
+
+with c3:
+    st.markdown(f'''
+        <div class="metric-card" style="border-left: 8px solid {color_border}; background-color: {'#451a1a' if stato_rischio == 'CRITICO' else '#1e293b'};">
+            <small style="color: #94a3b8;">RATING RISCHIO</small>
+            <h2 style="margin: 5px 0;">{stato_rischio}</h2>
+            <p style="color: {color_border}; font-size: 0.8rem;">Basato su Cash Flow</p>
+        </div>
+    ''', unsafe_allow_html=True)
+
+# --- SEZIONE 3: GRAFICI E TABELLE ---
+if uploaded_file:
+    st.markdown("### 📈 Dettaglio Voci di Bilancio")
+    fig = px.bar(df_bil, x=col_cat, y=col_val, color=col_cat, template="plotly_dark")
     st.plotly_chart(fig, use_container_width=True)
-
-st.markdown("---")
-
-# SEZIONE 2: NUOVA SEZIONE INDICI CONTABILI
-st.subheader("📊 Indici di Performance Aziendale")
-col_i1, col_i2, col_i3 = st.columns(3)
-with col_i1:
-    st.metric("ROE (Rendimento Capitale)", f"{(utile_netto/capitale_proprio)*100:.1f}%")
-with col_i2:
-    st.metric("ROS (Margine Vendite)", f"{(utile_netto/vendite_totali)*100:.1f}%")
-with col_i3:
-    st.metric("Indice Liquidità", "1.8", delta="Ottimale")
-
-st.markdown("---")
-
-# SEZIONE 3: RICERCA E CARD
-search = st.text_input("🔍 Cerca nei sistemi (SAP, Docfinance, Stato...)", "")
-df_filtered = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)] if search else df
-
-cols = st.columns(3)
-for i, row in df_filtered.reset_index().iterrows():
-    with cols[i % 3]:
-        color = "#ef4444" if row['Stato'] == "CRITICO" else "#38bdf8"
-        st.markdown(f"""
-            <div style="background:#1e293b; padding:15px; border-radius:10px; border-left: 5px solid {color}; border: 1px solid #f97316; margin-bottom:10px;">
-                <small style='color:#94a3b8'>{row['Sistema']}</small><br>
-                <b>{row['ID_Operazione']}</b><br>
-                <span style="font-size:12px; color:#cbd5e1;">{row['Descrizione']}</span><br>
-                <div style="margin-top:10px;"><b>€ {row['Valore_Euro']:,}</b> | <small>{row['Stato']}</small></div>
-            </div>
-        """, unsafe_allow_html=True)
+else:
+    st.markdown("### 📋 Registro Operazioni Correnti (Demo)")
+    # Tabella finta per riempire lo spazio se non c'è upload
+    demo_data = {
+        "Data": ["01/04", "05/04", "08/04"],
+        "Voce": ["Riba Fornitore Acciaio", "Incasso Cliente X", "Acquisto Utensileria"],
+        "Importo": ["- € 8.000", "+ € 15.000", "- € 1.200"],
+        "Stato": ["Docfinance", "Banca", "SAP"]
+    }
+    st.table(demo_data)
