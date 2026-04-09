@@ -100,7 +100,21 @@ if menu == "💎 EXECUTIVE MONITOR":
         st.subheader("🕵️ Verdetto Intelligenza Artificiale")
         st.write("L'analisi automatizzata non rileva anomalie nei flussi di cassa. La concentrazione dei crediti è entro i limiti di tolleranza.")
         st.info("Consiglio: Verificare l'anzianità dei crediti commerciali per possibili svalutazioni.")
+def check_benford(data):
+    first_digits = [int(str(abs(x))[0]) for x in data if x != 0]
+    counts = np.histogram(first_digits, bins=range(1, 11))[0]
+    actual_freq = counts / len(first_digits)
+    benford_freq = [np.log10(1 + 1/d) for d in range(1, 10)]
+    return actual_freq, benford_freq
 
+# Nel modulo Executive Monitor
+st.subheader("🕵️ Forensic Check (Benford's Law)")
+if not is_demo:
+    actual, expected = check_benford(df[val_col])
+    fig_ben = go.Figure()
+    fig_ben.add_trace(go.Bar(x=list(range(1,10)), y=actual, name='Reale'))
+    fig_ben.add_trace(go.Scatter(x=list(range(1,10)), y=expected, name='Teorica Benford', line=dict(color='red')))
+    st.plotly_chart(fig_ben, use_container_width=True)
 # ==========================================
 # MODULO 2: CALCOLO MATERIALITÀ
 # ==========================================
