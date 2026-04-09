@@ -7,11 +7,38 @@ st.set_page_config(page_title="Coin-Nexus Elite", layout="wide", initial_sidebar
 
 st.markdown("""
     <style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-    .main { background-color: #0f172a; }
-    [data-testid="stMetric"] { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
+st.markdown("""
+    <style>
+    /* Sfondo principale */
+    .main { background-color: #0f172a; color: white; }
+    
+    /* TITOLI BIANCHI */
+    h1, h2, h3, h4, h5, h6, p, label { color: white !important; }
+    
+    /* CORREZIONE RETTANGOLO BLU (Metriche) */
+    [data-testid="stMetric"] {
+        background-color: #1e293b; 
+        padding: 15px; 
+        border-radius: 10px; 
+        border: 1px solid #334155;
+    }
+    
+    /* TESTO DENTRO IL RETTANGOLO (Etichetta e Valore) */
+    [data-testid="stMetricLabel"] p {
+        color: #94a3b8 !important; /* Grigio chiaro per l'etichetta */
+        font-size: 16px !important;
+    }
+    
+    [data-testid="stMetricValue"] div {
+        color: #ffffff !important; /* Bianco puro per il numero/euro */
+        font-size: 32px !important;
+        font-weight: bold !important;
+    }
+
+    /* Input di ricerca */
+    .stTextInput input { color: white !important; }
+    </style>
+    """, unsafe_allow_html=True)
     </style>
     """, unsafe_allow_html=True)
 
