@@ -2,79 +2,90 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# 1. SETUP E FORZATURA CSS BIANCO ASSOLUTO
-st.set_page_config(page_title="Coin-Nexus Elite", layout="wide", initial_sidebar_state="collapsed")
+# 1. FORZATURA TEMA E CSS (Il segreto è config + CSS)
+st.set_page_config(
+    page_title="Coin-Nexus Elite", 
+    layout="wide", 
+    initial_sidebar_state="collapsed"
+)
 
+# Questo CSS colpisce chirurgicamente ogni elemento che potrebbe apparire scuro
 st.markdown("""
     <style>
-    /* Sfondo scuro per tutta l'app */
-    .main { background-color: #0f172a !important; }
+    /* Sfondo totale */
+    .stApp { background-color: #0f172a; }
     
-    /* FORZATURA TOTALE TESTI METRICHE */
-    /* Questo colpisce l'etichetta (es. Liquidità in Cassa) */
-    [data-testid="stMetricLabel"] {
-        -webkit-text-fill-color: #ffffff !important;
-        color: #ffffff !important;
-        font-weight: bold !important;
-        opacity: 1 !important;
-    }
-    
-    /* Questo colpisce il numero (es. € 35,000) */
-    [data-testid="stMetricValue"] {
-        -webkit-text-fill-color: #ffffff !important;
-        color: #ffffff !important;
-        font-weight: 800 !important;
-    }
+    /* Forza il colore bianco su TUTTO il testo dell'app */
+    * { color: white !important; font-family: 'Inter', sans-serif; }
 
-    /* Stile del rettangolo blu/scuro */
+    /* Rettangolo delle metriche (Liquidità) */
     [data-testid="stMetric"] {
         background-color: #1e293b !important;
         border: 1px solid #334155 !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
         padding: 20px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
 
-    /* Colore dei titoli generali */
-    h1, h2, h3, h4, p { color: white !important; }
+    /* Forza il bianco specifico per le Metriche (Label e Valore) */
+    [data-testid="stMetricLabel"] > div > p {
+        color: #f8fafc !important; /* Bianco sporco/ghiaccio */
+        font-size: 16px !important;
+    }
+    
+    [data-testid="stMetricValue"] > div {
+        color: #ffffff !important; /* Bianco puro */
+        font-size: 35px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Rende l'input della ricerca leggibile */
+    .stTextInput input {
+        background-color: #1e293b !important;
+        color: white !important;
+        border: 1px solid #334155 !important;
+    }
+
+    /* Colore delle linee divisorie */
+    hr { border-color: #334155 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. DATI E LOGICA (Il resto rimane uguale)
+# 2. DATI (Esempio)
 data = {
-    'ID_Operazione': ['REQ-9901', 'PAY-4402', 'STK-1105', 'REQ-9905', 'PAY-4409', 'PRAT-001'],
-    'Sistema': ['SAP', 'Docfinance', 'SO99+', 'SAP', 'Docfinance', 'Telemaco'],
-    'Descrizione': ['Acquisto Materie Prime', 'Saldi Fornitore X', 'Sottoscorta Acciaio', 'Ordine Cliente Y', 'Riba in Scadenza', 'Visura Camerale'],
-    'Valore_Euro': [15000, 4500, 0, 12000, 8900, 50],
-    'Stato': ['In Approvazione', 'In Attesa', 'CRITICO', 'Spedito', 'Da Pagare', 'Inviata']
+    'ID_Operazione': ['REQ-9901', 'PAY-4402', 'STK-1105', 'REQ-9905', 'PAY-4409'],
+    'Sistema': ['SAP', 'Docfinance', 'SO99+', 'SAP', 'Docfinance'],
+    'Descrizione': ['Acquisto Materie', 'Saldi Fornitore', 'Sottoscorta', 'Ordine Cliente', 'Riba Scadenza'],
+    'Valore_Euro': [15000, 4500, 0, 12000, 8900],
+    'Stato': ['Approvato', 'In Attesa', 'CRITICO', 'Spedito', 'Da Pagare']
 }
 df = pd.DataFrame(data)
-cassa_reale = st.sidebar.number_input("Liquidità Attuale (€)", value=35000)
 
-# --- VISUALIZZAZIONE ---
+# 3. INTERFACCIA
 st.title("COIN-NEXUS ELITE")
 st.markdown("---")
 
-col_t1, col_t2 = st.columns([1, 1])
+# Sezione Metriche e Tachimetro
+col1, col2 = st.columns([1, 1])
 
-with col_t1:
-    st.subheader("Stato Cassa")
-    st.metric(label="Liquidità in Cassa", value=f"€ {cassa_reale:,}")
-    # Nota: Se il valore è ancora scuro, ora abbiamo forzato il Webkit-Text-Fill
-    
-    totale_debiti = df['Valore_Euro'].sum()
-    st.metric(label="Debiti Totali Sistemi", value=f"€ {totale_debiti:,}")
+with col1:
+    st.metric(label="Liquidità in Cassa", value="€ 35,000")
+    st.metric(label="Debiti Totali", value=f"€ {df['Valore_Euro'].sum():,}")
 
-with col_t2:
-    indice_solidita = (cassa_reale / totale_debiti * 100) if totale_debiti > 0 else 100
+with col2:
+    # Tachimetro (Plotly usa il suo colore, forziamo bianco qui)
     fig = go.Figure(go.Indicator(
-        mode = "gauge+number", value = indice_solidita,
+        mode = "gauge+number", value = 85,
         number = {'suffix': "%", 'font': {'color': "white"}},
-        gauge = {'axis': {'range': [0, 200], 'tickcolor': "white"}, 'bar': {'color': "white"},
-                 'steps' : [{'range': [0, 80], 'color': "#ff4b4b"}, {'range': [80, 120], 'color': "#ffa500"}, {'range': [120, 200], 'color': "#00cc96"}]}))
-    fig.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+        gauge = {'axis': {'range': [0, 200], 'tickcolor': "white"},
+                 'bar': {'color': "white"},
+                 'steps' : [
+                     {'range': [0, 80], 'color': "#ef4444"},
+                     {'range': [80, 120], 'color': "#f59e0b"},
+                     {'range': [120, 200], 'color': "#10b981"}]}))
+    fig.update_layout(height=250, margin=dict(t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
     st.plotly_chart(fig, use_container_width=True)
 
-# SEZIONE CARD (Sempre con scritte forzate bianche)
 st.markdown("---")
-search = st.text_input("Cerca...", placeholder="Filtra i dati...")
-# [Resto del codice per le card...]
+st.subheader("🔍 Analisi Operativa")
+#
