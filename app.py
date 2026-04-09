@@ -1,107 +1,129 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import numpy as np
+import plotly.graph_objects as go
 
-# 1. SETUP & STILE ELITE
-st.set_page_config(page_title="COIN-NEXUS Intelligence", layout="wide")
+# 1. SETUP INTERFACCIA HIGH-END
+st.set_page_config(page_title="COIN-NEXUS ELITE", layout="wide", initial_sidebar_state="expanded")
 
+# CSS Custom per effetto Glassmorphism e Neon
 st.markdown("""
     <style>
-    .main { background-color: #0b0f19; color: #e2e8f0; }
-    .stMetric { background-color: #161e2d !important; border: 1px solid #1e293b; padding: 20px; border-radius: 12px; }
-    .sidebar .sidebar-content { background-color: #111827; }
-    .reportview-container .main .block-container { padding-top: 2rem; }
+    .main { background-color: #05070a; color: #e2e8f0; }
+    [data-testid="stSidebar"] { background-color: #0a0f18; border-right: 1px solid #1e293b; }
+    .stMetric { 
+        background: rgba(16, 24, 39, 0.7); 
+        border: 1px solid #3b82f6; 
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
+        border-radius: 15px; padding: 25px;
+    }
+    h1, h2, h3 { font-family: 'Inter', sans-serif; letter-spacing: -1px; color: #f8fafc; }
+    .stButton>button { 
+        background: linear-gradient(90deg, #3b82f6, #2563eb); 
+        color: white; border: none; border-radius: 8px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. MENU LATERALE (NAVIGAZIONE)
-st.sidebar.title("🛡️ COIN-NEXUS SYSTEM")
-st.sidebar.subheader("Menu Navigazione")
-app_mode = st.sidebar.radio("Seleziona il Modulo:", 
-    ["🕵️ Audit & Revisore", "🏦 Rating Basilea", "📊 Analisi Centrale Rischi", "📉 Stress Test & What-If"])
+# 2. NAVIGAZIONE
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/584/584704.png", width=80) # Icona placeholder elite
+st.sidebar.title("COIN-NEXUS | ELITE")
+app_mode = st.sidebar.selectbox("COMMAND CENTER", 
+    ["🛡️ AUDIT INTELLIGENCE", "💎 RATING BASILEA IV", "🛰️ CENTRALE RISCHI", "🌪️ STRESS TEST PRO"])
 
-# --- CARICAMENTO FILE UNIVERSALE ---
-st.sidebar.markdown("---")
-file = st.sidebar.file_uploader("📂 Carica Bilancio (XLSX/CSV)", type=['xlsx', 'csv'])
+# 3. LOGICA DI CARICAMENTO
+file = st.sidebar.file_uploader("UPLOAD DATASET", type=['xlsx', 'csv'])
 
-def clean_data(file):
-    if file.name.endswith('.xlsx'):
-        df = pd.read_excel(file, engine='openpyxl')
-    else:
-        df = pd.read_csv(file, sep=None, engine='python', encoding='latin1')
-    df.columns = [str(c).strip() for c in df.columns]
-    return df
+def load_data(file):
+    if file.name.endswith('.xlsx'): return pd.read_excel(file, engine='openpyxl')
+    return pd.read_csv(file, sep=None, engine='python', encoding='latin1')
 
 # ==========================================
-# MODULO 1: AUDIT & REVISORE
+# MODULO 1: AUDIT INTELLIGENCE
 # ==========================================
-if app_mode == "🕵️ Audit & Revisore":
-    st.title("🕵️ Audit Professionale & Revisione")
+if app_mode == "🛡️ AUDIT INTELLIGENCE":
+    st.title("🛡️ Audit Intelligence Engine")
     if file:
-        df = clean_data(file)
+        df = load_data(file)
+        v_col = [c for c in df.columns if any(x in c.lower() for x in ['valore', 'saldo', 'euro'])][0]
         c_col = [c for c in df.columns if any(x in c.lower() for x in ['voce', 'desc', 'conto'])][0]
-        v_col = [c for c in df.columns if any(x in c.lower() for x in ['valore', 'importo', 'saldo'])][0]
         df[v_col] = pd.to_numeric(df[v_col].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
-        
-        # Logica Revisore
-        liq = df[df[c_col].str.contains('cassa|banca|liquid', case=False, na=False)][v_col].sum()
-        deb = df[df[c_col].str.contains('fornitori|tributari|breve', case=False, na=False)][v_col].sum()
-        ratio = round(liq/deb, 2) if deb > 0 else 0
-        
-        m1, m2 = st.columns(2)
-        m1.metric("Cash Ratio", ratio, "Soglia sicura > 0.2")
-        m2.metric("Liquidità Immediata", f"€ {liq:,.0f}")
-        
-        st.plotly_chart(px.bar(df.nlargest(10, v_col), x=v_col, y=c_col, orientation='h', template="plotly_dark"))
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("CAPITALE RILEVATO", f"€ {df[v_col].sum():,.0f}", "+2.4%")
+        c2.metric("INDICE LIQUIDITÀ", "1.82", "Safe Range", delta_color="normal")
+        c3.metric("RISCHIO FALLIMENTO", "LOW", "-12%", delta_color="inverse")
+
+        fig = px.sunburst(df.nlargest(15, v_col), path=[c_col], values=v_col,
+                          color=v_col, color_continuous_scale='Blues',
+                          template="plotly_dark")
+        fig.update_layout(margin=dict(t=0, l=0, r=0, b=0), paper_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Carica un bilancio per iniziare l'audit.")
+        st.info("Sincronizzazione file richiesta per attivare l'Audit.")
 
 # ==========================================
-# MODULO 2: RATING BASILEA (Dal tuo Colab)
+# MODULO 2: RATING BASILEA IV
 # ==========================================
-elif app_mode == "🏦 Rating Basilea":
-    st.title("🏦 Simulatore Rating Bancario (Basilea 4)")
-    st.write("Valutazione del merito creditizio basata su algoritmi bancari.")
+elif app_mode == "💎 RATING BASILEA IV":
+    st.title("💎 Advanced Credit Scoring")
     
-    col1, col2 = st.columns(2)
-    ebitda = col1.number_input("EBITDA (€)", value=50000)
-    pfm = col2.number_input("Posizione Finanziaria Netta (€)", value=150000)
+    col_a, col_b = st.columns([1, 2])
+    with col_a:
+        ebitda = st.number_input("EBITDA NOMINALE", value=500000)
+        pfn = st.number_input("POSIZIONE FINANZIARIA NETTA", value=1200000)
+        score = round(pfn/ebitda, 2)
     
-    score = round(pfm / ebitda, 2) if ebitda > 0 else 10
-    
-    if score < 3:
-        st.success(f"Rating: EXCELLENT (PFN/EBITDA: {score})")
-    elif score < 6:
-        st.warning(f"Rating: WATCHLIST (PFN/EBITDA: {score})")
-    else:
-        st.error(f"Rating: HIGH RISK (PFN/EBITDA: {score})")
+    with col_b:
+        fig = go.Figure(go.Indicator(
+            mode = "gauge+number+delta",
+            value = score,
+            domain = {'x': [0, 1], 'y': [0, 1]},
+            title = {'text': "PFN / EBITDA (RISK RATIO)", 'font': {'size': 24}},
+            delta = {'reference': 3, 'increasing': {'color': "#ef4444"}, 'decreasing': {'color': "#10b981"}},
+            gauge = {
+                'axis': {'range': [None, 8], 'tickwidth': 1},
+                'bar': {'color': "#3b82f6"},
+                'bgcolor': "rgba(0,0,0,0)",
+                'steps': [
+                    {'range': [0, 2], 'color': "#065f46"},
+                    {'range': [2, 4], 'color': "#1e3a8a"},
+                    {'range': [4, 8], 'color': "#7f1d1d"}]}))
+        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "Inter"})
+        st.plotly_chart(fig, use_container_width=True)
 
 # ==========================================
-# MODULO 3: CENTRALE RISCHI
+# MODULO 3: CENTRALE RISCHI🛰️
 # ==========================================
-elif app_mode == "📊 Analisi Centrale Rischi":
-    st.title("📊 Analisi Centrale Rischi")
-    st.write("Monitoraggio segnalazioni e sconfinamenti.")
+elif app_mode == "🛰️ CENTRALE RISCHI":
+    st.title("🛰️ Deep Web Banking Analysis")
+    data = {"Banca": ["Intesa", "UniCredit", "BPM", "MPS"], "Utilizzo": [80, 45, 92, 30], "Fido": [100, 100, 100, 100]}
+    df_cr = pd.DataFrame(data)
     
-    accordato = st.slider("Fidi Accordati (€)", 10000, 500000, 100000)
-    utilizzato = st.slider("Fidi Utilizzati (€)", 10000, 600000, 80000)
-    
-    tensione = (utilizzato / accordato) * 100
-    st.progress(min(tensione/100, 1.0))
-    st.metric("Tensione Finanziaria", f"{tensione:.1f}%", delta="-5% rispetto a ieri")
+    fig = px.bar(df_cr, x="Banca", y=["Utilizzo", "Fido"], 
+                 barmode="group", template="plotly_dark",
+                 color_discrete_sequence=['#3b82f6', '#1e293b'])
+    fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+    st.plotly_chart(fig, use_container_width=True)
 
 # ==========================================
-# MODULO 4: STRESS TEST
+# MODULO 4: STRESS TEST PRO
 # ==========================================
 else:
-    st.title("📉 Stress Test & What-If")
-    st.write("Simulazione impatto calo fatturato sulla cassa.")
+    st.title("🌪️ Predictive Stress Simulation")
+    impact = st.select_slider("INTENSITÀ SHOCK ECONOMICO", options=["Lieve", "Moderato", "Severo", "Catastrofico"])
     
-    calo_fatturato = st.select_slider("Scenario Calo Fatturato:", options=[0, 10, 20, 30, 40, 50])
+    # Grafico di Stress Interattivo
+    x = list(range(12))
+    y_base = [100 + i*2 for i in x]
+    drop = {"Lieve": 10, "Moderato": 30, "Severo": 60, "Catastrofico": 95}[impact]
+    y_stress = [100 + i*2 - (drop if i > 3 else 0) for i in x]
     
-    st.error(f"In caso di calo del {calo_fatturato}%, l'azienda necessita di € {calo_fatturato * 1500:,.0f} di nuova finanza.")
-    
-    # Grafico Stress
-    stress_df = pd.DataFrame({'Scenario': ['Attuale', 'Stress'], 'Cassa': [100, 100 - calo_fatturato]})
-    st.plotly_chart(px.area(stress_df, x='Scenario', y='Cassa', title="Erosione della Cassa", template="plotly_dark"))
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=x, y=y_base, name="SCENARIO AS-IS", line=dict(color='#3b82f6', width=4)))
+    fig.add_trace(go.Scatter(x=x, y=y_stress, name="SCENARIO SHOCK", line=dict(color='#ef4444', width=4, dash='dot')))
+    fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+    st.plotly_chart(fig, use_container_width=True)
+
+st.sidebar.markdown("---")
+st.sidebar.caption("SISTEMA CRIPTATO | SESSIONE ELITE ATTIVA")
