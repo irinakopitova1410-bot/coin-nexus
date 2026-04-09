@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. DESIGN & INTERFACCIA ELITE
+# 1. DESIGN & INTERFACCIA
 st.set_page_config(page_title="Coin-Nexus Audit", layout="wide")
 
 st.markdown("""
@@ -22,7 +22,7 @@ uploaded_file = st.file_uploader("📂 Carica Bilancio (XLSX o CSV)", type=['xls
 if uploaded_file:
     try:
         # Lettura automatica
-        if uploaded_file.name.endswith('.xlsx'):
+        if uploaded_file.name.lower().endswith('.xlsx'):
             df = pd.read_excel(uploaded_file, engine='openpyxl')
         else:
             df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='latin1')
@@ -30,7 +30,7 @@ if uploaded_file:
         # Pulizia colonne
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Identificazione Colonne (Flessibile)
+        # Identificazione Colonne
         c_col = [c for c in df.columns if any(x in c.lower() for x in ['voce', 'desc', 'conto', 'cat'])][0]
         v_col = [c for c in df.columns if any(x in c.lower() for x in ['valore', 'importo', 'saldo', 'euro'])][0]
         
@@ -49,6 +49,10 @@ if uploaded_file:
         patrimonio = get_v(['patrimonio netto', 'capitale sociale', 'riserve', 'utile'])
         debiti_tot = get_v(['passività', 'totale debiti', 'mutui', 'tfr'])
 
-        # --- INDICI CHIAVE ---
+        # --- INDICI CHIAVE (CORREZIONE ERRORE RIGA 54) ---
         liq_index = round((liquidita + crediti + magazzino) / passivo_breve, 2) if passivo_breve > 0 else 0
-        solv_index = round(patrimonio / (patrimonio + debiti_tot), 2) if (patrimonio + debiti_tot) > 0 else
+        solv_index = round(patrimonio / (patrimonio + debiti_tot), 2) if (patrimonio + debiti_tot) > 0 else 0
+
+        # --- DASHBOARD KPI ---
+        k1, k2, k3 = st.columns(3)
+        status_l = "✅ OK" if liq_index > 1.2
