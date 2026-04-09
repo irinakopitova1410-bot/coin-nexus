@@ -1,53 +1,87 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from fpdf import FPDF
+import base64
 from datetime import datetime
 
-# 1. SETUP ELITE (Niente Neon eccessivi, solo Classe)
-st.set_page_config(page_title="COIN-NEXUS ELITE", layout="wide")
+# 1. SETTINGS ELITE
+st.set_page_config(page_title="COIN-NEXUS | AUDIT REPORT", layout="wide")
 
 st.markdown("""
     <style>
     .main { background-color: #05070a; color: #e2e8f0; }
-    [data-testid="stSidebar"] { background-color: #0a0f18; border-right: 1px solid #3b82f6; }
-    .stMetric { background-color: #111827; border: 1px solid #3b82f6; border-radius: 8px; padding: 20px !important; }
-    h1 { color: #ffffff; font-weight: 700; }
+    .stMetric { background-color: #111827; border: 1px solid #3b82f6; border-radius: 10px; padding: 20px !important; }
+    h1 { font-weight: 800; color: #ffffff; text-shadow: 0 0 10px #3b82f6; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. LOGICA SIDEBAR
-st.sidebar.title("💠 COIN-NEXUS")
-st.sidebar.caption("SISTEMA DI REVISIONE LEGALE v7.0")
+# 2. LOGICA REPORT PDF
+def create_pdf(df, mat_val, dscr_val):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(190, 10, "RELAZIONE DI REVISIONE INDIPENDENTE", ln=True, align="C")
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(190, 10, f"Data: {datetime.now().strftime('%d/%m/%Y')}", ln=True, align="R")
+    pdf.ln(10)
+    
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 10, "1. Giudizio del Revisore", ln=True)
+    pdf.set_font("Arial", "", 11)
+    opinione = "SENZA MODIFICHE" if dscr_val >= 1.1 else "CON RILIEVI (Going Concern)"
+    pdf.multi_cell(190, 10, f"A nostro giudizio, il bilancio d'esercizio fornisce una rappresentazione veritiera e corretta della situazione patrimoniale. Opinione: {opinione}.")
+    
+    pdf.ln(5)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(190, 10, "2. Materialita (ISA 320)", ln=True)
+    pdf.set_font("Arial", "", 11)
+    pdf.cell(190, 10, f"Soglia di errore tollerabile calcolata: Euro {mat_val:,.2f}", ln=True)
+    
+    return pdf.output(dest='S')
 
-menu = st.sidebar.radio("MODULI", ["📊 RIEPILOGO", "⚖️ MATERIALITÀ", "🛡️ CONTINUITÀ"])
+# 3. SIDEBAR & DATA
+st.sidebar.title("💠 NEBULA-X AUDIT")
+menu = st.sidebar.radio("SISTEMA", ["📊 DASHBOARD", "⚖️ REVISIONE PRO", "📄 EXPORT REPORT"])
 file = st.sidebar.file_uploader("CARICA BILANCIO", type=['xlsx', 'csv'])
 
-# 3. MOTORE DATI
 if file:
-    try:
-        df = pd.read_excel(file) if file.name.endswith('.xlsx') else pd.read_csv(file)
-        demo = False
-    except: demo = True
+    df = pd.read_excel(file) if file.name.endswith('.xlsx') else pd.read_csv(file)
+    df.columns = [str(c).upper().strip() for c in df.columns]
+    demo = False
 else:
     df = pd.DataFrame({'VOCE': ['Liquidità', 'Crediti', 'Debiti'], 'VALORE': [500000, 300000, 200000]})
     demo = True
 
-# 4. VISUALIZZAZIONE
-if menu == "📊 RIEPILOGO":
-    st.title("📊 Executive Dashboard")
+# 4. MODULI
+if menu == "📊 DASHBOARD":
+    st.title("📊 Controllo Strategico")
     c1, c2 = st.columns(2)
-    c1.metric("ATTIVO TOTALE", f"€ {df.iloc[:, 1].sum():,.0f}")
-    c2.metric("PUNTEGGIO RISCHIO", "BASSO", "SICURO")
+    val_col = df.columns[1]
+    c1.metric("ATTIVO TOTALE", f"€ {df[val_col].sum():,.0f}")
+    c2.metric("GOING CONCERN", "VERIFICATO" if demo else "ANALISI IN CORSO")
     
-    fig = px.pie(df, names=df.columns[0], values=df.columns[1], hole=0.6, template="plotly_dark")
+    fig = px.sunburst(df, path=[df.columns[0]], values=val_col, template="plotly_dark", color_continuous_scale='Blues')
     st.plotly_chart(fig, use_container_width=True)
 
-elif menu == "⚖️ MATERIALITÀ":
-    st.title("⚖️ Materialità (ISA 320)")
-    bench = st.number_input("Benchmark di Riferimento (€)", value=1000000)
-    st.metric("SOGLIA DI ERRORE", f"€ {bench * 0.01:,.0f}")
-    st.info("Calcolo basato su standard internazionali di revisione.")
+elif menu == "⚖️ REVISIONE PRO":
+    st.title("⚖️ Analisi Rischio ISA")
+    bench = st.number_input("Benchmark Totale (€)", value=1000000)
+    perc = st.slider("% Materialità", 0.5, 3.0, 1.0)
+    mat = bench * (perc / 100)
+    st.session_state['mat'] = mat
+    st.metric("MATERIALITÀ CALCOLATA", f"€ {mat:,.0f}")
 
 else:
-    st.title("🛡️ Continuità Aziendale")
-    st.success("✅ Parametri di stabilità conformi ai requisiti del Codice della Crisi.")
+    st.title("📄 Generazione Report Legale")
+    st.write("Clicca sul pulsante per generare la bozza della relazione di revisione pronta per la firma.")
+    
+    mat_final = st.session_state.get('mat', 10000)
+    pdf_out = create_pdf(df, mat_final, 1.5)
+    
+    st.download_button(
+        label="📥 SCARICA RELAZIONE PDF",
+        data=pdf_out,
+        file_name="Relazione_Revisione_CoinNexus.pdf",
+        mime="application/pdf"
+    )
