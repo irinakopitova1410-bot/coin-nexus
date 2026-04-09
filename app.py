@@ -74,10 +74,29 @@ if uploaded_file:
             st.success("✅ Bilancio caricato!")
     except Exception as e:
         st.error(f"Errore lettura file: {e}")
-
-# CARD RISULTATI
+# --- CARD RISULTATI (Sostituisci il blocco intorno alla riga 80-90) ---
 c1, c2, c3 = st.columns(3)
+
 with c1:
-    st.markdown(f'<div class="metric-card" style="border-top:5px solid {color_border}"><strong>LIQUIDITÀ</strong><h2>{liq_val}</h2></div>', unsafe_allow_html=True)
+    st.markdown(f'''
+        <div class="metric-card" style="border-top:5px solid {color_border}; background-color: #1e293b; padding: 15px; border-radius: 10px;">
+            <strong style="color: #94a3b8;">LIQUIDITÀ</strong>
+            <h2 style="color: white; margin: 0;">{liq_val}</h2>
+        </div>
+    ''', unsafe_allow_html=True)
+
 with c2:
-    st.markdown(f'<div class="metric-card"
+    st.markdown(f'''
+        <div class="metric-card" style="border-top:5px solid #3b82f6; background-color: #1e293b; padding: 15px; border-radius: 10px;">
+            <strong style="color: #94a3b8;">SOLVIBILITÀ</strong>
+            <h2 style="color: white; margin: 0;">{solv_val}</h2>
+        </div>
+    ''', unsafe_allow_html=True)
+
+with c3:
+    st.markdown(f'''
+        <div class="metric-card" style="border-top:5px solid {color_border}; background-color: #1e293b; padding: 15px; border-radius: 10px;">
+            <strong style="color: #94a3b8;">RISCHIO</strong>
+            <h2 style="color: white; margin: 0;">{stato_rischio}</h2>
+        </div>
+    ''', unsafe_allow_html=True)
