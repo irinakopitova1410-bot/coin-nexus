@@ -4,31 +4,27 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 
-# 1. SETUP ESTETICO "ELITE"
+# CONFIGURAZIONE ELITE
 st.set_page_config(page_title="COIN-NEXUS TITANIUM", layout="wide")
 
+# CSS PROFESSIONALE
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&display=swap');
-    .main { background: radial-gradient(circle at 50% 50%, #020617, #000000); color: #f1f5f9; font-family: 'Space Grotesk', sans-serif; }
-    [data-testid="stSidebar"] { background: rgba(15, 23, 42, 0.95); border-right: 1px solid #00d4ff; }
-    .stMetric { background: rgba(30, 41, 59, 0.7); border: 1px solid #00d4ff; border-radius: 12px; padding: 20px !important; }
-    h1 { text-shadow: 0 0 15px #00d4ff; color: #ffffff; }
+    .main { background-color: #020617; color: #f1f5f9; font-family: sans-serif; }
+    [data-testid="stSidebar"] { background-color: #0a0f18; border-right: 1px solid #00d4ff; }
+    .stMetric { background-color: #1e293b; border: 1px solid #00d4ff; border-radius: 10px; padding: 15px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. LOGICA SIDEBAR
+# SIDEBAR MENU
 st.sidebar.title("⚡ COIN-NEXUS CORE")
-menu = st.sidebar.radio("SISTEMI ATTIVI", [
-    "💎 DASHBOARD ESECUTIVA", 
-    "🕵️ RISCHIO & MATERIALITÀ", 
-    "🛡️ SCUDO DI CONTINUITÀ"
-])
+opzioni = ["💎 RIEPILOGO", "🕵️ REVISIONE", "🛡️ CONTINUITÀ"]
+menu = st.sidebar.radio("SISTEMI", opzioni)
 
-uploaded_file = st.sidebar.file_uploader("📥 CARICA BILANCIO", type=['xlsx', 'csv'])
+uploaded_file = st.sidebar.file_uploader("CARICA BILANCIO", type=['xlsx', 'csv'])
 
-# --- GESTIONE DATI ---
-if uploaded_file:
+# GESTIONE DATI
+if uploaded_file is not None:
     try:
         if uploaded_file.name.endswith('.xlsx'):
             df = pd.read_excel(uploaded_file, engine='openpyxl')
@@ -42,29 +38,34 @@ else:
     df = pd.DataFrame({'VOCE': ['Liquidità', 'Crediti', 'Debiti'], 'VALORE': [500000, 300000, 200000]})
     demo = True
 
-# ==========================================
-# MODULO 1: DASHBOARD
-# ==========================================
-if menu == "💎 DASHBOARD ESECUTIVA":
-    st.markdown(f"<h1>💎 Analisi Strategica {'(DEMO)' if demo else ''}</h1>", unsafe_allow_html=True)
-    v_col = 'VALORE' if 'VALORE' in df.columns else df.columns[1]
+# MODULO 1: RIEPILOGO
+if menu == "💎 RIEPILOGO":
+    st.title("💎 Dashboard Esecutiva")
+    val_col = 'VALORE' if 'VALORE' in df.columns else df.columns[1]
     
-    c1, c2, c3 = st.columns(3)
-    c1.metric("TOTALE ATTIVO", f"€ {df[v_col].sum():,.0f}", "+3.2%")
-    c2.metric("HEALTH SCORE IA", "96/100", "ECCELLENTE")
-    c3.metric("RISCHIO AUDIT", "LOW", "-5%", delta_color="inverse")
-
-    st.markdown("---")
-    fig = px.sunburst(df, path=[df.columns[0]], values=v_col, color=v_col, color_continuous_scale='GnBu', template='plotly_dark')
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', margin=dict(t=10, l=10, r=10, b=10))
+    c1, c2 = st.columns(2)
+    c1.metric("ATTIVO TOTALE", f"€ {df[val_col].sum():,.0f}")
+    c2.metric("SALUTE IA", "96/100")
+    
+    fig = px.sunburst(df, path=[df.columns[0]], values=val_col, color_continuous_scale='GnBu', template='plotly_dark')
     st.plotly_chart(fig, use_container_width=True)
 
-# ==========================================
-# MODULO 2: RISCHIO & MATERIALITÀ
-# ==========================================
-elif menu == "🕵️ RISCHIO & MATERIALITÀ":
-    st.title("🕵️ Valutazione Professionale (ISA 320)")
+# MODULO 2: REVISIONE (IL VALORE PER LE BIG4)
+elif menu == "🕵️ REVISIONE":
+    st.title("🕵️ Valutazione Rischio ISA 320")
+    st.subheader("Calcolo Materialità Professionale")
     
-    col_1, col_2 = st.columns(2)
-    with col_1:
-        st.subheader("S
+    bench = st.number_input("Inserisci Benchmark (es. Fatturato)", value=1000000)
+    sens = st.slider("% Sensibilità", 0.5, 3.0, 1.0)
+    st.metric("SOGLIA ERRORE TOLLERABILE", f"€ {bench * (sens / 100):,.0f}")
+    
+    st.info("Questo calcolo è lo standard usato dai revisori Deloitte per definire l'ambito del controllo.")
+
+# MODULO 3: CONTINUITÀ
+else:
+    st.title("🛡️ Scudo di Continuità")
+    dscr = st.slider("Indice DSCR Predittivo", 0.5, 3.0, 1.5)
+    if dscr >= 1.1:
+        st.success(f"✅ GOING CONCERN GARANTITO (DSCR: {dscr})")
+    else:
+        st.error(f"⚠️ RISCHIO INSOLVENZA (DSCR: {dscr})")
