@@ -104,7 +104,15 @@ if uploaded_file:
     
     # Logica per leggere correttamente entrambi i formati
     if uploaded_file.name.endswith('.csv'):
-        df = pd.read_csv(uploaded_file)
+if uploaded_file.name.endswith('.csv'):
+    # Prova a leggere il file gestendo l'encoding di Excel e i separatori comuni
+    try:
+        df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8')
+    except UnicodeDecodeError:
+        # Se fallisce, prova con la codifica tipica di Windows/Excel
+        uploaded_file.seek(0) # Torna all'inizio del file
+        df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='ISO-8859-1')
+    
     else:
         df = pd.read_excel(uploaded_file)
     
