@@ -11,7 +11,7 @@ st.markdown("""
     header {visibility: hidden;}
     footer {visibility: hidden;}
     .main { background-color: #0f172a; }
-    [data-testid="stMetric"] { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #334155; }
+    [data-testid="stMetric"] { background-color: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #06b6d4; }
     </style>
     """, unsafe_allow_html=True)
 
