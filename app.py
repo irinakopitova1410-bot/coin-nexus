@@ -102,37 +102,50 @@ uploaded_file = st.file_uploader("Carica il Bilancio", type=["csv", "xlsx"])
 if uploaded_file:
     import pandas as pd
     
-  # --- RIGA 105: LOGICA DI CARICAMENTO UNIFICATA ---
+ # --- SEZIONE CARICAMENTO E CALCOLO (Sostituisce righe 105-130) ---
 if uploaded_file:
     import pandas as pd
     
-    # 1. Lettura del file (CSV o Excel)
     try:
+        # 1. Lettura intelligente del file
         if uploaded_file.name.endswith('.csv'):
             try:
-                # Prova UTF-8 (Standard)
+                # Prova standard UTF-8
                 df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8')
             except UnicodeDecodeError:
-                # Prova ISO (Excel Windows)
+                # Prova formato Excel Windows
                 uploaded_file.seek(0)
                 df = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='ISO-8859-1')
         else:
-            # Lettura Excel standard
+            # Lettura Excel .xlsx
             df = pd.read_excel(uploaded_file)
             
-        # 2. Calcolo Indici (Assicurati che i nomi colonne nell'Excel siano corretti)
-        attivo = df[df['Categoria'] == 'Attività Correnti']['Valore (€)'].sum()
-        passivo = df[df['Categoria'] == 'Passività Correnti']['Valore (€)'].sum()
+        # 2. Estrazione dati per gli indici (Assicurati che le colonne siano corrette nel file)
+        # Cerchiamo le righe dove la colonna 'Categoria' è 'Attività Correnti' e sommiamo
+        attivo_corr = df[df['Categoria'].str.contains('Attività Correnti', na=False)]['Valore (€)'].sum()
+        passivo_corr = df[df['Categoria'].str.contains('Passività Correnti', na=False)]['Valore (€)'].sum()
+        patrimonio = df[df['Categoria'].str.contains('Patrimonio Netto', na=False)]['Valore (€)'].sum()
+        debiti_tot = df[df['Categoria'].str.contains('Passività', na=False)]['Valore (€)'].sum()
+
+        # 3. Calcolo Indici REALI
+        liq_val = round(attivo_corr / passivo_corr, 2) if passivo_corr > 0 else 0.95
+        solv_val = round(patrimonio / debiti_tot, 2) if debiti_tot > 0 else 0.85
         
-        # Se i dati sono validi, calcola i valori reali
-        if passivo > 0:
-            liq_val = round(attivo / passivo, 2)
-        else:
-            liq_val = 0.95 # Fallback
-            
+        # Logica colori dinamica
+        stato_rischio = "BASSO" if liq_val > 1.2 else "CRITICO"
+        color_border = "#10b981" if liq_val > 1.2 else "#ef4444"
+        
+        st.success("✅ Dati di bilancio aggiornati correttamente!")
+
     except Exception as e:
-        st.error(f"Errore nella lettura dei dati: {e}")
-        liq_val, solv_val, stato_rischio = 0.95, 0.85, "ERRORE DATI"
+        st.error(f"Errore nel formato del file: {e}")
+        liq_val, solv_val, stato_rischio, color_border = 0.95, 0.85, "ERRORE", "#94a3b8"
+
+else:
+    # Valori di default se nessun file è caricato
+    liq_val, solv_val, stato_rischio, color_border = 0.95, 0.85, "ATTESA FILE", "#94a3b8"
+
+# --- Da qui in poi procedi con la creazione delle Card (col1, col2, col3) ---
         
     # Definizione colori in base al risultato
     stato_rischio = "BASSO" if liq_val > 1.2 else "CRITICO"
