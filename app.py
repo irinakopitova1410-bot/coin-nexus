@@ -5,7 +5,49 @@ import plotly.express as px
 
 # 1. CONFIGURAZIONE E BLOCCO INTERFACCIA
 st.set_page_config(page_title="Coin-Nexus Elite", layout="wide", initial_sidebar_state="collapsed")
+# --- SEZIONE INDICATORI PERFORMANCE (KPI) ---
+st.write("### Indicatori Performance Aziendale")
 
+# Creiamo 4 colonne per gli indicatori principali
+kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+
+with kpi1:
+    st.markdown(f'''
+        <div class="metric-card" style="border-left: 5px solid #3b82f6;">
+            <p style="color: #94a3b8; font-size: 0.8rem; margin: 0;">TOTALE ACQUISTI</p>
+            <h2 style="margin: 0; color: white;">€ 27.000</h2>
+            <p style="color: #10b981; font-size: 0.8rem; margin: 0;">↑ 5.2% vs mese prec.</p>
+        </div>
+    ''', unsafe_allow_html=True)
+
+with kpi2:
+    st.markdown(f'''
+        <div class="metric-card" style="border-left: 5px solid #fbbf24;">
+            <p style="color: #94a3b8; font-size: 0.8rem; margin: 0;">IN APPROVAZIONE</p>
+            <h2 style="margin: 0; color: white;">2 REQ</h2>
+            <p style="color: #fbbf24; font-size: 0.8rem; margin: 0;">Attesa risposta SAP</p>
+        </div>
+    ''', unsafe_allow_html=True)
+
+with kpi3:
+    st.markdown(f'''
+        <div class="metric-card" style="border-left: 5px solid #ef4444;">
+            <p style="color: #94a3b8; font-size: 0.8rem; margin: 0;">FLUSSO CASSA (OUT)</p>
+            <h2 style="margin: 0; color: white;">€ 13.400</h2>
+            <p style="color: #ef4444; font-size: 0.8rem; margin: 0;">Scadenze Docfinance</p>
+        </div>
+    ''', unsafe_allow_html=True)
+
+with kpi4:
+    st.markdown(f'''
+        <div class="metric-card" style="border-left: 5px solid #f87171;">
+            <p style="color: #94a3b8; font-size: 0.8rem; margin: 0;">ALLERTA STOCK</p>
+            <h2 style="margin: 0; color: white;">CRITICO</h2>
+            <p style="color: #f87171; font-size: 0.8rem; margin: 0;">Acciaio sottoscorta</p>
+        </div>
+    ''', unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True) # Spaziatore
 # CSS Avanzato per nascondere header, menu e pulsanti di share
 hide_st_style = """
             <style>
