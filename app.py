@@ -53,6 +53,48 @@ if uploaded_file:
     except Exception as e:
         st.error(f"Errore tecnico: {e}")
 else:
+# ... (subito dopo il grafico di Benford) ...
+
+            # --- SEZIONE GENERAZIONE REPORT FINALE (INTEGRATA) ---
+            st.divider()
+            st.subheader("📥 Certificazione Audit Platinum")
+
+            # Calcoliamo il rischio basandoci sulle anomalie trovate prima
+            pericolo = df[df[col_v] > mat]
+            rischio_final = "ALTO" if not pericolo.empty else "CONTROLLATO"
+
+            if st.button("🚀 GENERA REPORT UFFICIALE"):
+                try:
+                    # Generazione fisica del PDF
+                    pdf_output = genera_report_pdf(totale, mat, rischio_final)
+                    
+                    st.download_button(
+                        label="📥 CLICCA QUI PER SCARICARE IL PDF",
+                        data=pdf_output,
+                        file_name=f"Audit_Report_CoinNexus.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+                    st.success("Report generato con successo. Pronto per l'invio al Board.")
+                except Exception as e:
+                    st.error(f"Errore nella creazione del PDF: {e}")
+
+    except Exception as e:
+        st.error(f"❌ Errore durante l'elaborazione: {e}")
+else:
+    # Questa parte appare se non c'è il file caricato
+    st.info("👋 Benvenuto. Carica un file Excel o CSV per attivare i report professionali.")
+
+
+
+
+
+
+
+
+
+
+    
     st.info("👋 Sistema Pronto. Carica un file Excel per iniziare l'Audit.")
 # --- SEZIONE GENERAZIONE REPORT FINALE ---
 st.divider()
