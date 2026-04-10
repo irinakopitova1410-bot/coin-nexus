@@ -5,39 +5,45 @@ import plotly.express as px
 from fpdf import FPDF
 import datetime
 
-# --- CONFIGURAZIONE UI TECHNO ---
+# --- CONFIGURAZIONE INTERFACCIA ---
 st.set_page_config(page_title="COIN-NEXUS CYBER-AUDIT", layout="wide")
 
-# CSS "Cyber-Dark" Ultra-Stabile
+# CSS TECHNO-MODERN (Deep Black & Neon Blue)
 st.markdown("""
     <style>
-    .stApp { background-color: #050508; color: #e0e6ed; }
-    [data-testid="stSidebar"] { background-color: #0a0b14; border-right: 1px solid #1f293a; }
-    div[data-testid="stMetricValue"] { color: #3b82f6 !important; font-family: 'Courier New', monospace; font-size: 1.8rem !important; }
-    .stMetric { background-color: #101423; border: 1px solid #1f293a; border-radius: 10px; padding: 15px; }
-    .stButton>button { background: linear-gradient(90deg, #1e40af, #3b82f6); color: white; border: none; width: 100%; font-weight: bold; border-radius: 5px; }
-    .stTabs [data-baseweb="tab-list"] { background-color: #0a0b14; }
-    </style>
-    """, unsafe_allow_html=True)
+    /* Sfondo e Testo */
+    .stApp { background-color: #050505; color: #ffffff; }
+    
+    /* Sidebar Professionale */
+    [data-testid="stSidebar"] { background-color: #0a0a0a; border-right: 1px solid #333; }
+    
+    /* Metriche stile Dashboard Navale */
+    div[data-testid="stMetricValue"] { color: #00d4ff !important; font-family: 'Monaco', monospace; font-size: 2rem !important; }
+    .stMetric { 
+        background-color: #111; 
+        border: 1px solid #222; 
+        border-radius: 4px; 
+        padding: 20px;
+        box-shadow: inset 0 0 10px rgba(0, 212, 255, 0.05);
+    }
+    
+    /* Pulsanti ad alto contrasto */
+    .stButton>button {
+        background: transparent;
+        color: #00d4ff;
+        border: 1px solid #00d4ff;
+        border-radius: 2px;
+        font-weight: bold;
+        transition: all 0.3s;
+        width: 100%;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+    .stButton>button:hover {
+        background: #00d4ff;
+        color: #000;
+        box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+    }
 
-# --- FUNZIONI DI SUPPORTO ---
-def safe_benford(data):
-    try:
-        digits = data.abs().astype(str).str.extract('([1-9])')[0].dropna().astype(int)
-        if digits.empty: return pd.DataFrame()
-        obs = digits.value_counts(normalize=True).sort_index()
-        exp = pd.Series({i: np.log10(1 + 1/i) for i in range(1, 10)})
-        return pd.DataFrame({'Reale': obs, 'Atteso': exp}).fillna(0)
-    except:
-        return pd.DataFrame()
-
-def genera_pdf_safe(massa, mat, anom, studio):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_fill_color(15, 23, 42)
-    pdf.rect(0, 0, 210, 45, 'F')
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Arial", 'B', 22)
-    pdf.cell(190, 25, studio.upper(), ln=True, align='C')
-    pdf.set_text_color(0, 0, 0)
-    pdf.ln(30)
+    /* Tabs Minimaliste */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 10px;
