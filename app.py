@@ -83,29 +83,32 @@ if uploaded_file:
             st.dataframe(voci_critiche[[col_c, col_v]])
         # Treemap
         st.plotly_chart(px.treemap(df.nlargest(20, col_v), path=[col_c], values=col_v, template="plotly_dark"), use_container_width=True)
-
-        # REPORT PDF (Fix finale)
+    # --- SEZIONE GENERAZIONE REPORT FINALE ---
         st.divider()
-        # --- GENERAZIONE REPORT PROFESSIONALE ---
-        # --- SEZIONE GENERAZIONE REPORT ---
-        if st.button("🚀 GENERA REPORT AUDIT PLATINUM"):
+        st.subheader("📥 Certificazione Audit Platinum")
+        # 1. Calcolo variabili necessarie (Tutti i "4 ingredienti")
+        voci_pericolose = df[df[col_v] > mat]
+        rischio_per_report = "ALTO" if not voci_pericolose.empty else "CONTROLLATO"
+        if st.button("🚀 GENERA REPORT UFFICIALE"):
             try:
-                # 1. Calcoliamo le anomalie
-                voci_pericolose = df[df[col_v] > mat]
-                
-                # 2. Definiamo lo stato del rischio (Variabile: rischio_val)
-                rischio_val = "ALTO" if not voci_pericolose.empty else "CONTROLLATO"
-                
-                # 3. CHIAMATA ALLA FUNZIONE (Usiamo rischio_val)
-                pdf_bytes = genera_report_pdf(totale, mat, rischio_val, voci_pericolose)
-                
+                # 2. Chiamata alla funzione con i nomi corretti
+                # Passiamo: totale, mat, rischio_per_report, voci_pericolose
+                pdf_output = genera_report_pdf(totale, mat, rischio_per_report, voci_pericolose
                 st.download_button(
-                    label="📥 SCARICA ORA IL PDF CERTIFICATO",
-                    data=bytes(pdf_bytes),
-                    file_name="Audit_Report_Platinum.pdf",
+                    label="📥 SCARICA PDF CERTIFICATO",
+                    data=bytes(pdf_output),
+                    file_name=f"Audit_Report_CoinNexus_{datetime.datetime.now().strftime('%Y%m%d')}.pdf",
                     mime="application/pdf",
                     use_container_width=True
                 )
-                st.success("Report generato con successo!")
+                st.success("Report generato con successo. Pronto per l'invio al Board.")
+                
             except Exception as e:
-                st.error(f"Errore durante la creazione del PDF: {e}")
+                st.error(f"Errore tecnico nella creazione del PDF: {e}")
+
+    except Exception as e:
+        st.error(f"❌ Errore durante l'elaborazione dei dati: {e}")
+
+else:
+    # Messaggio che appare all'inizio quando l'app è vuota
+    st.info("👋 Benvenuto in Coin-Nexus Platinum. Carica un file Excel o CSV per iniziare l'audit.")
