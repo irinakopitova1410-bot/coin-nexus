@@ -50,10 +50,8 @@ if file:
             c1, c2 = st.columns(2)
             def_v = [c for c in cols if any(x in c.lower() for x in ['valore', 'saldo', 'euro', 'amount'])]
             def_c = [c for c in cols if any(x in c.lower() for x in ['voce', 'desc', 'conto'])]
-            
             col_v = c1.selectbox("Colonna Valori", cols, index=cols.index(def_v[0]) if def_v else 0)
             col_c = c2.selectbox("Colonna Descrizioni", cols, index=cols.index(def_c[0]) if def_c else 0)
-            
             df[col_v] = pd.to_numeric(df[col_v].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
             # Metrics ISA 320
             totale = df[col_v].sum()
@@ -62,20 +60,6 @@ if file:
             m1.metric("CAPITALE TOTALE", f"€ {totale:,.2f}")
             m2.metric("MATERIALITÀ (ISA 320)", f"€ {mat:,.2f}")
             m3.metric("INTEGRITÀ DATI", "96.4%", "TRUSTED")
-# --- MODULO ALERT CRITICITÀ (Righe 60-70 circa) ---
-        st.markdown("---")
-        voci_critiche = df[df[col_v] > mat]
-        if not voci_critiche.empty:
-            st.error(f"🚨 RILEVATE {len(voci_critiche)} VOCI SOPRA LA SOGLIA DI MATERIALITÀ")
-            with st.expander("Visualizza Voci ad Alto Rischio"):
-                st.table(voci_critiche[[col_c, col_v]].sort_values(by=col_v, ascending=False))
-        else:
-            st.success("✅ Nessuna voce singola supera la soglia di materialità.")     
-            # Treemap
-            fig = px.treemap(df.nlargest(20, col_v), path=[col_c], values=col_v, color=col_v,
-                             color_continuous_scale='Blues', template="plotly_dark")
-            st.plotly_chart(fig, use_container_width=True)
-
             # Forensic Section
             st.subheader("🕵️ Analisi Forense: Test di Benford")
             act, exp = benford_analysis(df[col_v])
