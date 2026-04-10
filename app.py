@@ -105,13 +105,14 @@ if uploaded_file:
         # REPORT PDF (Fix finale)
         st.divider()
         # --- GENERAZIONE REPORT PROFESSIONALE ---
+
         if st.button("🚀 GENERA REPORT AUDIT PLATINUM"):
             try:
-                # 1. Definiamo le anomalie da passare alla funzione
+                # Recuperiamo le voci che superano la soglia (le anomalie)
                 voci_pericolose = df[df[col_v] > mat]
                 
-                # 2. Chiamata corretta con tutti e 4 gli argomenti
-                pdf_bytes = genera_report_pdf(totale, mat, rischio, voci_pericolose)
+                # CHIAMATA CORRETTA: aggiungiamo 'voci_pericolose' come quarto argomento
+                pdf_bytes = genera_report_pdf(totale, mat, rischio_lvl, voci_pericolose)
                 
                 st.download_button(
                     label="📥 SCARICA ORA IL PDF CERTIFICATO",
