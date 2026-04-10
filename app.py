@@ -4,40 +4,85 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from fpdf import FPDF
+import io
 
-# --- CONFIGURAZIONE ELITE ---
+# --- CONFIGURAZIONE ---
 st.set_page_config(page_title="COIN-NEXUS PLATINUM", layout="wide")
 
-# CSS per interfaccia professionale
+# --- STILE ---
 st.markdown("""
     <style>
     .main { background-color: #05070a; color: #e2e8f0; }
     .stMetric { background: rgba(16, 24, 39, 0.8); border: 1px solid #3b82f6; border-radius: 12px; padding: 20px; }
-    .stButton>button { 
-        background: linear-gradient(90deg, #3b82f6, #2563eb); 
-        color: white; border: none; font-weight: bold; border-radius: 8px; width: 100%; height: 3em;
-    }
+    .stButton>button { background: linear-gradient(90deg, #3b82f6, #2563eb); color: white; width: 100%; border-radius: 8px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNZIONE GENERAZIONE PDF ---
-def genera_report_pdf(totale, mat, rischio, num_voci):
+# --- FUNZIONE PDF SICURA ---
+def genera_report_pdf(totale, mat, rischio):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 10, "COIN-NEXUS PLATINUM - AUDIT CERTIFICATION", ln=True, align='C')
+    pdf.cell(200, 10, "COIN-NEXUS PLATINUM - AUDIT REPORT", ln=True, align='C')
     pdf.ln(10)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 10, "SINTESI ANALISI FINANZIARIA", ln=True)
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(200, 8, f"- Massa Monetaria Totale: Euro {totale:,.2f}", ln=True)
-    pdf.cell(200, 8, f"- Soglia Materialita (ISA 320): Euro {mat:,.2f}", ln=True)
-    pdf.cell(200, 8, f"- Numero Record Verificati: {num_voci}", ln=True)
-    pdf.cell(200, 8, f"- Livello di Rischio: {rischio}", ln=True)
+    pdf.set_font("Arial", '', 12)
+    pdf.cell(200, 10, f"Massa monetaria analizzata: Euro {totale:,.2f}", ln=True)
+    pdf.cell(200, 10, f"Soglia di Materialita (ISA 320): Euro {mat:,.2f}", ln=True)
+    pdf.cell(200, 10, f"Livello di Rischio: {rischio}", ln=True)
     pdf.ln(10)
-    pdf.multi_cell(0, 8, "Il presente report attesta la verifica di integrita statistica conforme agli standard ISA 320.")
-    return pdf.output(dest='S').encode('latin-1')
+    pdf.multi_cell(0, 10, "Conclusioni: Analisi completata con successo secondo standard ISA 320.")
+    return pdf.output()
 
-# --- SIDEBAR ---
+# --- SIDEBAR E CARICAMENTO ---
 st.sidebar.title("💠 COIN-NEXUS PLATINUM")
-uploaded_file = st.sidebar.file_uploader("Sincronizza Dati Aziendali", type
+uploaded_file = st.sidebar.file_uploader("Sincronizza Dati", type=['xlsx', 'csv'])
+
+if uploaded_file:
+    try:
+        # Lettura file
+        if uploaded_file.name.endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file)
+        else:
+            df = pd.read_csv(uploaded_file)
+        
+        # Individuazione colonne
+        cols = df.columns.tolist()
+        col_v = [c for c in cols if any(x in c.lower() for x in ['saldo', 'importo', 'euro', 'valore'])][0]
+        col_c = [c for c in cols if any(x in c.lower() for x in ['desc', 'voce', 'conto', 'account'])][0]
+        
+        # Pulizia numeri
+        df[col_v] = pd.to_numeric(df[col_v].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
+
+        st.title("🛡️ Audit Intelligence & Forensic")
+
+        # Metriche
+        totale = df[col_v].sum()
+        mat = totale * 0.01
+        rischio = "BASSO" if totale < 1000000 else "MODERATO"
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("CAPITALE ANALIZZATO", f"€ {totale:,.2f}")
+        m2.metric("MATERIALITÀ (ISA 320)", f"€ {mat:,.2f}")
+        m3.metric("STATUS", rischio)
+
+        # --- ALERT BIG 4 (RIGA 65) ---
+        voci_pericolose = df[df[col_v] > mat]
+        if not voci_pericolose.empty:
+            st.error(f"🚨 ALERT: Rilevate {len(voci_pericolose)} voci sopra la materialità!")
+            st.dataframe(voci_pericolose[[col_c, col_v]].sort_values(by=col_v, ascending=False))
+
+        # Visualizzazione
+        st.subheader("📊 Mappa Concentrazione")
+        fig = px.treemap(df.nlargest(20, col_v), path=[col_c], values=col_v, template="plotly_dark")
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Download Report
+        st.divider()
+        if st.button("🚀 GENERA REPORT PDF"):
+            pdf_out = genera_report_pdf(totale, mat, rischio)
+            st.download_button(label="Clicca qui per scaricare", data=bytes(pdf_out), file_name="Audit_Platinum.pdf", mime="application/pdf")
+
+    except Exception as e:
+        st.error(f"⚠️ Errore durante l'analisi: {e}")
+else:
+    st.info("👋 Carica un file per iniziare.")
