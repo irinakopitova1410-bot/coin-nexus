@@ -36,7 +36,6 @@ def genera_report_pdf(totale, mat, rischio):
 # --- SIDEBAR E CARICAMENTO ---
 st.sidebar.title("💠 COIN-NEXUS PLATINUM")
 uploaded_file = st.sidebar.file_uploader("Sincronizza Dati", type=['xlsx', 'csv'])
-
 if uploaded_file:
     try:
         # Lettura file
@@ -45,11 +44,30 @@ if uploaded_file:
         else:
             df = pd.read_csv(uploaded_file)
         
-        # Individuazione colonne
+        # --- NUOVO MAPPING INTELLIGENTE (Risolve 'index out of range') ---
         cols = df.columns.tolist()
-        col_v = [c for c in cols if any(x in c.lower() for x in ['saldo', 'importo', 'euro', 'valore'])][0]
-        col_c = [c for c in cols if any(x in c.lower() for x in ['desc', 'voce', 'conto', 'account'])][0]
         
+        # Cerchiamo la colonna dei VALORI (Saldo, Importo, ecc.)
+        col_v_list = [c for c in cols if any(x in c.lower() for x in ['saldo', 'importo', 'euro', 'valore', 'totale'])]
+        # Cerchiamo la colonna delle DESCRIZIONI (Voce, Conto, ecc.)
+        col_c_list = [c for c in cols if any(x in c.lower() for x in ['desc', 'voce', 'conto', 'account', 'nominativo'])]
+
+        if not col_v_list or not col_c_list:
+            st.warning("⚠️ Non ho trovato colonne con nomi standard (Saldo, Descrizione).")
+            st.info("Scegli manualmente le colonne da analizzare:")
+            col_v = st.selectbox("Seleziona la colonna degli IMPORTI:", cols)
+            col_c = st.selectbox("Seleziona la colonna delle DESCRIZIONI:", cols)
+        else:
+            col_v = col_v_list[0]
+            col_c = col_c_list[0]
+        
+        # Pulizia numeri (rimuove € e spazi)
+        df[col_v] = pd.to_numeric(df[col_v].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
+        # ---------------------------------------------------------------
+
+        st.title("🛡️ Audit Intelligence & Forensic")
+        
+        # ... qui continua il resto del codice delle metriche ...
         # Pulizia numeri
         df[col_v] = pd.to_numeric(df[col_v].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
 
