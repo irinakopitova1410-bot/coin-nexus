@@ -41,7 +41,37 @@ if uploaded_file:
         df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
         cols = df.columns.tolist()
 
-        # --- SISTEMA DI MAPPING INTELLIGENTE ---
-        # Cerchiamo colonne probabili
-        probabili_v = [c for c in cols if any(x in c.lower() for x in ['saldo', 'importo', 'euro', 'valore', 'totale'])]
-        probabili_c = [c for c in cols if any(x in c.lower
+        # --- SISTEMA DI MAPPING CORRETTO (SENZA SYNTAX ERROR) ---
+        probabili_v = [c for c in cols if any(x in str(c).lower() for x in ['saldo', 'importo', 'euro', 'valore', 'totale'])]
+        probabili_c = [c for c in cols if any(x in str(c).lower() for x in ['desc', 'voce', 'conto', 'account', 'dettaglio'])]
+
+        col_v, col_c = None, None
+
+        if probabili_v and probabili_c:
+            col_v = probabili_v[0]
+            col_c = probabili_c[0]
+            st.sidebar.success(f"✅ Rilevate: {col_v} e {col_c}")
+        else:
+            st.warning("⚠️ Colonne non identificate automaticamente.")
+            col_v = st.sidebar.selectbox("Colonna Valori (Importi):", cols)
+            col_c = st.sidebar.selectbox("Colonna Descrizioni:", cols)
+
+        if col_v and col_c:
+            # Pulizia dati
+            df[col_v] = pd.to_numeric(df[col_v].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
+            
+            st.title("🛡️ Audit Intelligence & Forensic")
+
+            # Metriche
+            totale = df[col_v].sum()
+            mat = totale * 0.01
+            rischio = "BASSO" if totale < 1000000 else "MODERATO"
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("MASSA MONETARIA", f"€ {totale:,.2f}")
+            m2.metric("SOGLIA ISA 320", f"€ {mat:,.2f}")
+            m3.metric("RATING RISCHIO", rischio)
+
+            # --- ALERT BIG 4 ---
+            voci_sopra = df[df[col_v] > mat]
+            if not voci_sopra.empty:
