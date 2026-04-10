@@ -55,16 +55,22 @@ if file:
             col_c = c2.selectbox("Colonna Descrizioni", cols, index=cols.index(def_c[0]) if def_c else 0)
             
             df[col_v] = pd.to_numeric(df[col_v].astype(str).replace('[€, ]', '', regex=True), errors='coerce').fillna(0)
-
             # Metrics ISA 320
             totale = df[col_v].sum()
             mat = totale * 0.01
-            
             m1, m2, m3 = st.columns(3)
             m1.metric("CAPITALE TOTALE", f"€ {totale:,.2f}")
             m2.metric("MATERIALITÀ (ISA 320)", f"€ {mat:,.2f}")
             m3.metric("INTEGRITÀ DATI", "96.4%", "TRUSTED")
-
+# --- MODULO ALERT CRITICITÀ (Righe 60-70 circa) ---
+        st.markdown("---")
+        voci_critiche = df[df[col_v] > mat]
+        if not voci_critiche.empty:
+            st.error(f"🚨 RILEVATE {len(voci_critiche)} VOCI SOPRA LA SOGLIA DI MATERIALITÀ")
+            with st.expander("Visualizza Voci ad Alto Rischio"):
+                st.table(voci_critiche[[col_c, col_v]].sort_values(by=col_v, ascending=False))
+        else:
+            st.success("✅ Nessuna voce singola supera la soglia di materialità.")     
             # Treemap
             fig = px.treemap(df.nlargest(20, col_v), path=[col_c], values=col_v, color=col_v,
                              color_continuous_scale='Blues', template="plotly_dark")
