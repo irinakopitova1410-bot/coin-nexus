@@ -5,43 +5,40 @@ import plotly.express as px
 from fpdf import FPDF
 import datetime
 
-# --- CONFIGURAZIONE UI ---
+# --- CONFIGURAZIONE UI TECHNO ---
 st.set_page_config(page_title="COIN-NEXUS CYBER-AUDIT", layout="wide")
 
-# CSS TECHNO-SAFE (Design scuro e moderno)
+# CSS "Cyber-Dark" stabile
 st.markdown("""
     <style>
-    .stApp { background-color: #05050a; color: #e0e6ed; }
-    [data-testid="stSidebar"] { background-color: #0a0b15; border-right: 1px solid #1f2937; }
+    .stApp { background-color: #0a0b10; color: #e0e6ed; }
+    [data-testid="stSidebar"] { background-color: #0e1117; border-right: 1px solid #1f2937; }
     
-    /* Cyber Metrics */
-    div[data-testid="stMetricValue"] { color: #3b82f6 !important; font-family: 'Courier New', monospace; font-weight: bold; }
+    /* Stile Metriche Techno */
+    div[data-testid="stMetricValue"] { color: #3b82f6 !important; font-family: 'Courier New', monospace; }
     .stMetric { 
-        background-color: #0f172a; 
-        border: 1px solid #1e293b; 
+        background-color: #161b22; 
+        border: 1px solid #30363d; 
         border-radius: 10px; 
         padding: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
     
-    /* Button Techno */
+    /* Pulsante Techno */
     .stButton>button {
-        background: linear-gradient(90deg, #1e40af, #3b82f6);
+        background: linear-gradient(90deg, #1d4ed8, #3b82f6);
         color: white;
         border: none;
-        padding: 10px 24px;
         border-radius: 5px;
         font-weight: bold;
-        transition: 0.3s;
         width: 100%;
     }
-    .stButton>button:hover { box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); transform: scale(1.02); }
-    
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] { gap: 20px; }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        background-color: #1e293b;
-        border-radius: 5px 5px 0 0;
-        color: white;
-        padding:
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- LOGICA DI ANALISI ---
+def test_benford(data):
+    # Estrae la prima cifra in modo sicuro
+    digits = data.abs().astype(str).str.extract('([1-9])')[0].dropna().astype(int)
+    if digits.empty: return pd.DataFrame()
+    obs = digits.value_counts(normalize=True).sort_index()
+    exp =
