@@ -83,17 +83,18 @@ if uploaded_file:
             st.dataframe(voci_critiche[[col_c, col_v]])
         # Treemap
         st.plotly_chart(px.treemap(df.nlargest(20, col_v), path=[col_c], values=col_v, template="plotly_dark"), use_container_width=True)
-    # --- SEZIONE GENERAZIONE REPORT FINALE ---
+  # --- SEZIONE GENERAZIONE REPORT FINALE ---
         st.divider()
         st.subheader("📥 Certificazione Audit Platinum")
-        # 1. Calcolo variabili necessarie (Tutti i "4 ingredienti")
+        # Prepariamo i dati per il report
         voci_pericolose = df[df[col_v] > mat]
-        rischio_per_report = "ALTO" if not voci_pericolose.empty else "CONTROLLATO"
+        # Definiamo la variabile rischio che serve alla funzione
+        rischio_final = "ALTO" if not voci_pericolose.empty else "CONTROLLATO"
         if st.button("🚀 GENERA REPORT UFFICIALE"):
             try:
-                # 2. Chiamata alla funzione con i nomi corretti
-                # Passiamo: totale, mat, rischio_per_report, voci_pericolose
-                pdf_output = genera_report_pdf(totale, mat, rischio_per_report, voci_pericolose
+                # CHIAMATA ARMONIZZATA: passiamo tutti i 4 argomenti richiesti
+                pdf_output = genera_report_pdf(totale, mat, rischio_final, voci_pericolose)
+                
                 st.download_button(
                     label="📥 SCARICA PDF CERTIFICATO",
                     data=bytes(pdf_output),
@@ -107,8 +108,4 @@ if uploaded_file:
                 st.error(f"Errore tecnico nella creazione del PDF: {e}")
 
     except Exception as e:
-        st.error(f"❌ Errore durante l'elaborazione dei dati: {e}")
-
-else:
-    # Messaggio che appare all'inizio quando l'app è vuota
-    st.info("👋 Benvenuto in Coin-Nexus Platinum. Carica un file Excel o CSV per iniziare l'audit.")
+        st.error(
