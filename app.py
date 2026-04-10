@@ -8,7 +8,7 @@ import datetime
 # --- CONFIGURAZIONE INTERFACCIA ---
 st.set_page_config(page_title="COIN-NEXUS PLATINUM", layout="wide")
 
-# Funzione PDF corretta per FPDF2 (Alta Stabilità)
+# Funzione PDF corretta e "Blindata"
 def genera_report_pdf(totale, mat, rischio, df_anomalie):
     pdf = FPDF()
     pdf.add_page()
@@ -31,12 +31,14 @@ def genera_report_pdf(totale, mat, rischio, df_anomalie):
     pdf.set_font("Arial", '', 11)
     pdf.cell(100, 10, "Massa Analizzata", 1)
     pdf.cell(90, 10, f"Euro {totale:,.2f}", 1, ln=True)
+    pdf.cell(100, 10, "Soglia Materialita", 1)
+    pdf.cell(90, 10, f"Euro {mat:,.2f}", 1, ln=True)
     pdf.cell(100, 10, "Rating Rischio", 1)
     pdf.cell(90, 10, str(rischio), 1, ln=True)
     
     pdf.ln(10)
     
-    # Tabella Anomalie (Il cuore del valore +200%)
+    # Tabella Anomalie
     if not df_anomalie.empty:
         pdf.set_font("Arial", 'B', 14)
         pdf.set_text_color(180, 0, 0)
@@ -49,7 +51,4 @@ def genera_report_pdf(totale, mat, rischio, df_anomalie):
         pdf.cell(50, 8, "Importo", 1, ln=True)
         
         pdf.set_font("Arial", '', 9)
-        for i, row in df_anomalie.head(20).iterrows():
-            # Pulizia per evitare l'errore 0 (Encoding Safe)
-            txt = str(row[0]).encode('ascii', 'ignore').decode('ascii')
-            pdf.cell(140, 7, txt
+        for i, row in df
