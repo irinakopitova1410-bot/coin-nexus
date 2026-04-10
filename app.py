@@ -5,29 +5,42 @@ import plotly.express as px
 from fpdf import FPDF
 import datetime
 
-# --- CONFIGURAZIONE INTERFACCIA ---
-st.set_page_config(page_title="COIN-NEXUS PLATINUM AUDIT", layout="wide")
+# --- CONFIGURAZIONE ---
+st.set_page_config(page_title="COIN-NEXUS PLATINUM", layout="wide")
 
-st.markdown("""
-    <style>
-    .main { background-color: #05070a; color: #e2e8f0; }
-    .stMetric { background: rgba(16, 24, 39, 0.8); border: 1px solid #3b82f6; border-radius: 12px; padding: 20px; }
-    .stButton>button { background: linear-gradient(90deg, #3b82f6, #2563eb); color: white; border-radius: 8px; font-weight: bold; width: 100%; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- FUNZIONE GENERAZIONE PDF PROFESSIONALE ---
 def genera_report_pdf(totale, mat, rischio, df_anomalie):
     pdf = FPDF()
     pdf.add_page()
-    
-    # Header Blu Istituzionale (Valore +200%)
     pdf.set_fill_color(30, 58, 138)
     pdf.rect(0, 0, 210, 40, 'F')
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", 'B', 20)
-    pdf.cell(190, 25, "COIN-NEXUS PLATINUM - AUDIT REPORT", ln=True, align='C')
-    pdf.set_font("Arial", '', 10)
-    pdf.cell(190, -5, f"Generato il: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align='C')
-    
+    pdf.cell(190, 25, "COIN-NEXUS PLATINUM REPORT", ln=True, align='C')
     pdf.set_text_color(0, 0, 0)
+    pdf.ln(25)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(100, 10, "Parametro", 1)
+    pdf.cell(90, 10, "Valore", 1, ln=True)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(100, 10, "Massa Totale", 1)
+    pdf.cell(90, 10, f"{totale:,.2f}", 1, ln=True)
+    pdf.cell(100, 10, "Materialita", 1)
+    pdf.cell(90, 10, f"{mat:,.2f}", 1, ln=True)
+    pdf.ln(10)
+    if not df_anomalie.empty:
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(140, 8, "Descrizione", 1)
+        pdf.cell(50, 8, "Importo", 1, ln=True)
+        pdf.set_font("Arial", '', 9)
+        for i, row in df_anomalie.head(20).iterrows():
+            desc = str(row[0]).encode('latin-1', 'ignore').decode('latin-1')
+            pdf.cell(140, 7, desc[:60], 1)
+            pdf.cell(50, 7, f"{row[1]:,.2f}", 1, ln=True)
+    return pdf.output()
+
+st.title("🛡️ Audit Intelligence Coin-Nexus")
+uploaded_file = st.sidebar.file_uploader("Carica Excel", type=['xlsx', 'csv'])
+
+if uploaded_file:
+    try:
+        df = pd.read_excel(
