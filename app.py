@@ -15,8 +15,8 @@ def genera_report_pdf(totale, mat, rischio, df_anomalie):
     pdf = FPDF()
     pdf.add_page()
     
-    # Intestazione Professionale
-    pdf.set_fill_color(30, 58, 138) # Blu scuro
+    # Intestazione Blu (Valore +200%)
+    pdf.set_fill_color(30, 58, 138)
     pdf.rect(0, 0, 210, 40, 'F')
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Arial", 'B', 20)
@@ -25,51 +25,35 @@ def genera_report_pdf(totale, mat, rischio, df_anomalie):
     pdf.set_text_color(0, 0, 0)
     pdf.ln(20)
     
-    # Riepilogo Metrico in Tabella
+    # Tabella Riepilogo
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(100, 10, "Parametro di Revisione", 1)
-    pdf.cell(90, 10, "Valore Rilevato", 1, ln=True)
+    pdf.cell(100, 10, "Parametro", 1)
+    pdf.cell(90, 10, "Valore", 1, ln=True)
     
     pdf.set_font("Arial", '', 11)
-    pdf.cell(100, 10, "Massa Monetaria Analizzata", 1)
+    # Usiamo 'Euro' invece del simbolo € per evitare crash di font
+    pdf.cell(100, 10, "Massa Monetaria", 1)
     pdf.cell(90, 10, f"Euro {totale:,.2f}", 1, ln=True)
-    pdf.cell(100, 10, "Soglia Materialita (ISA 320)", 1)
+    pdf.cell(100, 10, "Materialita (ISA 320)", 1)
     pdf.cell(90, 10, f"Euro {mat:,.2f}", 1, ln=True)
-    pdf.cell(100, 10, "Rating di Rischio Finale", 1)
-    pdf.set_font("Arial", 'B', 11)
-    pdf.cell(90, 10, rischio, 1, ln=True)
-    
     pdf.ln(10)
-    
-    # SEZIONE ANOMALIE (IL VERO VALORE)
+    # Sezione Anomalie con pulizia caratteri
     if not df_anomalie.empty:
         pdf.set_font("Arial", 'B', 14)
         pdf.set_text_color(200, 0, 0)
-        pdf.cell(190, 10, "DETTAGLIO VOCI SOPRA SOGLIA DI MATERIALITA", ln=True)
-        pdf.set_font("Arial", '', 9)
+        pdf.cell(190, 10, "DETTAGLIO ANOMALIE RILEVATE", ln=True)
+        pdf.ln(5)
+        pdf.set_font("Arial", '', 10)
         pdf.set_text_color(0, 0, 0)
-        
-        # Intestazioni tabella anomalie
-        pdf.cell(140, 8, "Descrizione Voce/Conto", 1)
-        pdf.cell(50, 8, "Importo", 1, ln=True)
-        
-        # Prime 15 anomalie per non intasare il PDF
-        for i, row in df_anomalie.head(15).iterrows():
-            pdf.cell(140, 7, str(row[0])[:60], 1)
-            pdf.cell(50, 7, f"{row[1]:,.2f}", 1, ln=True)
-            
-    pdf.ln(10)
-    pdf.set_font("Arial", 'I', 8)
-    pdf.multi_cell(0, 5, "Dichiarazione: Il presente report e stato generato tramite algoritmi di Forensic Accounting. Le evidenze sopra riportate devono essere sottoposte a verifica documentale (Test Sostantivi).")
-    
+        for i, row in df_anomalie.head(20).iterrows():
+            # Pulizia stringa: rimuove caratteri non-latin1 per evitare l'errore '0'
+            testo_pulito = str(row[0]).encode('latin-1', 'ignore').decode('latin-1')
+            pdf.cell(140, 8, testo_pulito[:60], 1)
+            pdf.cell(50, 8, f"{row[1]:,.2f}", 1, ln=True)
     return pdf.output()
-    # Restituisce i byte direttamente (fpdf2 output() è già un bytearray/bytes)
-    return pdf.output()
-
 # --- INTERFACCIA ---
 st.sidebar.title("💠 COIN-NEXUS PLATINUM")
 uploaded_file = st.sidebar.file_uploader("Carica File", type=['xlsx', 'csv'])
-
 if uploaded_file:
     try:
         df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
@@ -92,28 +76,23 @@ if uploaded_file:
         c1.metric("TOTALE ANALIZZATO", f"€ {totale:,.2f}")
         c2.metric("SOGLIA ISA 320", f"€ {mat:,.2f}")
         c3.metric("RATING", rischio)
-
         # Alert
         voci_critiche = df[df[col_v] > mat]
         if not voci_critiche.empty:
             st.error(f"🚨 Rilevate {len(voci_critiche)} anomalie sopra soglia!")
             st.dataframe(voci_critiche[[col_c, col_v]])
-
         # Treemap
         st.plotly_chart(px.treemap(df.nlargest(20, col_v), path=[col_c], values=col_v, template="plotly_dark"), use_container_width=True)
 
         # REPORT PDF (Fix finale)
         st.divider()
         # --- GENERAZIONE REPORT PROFESSIONALE ---
-
         if st.button("🚀 GENERA REPORT AUDIT PLATINUM"):
             try:
                 # Recuperiamo le voci che superano la soglia (le anomalie)
                 voci_pericolose = df[df[col_v] > mat]
-                
                 # CHIAMATA CORRETTA: aggiungiamo 'voci_pericolose' come quarto argomento
                 pdf_bytes = genera_report_pdf(totale, mat, rischio_lvl, voci_pericolose)
-                
                 st.download_button(
                     label="📥 SCARICA ORA IL PDF CERTIFICATO",
                     data=bytes(pdf_bytes),
