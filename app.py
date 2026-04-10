@@ -104,16 +104,25 @@ if uploaded_file:
 
         # REPORT PDF (Fix finale)
         st.divider()
-        if st.button("🚀 GENERA REPORT PDF"):
-            pdf_bytes = genera_report_pdf(totale, mat, rischio)
-            # Trasformiamo in bytes se fpdf2 restituisce bytearray
-            st.download_button(
-                label="📥 Scarica Report",
-                data=bytes(pdf_bytes), 
-                file_name="Audit_Report.pdf",
-                mime="application/pdf"
-            )
-
+        # --- GENERAZIONE REPORT PROFESSIONALE ---
+        if st.button("🚀 GENERA REPORT AUDIT PLATINUM"):
+            try:
+                # 1. Definiamo le anomalie da passare alla funzione
+                voci_pericolose = df[df[col_v] > mat]
+                
+                # 2. Chiamata corretta con tutti e 4 gli argomenti
+                pdf_bytes = genera_report_pdf(totale, mat, rischio, voci_pericolose)
+                
+                st.download_button(
+                    label="📥 SCARICA ORA IL PDF CERTIFICATO",
+                    data=bytes(pdf_bytes),
+                    file_name="Audit_Report_Platinum.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+                st.success("Report generato con successo!")
+            except Exception as e:
+                st.error(f"Errore durante la creazione del PDF: {e}")
     except Exception as e:
         st.error(f"Errore tecnico: {e}")
 else:
