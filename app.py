@@ -11,22 +11,58 @@ import datetime
 st.set_page_config(page_title="COIN-NEXUS PLATINUM", layout="wide")
 
 # --- FUNZIONE PDF CORRETTA (Senza .encode) ---
-def genera_report_pdf(totale, mat, rischio):
+def genera_report_pdf(totale, mat, rischio, df_anomalie):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 10, "COIN-NEXUS PLATINUM - AUDIT CERTIFICATION", ln=True, align='C')
-    pdf.set_font("Arial", '', 10)
-    pdf.cell(200, 10, f"Data: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align='C')
+    
+    # Intestazione Professionale
+    pdf.set_fill_color(30, 58, 138) # Blu scuro
+    pdf.rect(0, 0, 210, 40, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", 'B', 20)
+    pdf.cell(190, 25, "COIN-NEXUS PLATINUM AUDIT", ln=True, align='C')
+    
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(20)
+    
+    # Riepilogo Metrico in Tabella
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(100, 10, "Parametro di Revisione", 1)
+    pdf.cell(90, 10, "Valore Rilevato", 1, ln=True)
+    
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(100, 10, "Massa Monetaria Analizzata", 1)
+    pdf.cell(90, 10, f"Euro {totale:,.2f}", 1, ln=True)
+    pdf.cell(100, 10, "Soglia Materialita (ISA 320)", 1)
+    pdf.cell(90, 10, f"Euro {mat:,.2f}", 1, ln=True)
+    pdf.cell(100, 10, "Rating di Rischio Finale", 1)
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(90, 10, rischio, 1, ln=True)
+    
     pdf.ln(10)
     
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 10, "SINTESI ANALISI:", ln=True)
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(200, 8, f"- Massa Monetaria: Euro {totale:,.2f}", ln=True)
-    pdf.cell(200, 8, f"- Soglia Materialita: Euro {mat:,.2f}", ln=True)
-    pdf.cell(200, 8, f"- Rischio Rilevato: {rischio}", ln=True)
+    # SEZIONE ANOMALIE (IL VERO VALORE)
+    if not df_anomalie.empty:
+        pdf.set_font("Arial", 'B', 14)
+        pdf.set_text_color(200, 0, 0)
+        pdf.cell(190, 10, "DETTAGLIO VOCI SOPRA SOGLIA DI MATERIALITA", ln=True)
+        pdf.set_font("Arial", '', 9)
+        pdf.set_text_color(0, 0, 0)
+        
+        # Intestazioni tabella anomalie
+        pdf.cell(140, 8, "Descrizione Voce/Conto", 1)
+        pdf.cell(50, 8, "Importo", 1, ln=True)
+        
+        # Prime 15 anomalie per non intasare il PDF
+        for i, row in df_anomalie.head(15).iterrows():
+            pdf.cell(140, 7, str(row[0])[:60], 1)
+            pdf.cell(50, 7, f"{row[1]:,.2f}", 1, ln=True)
+            
+    pdf.ln(10)
+    pdf.set_font("Arial", 'I', 8)
+    pdf.multi_cell(0, 5, "Dichiarazione: Il presente report e stato generato tramite algoritmi di Forensic Accounting. Le evidenze sopra riportate devono essere sottoposte a verifica documentale (Test Sostantivi).")
     
+    return pdf.output()
     # Restituisce i byte direttamente (fpdf2 output() è già un bytearray/bytes)
     return pdf.output()
 
