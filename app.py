@@ -8,6 +8,7 @@ import datetime
 # --- CONFIGURAZIONE ---
 st.set_page_config(page_title="COIN-NEXUS PLATINUM", layout="wide")
 
+# --- FUNZIONE PDF CORRETTA ---
 def genera_report_pdf(totale, mat, rischio, df_anomalie):
     pdf = FPDF()
     pdf.add_page()
@@ -18,14 +19,17 @@ def genera_report_pdf(totale, mat, rischio, df_anomalie):
     pdf.cell(190, 25, "COIN-NEXUS PLATINUM REPORT", ln=True, align='C')
     pdf.set_text_color(0, 0, 0)
     pdf.ln(25)
+    
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(100, 10, "Parametro", 1)
     pdf.cell(90, 10, "Valore", 1, ln=True)
+    
     pdf.set_font("Arial", '', 11)
     pdf.cell(100, 10, "Massa Totale", 1)
     pdf.cell(90, 10, f"{totale:,.2f}", 1, ln=True)
     pdf.cell(100, 10, "Materialita", 1)
     pdf.cell(90, 10, f"{mat:,.2f}", 1, ln=True)
+    
     pdf.ln(10)
     if not df_anomalie.empty:
         pdf.set_font("Arial", 'B', 12)
@@ -38,9 +42,17 @@ def genera_report_pdf(totale, mat, rischio, df_anomalie):
             pdf.cell(50, 7, f"{row[1]:,.2f}", 1, ln=True)
     return pdf.output()
 
+# --- INTERFACCIA ---
 st.title("🛡️ Audit Intelligence Coin-Nexus")
-uploaded_file = st.sidebar.file_uploader("Carica Excel", type=['xlsx', 'csv'])
+uploaded_file = st.sidebar.file_uploader("Carica Excel o CSV", type=['xlsx', 'csv'])
 
 if uploaded_file:
     try:
-        df = pd.read_excel(
+        # CORREZIONE SINTASSI RIGA 46:
+        if uploaded_file.name.endswith('.xlsx'):
+            df = pd.read_excel(uploaded_file)
+        else:
+            df = pd.read_csv(uploaded_file)
+            
+        # Identificazione automatica colonne numeriche
+        col
