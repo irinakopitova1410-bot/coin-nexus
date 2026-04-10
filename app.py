@@ -54,3 +54,24 @@ if uploaded_file:
         st.error(f"Errore tecnico: {e}")
 else:
     st.info("👋 Sistema Pronto. Carica un file Excel per iniziare l'Audit.")
+# --- SEZIONE GENERAZIONE REPORT FINALE ---
+st.divider()
+st.subheader("📥 Certificazione Audit Platinum")
+
+# Creiamo il tasto per il PDF
+if st.button("🚀 GENERA REPORT UFFICIALE"):
+    # Calcolo rischio per il report
+    rischio_final = "ALTO" if not pericolo.empty else "CONTROLLATO"
+    
+    # Generazione fisica del PDF (usando la funzione definita in alto)
+    pdf_output = genera_report_pdf(totale, mat, rischio_final)
+    
+    st.download_button(
+        label="📥 SCARICA PDF CERTIFICATO",
+        data=pdf_output,
+        file_name=f"Audit_Report_CoinNexus.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
+    st.success("Report generato con successo. Pronto per l'invio al Board.")
+
