@@ -87,12 +87,18 @@ if uploaded_file:
         # REPORT PDF (Fix finale)
         st.divider()
         # --- GENERAZIONE REPORT PROFESSIONALE ---
+        # --- SEZIONE GENERAZIONE REPORT ---
         if st.button("🚀 GENERA REPORT AUDIT PLATINUM"):
             try:
-                # Recuperiamo le voci che superano la soglia (le anomalie)
+                # 1. Calcoliamo le anomalie
                 voci_pericolose = df[df[col_v] > mat]
-                # CHIAMATA CORRETTA: aggiungiamo 'voci_pericolose' come quarto argomento
-                pdf_bytes = genera_report_pdf(totale, mat, rischio_lvl, voci_pericolose)
+                
+                # 2. Definiamo lo stato del rischio (Variabile: rischio_val)
+                rischio_val = "ALTO" if not voci_pericolose.empty else "CONTROLLATO"
+                
+                # 3. CHIAMATA ALLA FUNZIONE (Usiamo rischio_val)
+                pdf_bytes = genera_report_pdf(totale, mat, rischio_val, voci_pericolose)
+                
                 st.download_button(
                     label="📥 SCARICA ORA IL PDF CERTIFICATO",
                     data=bytes(pdf_bytes),
@@ -103,7 +109,3 @@ if uploaded_file:
                 st.success("Report generato con successo!")
             except Exception as e:
                 st.error(f"Errore durante la creazione del PDF: {e}")
-    except Exception as e:
-        st.error(f"Errore tecnico: {e}")
-else:
-    st.info("Carica un file Excel per iniziare.")
