@@ -5,137 +5,111 @@ import plotly.express as px
 from fpdf import FPDF
 import datetime
 
-# --- CONFIGURAZIONE HIGH-END ---
-st.set_page_config(page_title="COIN-NEXUS ULTIMATE", layout="wide", page_icon="💎")
+# --- CONFIGURAZIONE INTERFACCIA TECHNO ---
+st.set_page_config(page_title="COIN-NEXUS CYBER-AUDIT", layout="wide", page_icon="🕵️")
 
+# CSS Avanzato per Look Techno-Futuristico
 st.markdown("""
     <style>
-    .main { background: #0b0e14; }
-    .stMetric { background: #111827; border-left: 5px solid #3b82f6; border-radius: 5px; padding: 20px; }
-    .stSidebar { background-color: #111827; }
+    /* Font principale e Sfondo Deep Black */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    
+    html, body, [data-testid="stAppViewContainer"] {
+        font-family: 'Inter', sans-serif;
+        background-color: #050509;
+        color: #e0e6ed;
+    }
+
+    /* Sidebar Scura e Pulita */
+    [data-testid="stSidebar"] {
+        background-color: #0a0b14;
+        border-right: 1px solid #1f293a;
+    }
+
+    /* Metriche stile 'Cyber-Panel' con Glow */
+    .stMetric {
+        background: rgba(16, 20, 35, 0.6);
+        border: 1px solid #1f293a;
+        border-radius: 12px;
+        padding: 25px;
+        transition: all 0.3s ease-in-out;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    .stMetric:hover {
+        border-color: #3b82f6;
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+        transform: translateY(-2px);
+    }
+    .stMetric label { color: #818cf8 !important; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .stMetric .stNumberValue { color: #ffffff !important; font-weight: 700; font-size: 2.2rem !important; }
+
+    /* Pulsanti Techno con Gradiente */
+    .stButton>button {
+        background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.2s;
+        width: 100%;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+    .stButton>button:hover {
+        background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+        box-shadow: 0 0 20px rgba(96, 165, 250, 0.6);
+    }
+
+    /* Tab Design scuro */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #0a0b14;
+        border-radius: 8px;
+        padding: 5px;
+        border: 1px solid #1f293a;
+    }
+    .stTabs [data-baseweb="tab"] {
+        color: #9ca3af;
+        font-weight: 600;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #3b82f6 !important;
+        background-color: #111827;
+        border-radius: 6px;
+    }
+
+    /* Input e Slider */
+    .stSlider [data-baseweb="slider"] { color: #3b82f6; }
+    .stTextInput>div>div>input {
+        background-color: #111827;
+        border: 1px solid #1f293a;
+        color: white;
+        border-radius: 6px;
+    }
+
+    /* Warning Alert color magenta techno */
+    .stAlert {
+        background-color: #1e1b2e;
+        color: #f472b6;
+        border: 1px solid #f472b6;
+        border-radius: 8px;
+    }
+    
+    /* Header pulsante */
+    h1, h2, h3 {
+        color: #ffffff;
+        font-weight: 700;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 # --- ENGINE ANALISI AVANZATA ---
-def analisi_benford(data):
-    digits = data.abs().astype(str).str.extract('([1-9])')[0].dropna().astype(int)
-    if digits.empty: return pd.DataFrame()
-    obs = digits.value_counts(normalize=True).sort_index()
-    exp = pd.Series({i: np.log10(1 + 1/i) for i in range(1, 10)})
-    return pd.DataFrame({'Reale': obs, 'Atteso': exp}).fillna(0)
+def check_data_integrity(df, col_v):
+    issues = []
+    if df[col_v].isnull().any(): issues.append(f"📡 Rilevati {df[col_v].isnull().sum()} pacchetti dati mancanti (NULL).")
+    if (df[col_v] == 0).any(): issues.append(f"📉 Rilevati { (df[col_v] == 0).sum() } valori zero (Sospetto Window Dressing).")
+    if (df[col_v] < 0).any(): issues.append("⚠️ Valori negativi individuati (Verificare storni).")
+    return issues
 
-# --- GENERATORE CARTE DI LAVORO (PDF CERTIFICATO) ---
-def genera_pdf_professional(totale, mat, samp, rischio, anomalie, note, studio_nome):
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Intestazione Branding
-    pdf.set_fill_color(30, 58, 138)
-    pdf.rect(0, 0, 210, 50, 'F')
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Arial", 'B', 26)
-    pdf.cell(190, 30, studio_nome.upper(), ln=True, align='C')
-    pdf.set_font("Arial", 'I', 12)
-    pdf.cell(190, 10, "Documentazione di Revisione ai sensi del principio ISA Italia 230", ln=True, align='C')
-    
-    pdf.set_text_color(0, 0, 0)
-    pdf.ln(30)
-    
-    # Metodologia
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, "RIEPILOGO METODOLOGICO DI PIANIFICAZIONE", ln=True)
-    pdf.set_font("Arial", '', 11)
-    data_audit = datetime.date.today().strftime("%d/%m/%Y")
-    pdf.multi_cell(0, 8, f"In data {data_audit}, e stata eseguita l'analisi del database fornito. La materialita e stata determinata in base ai rischi identificati e ai benchmark di settore.")
-    
-    # Tabella Parametri
-    pdf.ln(5)
-    pdf.set_font("Arial", 'B', 10)
-    pdf.cell(100, 10, "Parametro di Revisione", 1)
-    pdf.cell(90, 10, "Valore", 1, ln=True)
-    pdf.set_font("Arial", '', 10)
-    pdf.cell(100, 10, "Massa Totale Verificata", 1)
-    pdf.cell(90, 10, f"Euro {totale:,.2f}", 1, ln=True)
-    pdf.cell(100, 10, "Materialita di Pianificazione (ISA 320)", 1)
-    pdf.cell(90, 10, f"Euro {mat:,.2f}", 1, ln=True)
-    pdf.cell(100, 10, "Soglia Errore Trascurabile (SAMP)", 1)
-    pdf.cell(90, 10, f"Euro {samp:,.2f}", 1, ln=True)
-    
-    pdf.ln(10)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, "CONCLUSIONI DEL TEAM DI AUDIT", ln=True)
-    pdf.set_font("Arial", 'I', 10)
-    pdf.multi_cell(0, 8, note if note else "L'analisi non ha evidenziato criticita tali da richiedere procedure di validita estese, salvo quanto indicato nel dettaglio eccezioni.")
-
-    if not anomalie.empty:
-        pdf.ln(10)
-        pdf.set_font("Arial", 'B', 12)
-        pdf.cell(140, 8, "Voci Sopra Soglia (Eccezioni)", 1, 0, 'C')
-        pdf.cell(50, 8, "Valore", 1, 1, 'C')
-        pdf.set_font("Arial", '', 9)
-        for _, row in anomalie.head(25).iterrows():
-            desc = str(row.iloc[0]).encode('ascii', 'ignore').decode('ascii')
-            pdf.cell(140, 7, desc[:65], 1)
-            pdf.cell(50, 7, f"{row.iloc[1]:,.2f}", 1, 1, 'R')
-            
-    return pdf.output()
-
-# --- INTERFACCIA ---
-st.title("💎 Coin-Nexus Ultimate Audit Platform")
-st.subheader("Professional Grade Compliance & Forensic Engine")
-
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/584/584011.png", width=100)
-    st.header("🏢 Personalizzazione Studio")
-    nome_studio = st.text_input("Nome Studio Professionale", "Global Audit Firm")
-    st.divider()
-    st.header("📂 Caricamento Dati")
-    file = st.file_uploader("Bilancio di Verifica o Giornale di Contabilita", type=['xlsx', 'csv'])
-    st.divider()
-    st.header("⚖️ Metodologia")
-    perc_mat = st.slider("Materialità (% Massa Totale)", 0.5, 5.0, 1.5)
-    perc_samp = st.slider("Soglia SAMP (% della Materialità)", 1, 10, 5)
-
-if file:
-    try:
-        df = pd.read_excel(file) if file.name.endswith('.xlsx') else pd.read_csv(file)
-        nums = df.select_dtypes(include=[np.number]).columns
-        chars = df.select_dtypes(include=['object']).columns
-        
-        if len(nums) > 0 and len(chars) > 0:
-            col_v, col_c = nums[0], chars[0]
-            
-            # CALCOLI 100K
-            massa = df[col_v].sum()
-            mat_val = massa * (perc_mat / 100)
-            samp_val = mat_val * (perc_samp / 100)
-            anom = df[df[col_v] > mat_val].sort_values(by=col_v, ascending=False)
-            
-            # DASHBOARD ELITE
-            k1, k2, k3 = st.columns(3)
-            k1.metric("MASSA CONTROLLATA", f"€ {massa:,.2f}")
-            k2.metric("SOGLIA MATERIALITÀ", f"€ {mat_val:,.2f}")
-            k3.metric("ALERT EVIDENZIATI", len(anom))
-
-            tab1, tab2, tab3 = st.tabs(["📊 Analisi Rischi", "🕵️ Forensic Test", "📜 Reporting"])
-            
-            with tab1:
-                st.plotly_chart(px.treemap(df.nlargest(30, col_v), path=[col_c], values=col_v, template="plotly_dark", title="Mappa di Concentrazione Voci di Bilancio"), use_container_width=True)
-            
-            with tab2:
-                st.subheader("Test della Prima Cifra (Legge di Benford)")
-                ben_df = analisi_benford(df[col_v])
-                if not ben_df.empty:
-                    st.line_chart(ben_df)
-                    st.info("Nota: Gli scostamenti eccessivi dalla linea 'Atteso' richiedono indagini forensi su eventuali tentativi di 'Window Dressing' o frode.")
-
-            with tab3:
-                st.subheader("Generatore Carte di Lavoro")
-                note_audit = st.text_area("Inserisci Conclusioni Professionali per il Report", height=150)
-                if st.button("🚀 GENERA DOCUMENTAZIONE FIRMATA"):
-                    pdf_final = genera_pdf_professional(massa, mat_val, samp_val, "VALUTATO", anom, note_audit, nome_studio)
-                    st.download_button("📥 Scarica Report di Revisione Certificato", data=bytes(pdf_final), file_name=f"Carte_Lavoro_{nome_studio}.pdf", mime="application/pdf", use_container_width=True)
-    except Exception as e:
-        st.error(f"Errore tecnico: {e}")
-else:
-    st.info("Inizia caricando i dati contabili per eseguire lo screening di rischio automatico.")
+def benford_analysis(data):
+    digits = data.abs().astype(str).
