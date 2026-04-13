@@ -1,6 +1,6 @@
 from supabase import create_client
 
-SUPABASE_URL = "https://YOUR_PROJECT.supabase.co"
-SUPABASE_KEY = "YOUR_ANON_KEY"
+SUPABASE_URL = "https://TUO-PROGETTO.supabase.co"
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
