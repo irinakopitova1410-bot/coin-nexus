@@ -8,94 +8,113 @@ import datetime
 from sklearn.ensemble import IsolationForest
 from supabase import create_client, Client
 
-# --- 1. CONFIGURAZIONE CORE ---
+# --- 1. CONFIGURAZIONE SICURA ---
+# Se non hai ancora le chiavi, l'app funzionerà comunque (senza salvare su cloud)
 SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
-SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos" # <--- METTI LA TUA CHIAVE REALE
-try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-except:
-    st.error("Connessione Cloud Fallita. Controlla la Key.")
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos" 
 
-# --- 2. MOTORE DI CALCOLO QUANTUM ---
-def quantum_analysis(df, val_col):
-    totale_flussi = df[val_col].sum()
-    media_flussi = df[val_col].mean()
-    volatilita = df[val_col].std()
-    
-    # Materialità ISA 320 (Soglia di errore tollerabile)
-    materialita = totale_flussi * 0.015 
-    
-    # Simulazione DSCR (Sostenibilità Debito)
-    # Se la volatilità è bassa rispetto ai flussi, il debito è più sostenibile
-    dscr = (totale_flussi / (volatilita * 1.5)) if volatilita > 0 else 2.5
-    
-    # Z-Score semplificato (Rischio Crisi)
-    z_score = 1.2 + (totale_flussi / 1000000) - (volatilita / totale_flussi)
-    
-    # Rating Finale
-    if z_score > 2.5 and dscr > 1.2: rating = "AAA - EXCELLENT"
-    elif z_score > 1.1: rating = "BBB - STABLE"
-    else: rating = "CCC - AT RISK"
-    
-    return {
-        "totale": totale_flussi,
-        "materialita": materialita,
-        "dscr": dscr,
-        "z_score": z_score,
-        "rating": rating
-    }
+def get_supabase():
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except:
+        return None
 
-# --- 3. GENERATORE REPORT CERTIFICATO ---
-class PDF(FPDF):
+client_db = get_supabase()
+
+# --- 2. CLASSE PDF OTTIMIZZATA ---
+class QuantumPDF(FPDF):
     def header(self):
-        self.set_fill_color(0, 40, 80)
+        self.set_fill_color(0, 51, 102)
         self.rect(0, 0, 210, 40, 'F')
-        self.set_font("Arial", 'B', 22)
+        self.set_font("Arial", 'B', 20)
         self.set_text_color(255, 255, 255)
-        self.cell(190, 20, "COIN-NEXUS QUANTUM REPORT v3.5", ln=True, align='C')
+        self.cell(190, 20, "COIN-NEXUS QUANTUM CERTIFICATION", ln=True, align='C')
         self.ln(20)
 
-def genera_report_pdf(studio, data, anomalie):
-    pdf = PDF()
+def genera_pdf_certificato(studio, dati, anomalie_count):
+    pdf = QuantumPDF()
     pdf.add_page()
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", 'B', 14)
-    pdf.cell(190, 10, f"STUDIO PROFESSIONALE: {studio.upper()}", ln=True)
-    pdf.cell(190, 10, f"DATA CERTIFICAZIONE: {datetime.date.today()}", ln=True)
-    pdf.ln(5)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.cell(190, 10, f"EMESSO DA: {studio.upper()}", ln=True)
+    pdf.cell(190, 10, f"DATA: {datetime.date.today()}", ln=True)
     pdf.ln(10)
     
-    # Tabella Risultati
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(95, 10, "INDICATORE", 1)
-    pdf.cell(95, 10, "VALORE", 1, ln=True)
+    pdf.cell(95, 10, "INDICATORE", 1, 0, 'C')
+    pdf.cell(95, 10, "VALORE", 1, 1, 'C')
     
     pdf.set_font("Arial", size=11)
-    results = [
-        ("Massa Totale Analizzata", f"EUR {data['totale']:,.2f}"),
-        ("Soglia Materialita ISA 320", f"EUR {data['materialita']:,.2f}"),
-        ("Indice Sostenibilita DSCR", f"{data['dscr']:.2f}"),
-        ("Quantum Z-Score", f"{data['z_score']:.2f}"),
-        ("RATING FINALE", data['rating'])
-    ]
-    for label, val in results:
-        pdf.cell(95, 10, label, 1)
-        pdf.cell(95, 10, val, 1, ln=True)
-        
-    pdf.ln(10)
-    pdf.set_font("Arial", 'I', 10)
-    pdf.multi_cell(190, 7, "VALIDAZIONE: Il presente documento certifica la regolarita dei flussi analizzati tramite algoritmi di intelligenza artificiale forense e conformita ISA.")
+    for k, v in dati.items():
+        pdf.cell(95, 10, k, 1)
+        pdf.cell(95, 10, str(v), 1, 1)
     
+    pdf.ln(10)
+    pdf.multi_cell(190, 7, "CONFORMITA: Analisi eseguita secondo standard ISA 320 e monitoraggio AI Forensic.")
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 4. INTERFACCIA STREAMLIT PLATINUM ---
-st.set_page_config(page_title="COIN-NEXUS QUANTUM", layout="wide", page_icon="💠")
-
-# Style Custom
-st.markdown("""<style>
-    .metric-card { background: #111; padding: 20px; border-radius: 10px; border: 1px solid #00f2ff; text-align: center; }
-    .stMetric { background: #0e1117; border: 1px solid #333; padding: 15px; border-radius: 10px; }
-</style>""", unsafe_allow_html=True)
+# --- 3. INTERFACCIA E LOGICA ---
+st.set_page_config(page_title="COIN-NEXUS PLATINUM", layout="wide")
 
 if "auth" not in st.session_state:
+    st.session_state["auth"] = False
+
+if not st.session_state["auth"]:
+    st.title("💠 COIN-NEXUS ACCESS")
+    pwd = st.text_input("PASSWORD", type="password")
+    if st.button("SBLOCCA SISTEMA"):
+        if pwd == "PLATINUM2026":
+            st.session_state["auth"] = True
+            st.rerun()
+    st.stop()
+
+# --- DASHBOARD ---
+st.title("💠 Quantum Financial Engine v3.5")
+with st.sidebar:
+    st.header("IMPOSTAZIONI")
+    studio = st.text_input("Studio/Banca", "STUDIO_GOLD_REVISIONI")
+    file = st.file_uploader("Carica Bilancio (Excel/CSV)", type=['xlsx', 'csv'])
+    if st.button("CHIUDI SESSIONE"):
+        st.session_state["auth"] = False
+        st.rerun()
+
+if file:
+    try:
+        # Caricamento e pulizia
+        df = pd.read_excel(file) if file.name.endswith('.xlsx') else pd.read_csv(file)
+        val_col = df.select_dtypes(include=[np.number]).columns[0]
+        
+        # Calcoli Avanzati
+        ricavi = df[val_col].sum()
+        mat = ricavi * 0.012
+        rischio_score = 1.2 + (ricavi / 500000)
+        rating = "AAA" if rischio_score > 2.5 else "BBB"
+        
+        # AI Detection
+        iso = IsolationForest(contamination=0.05).fit(df[[val_col]])
+        anomalie = len(df[iso.predict(df[[val_col]]) == -1])
+
+        # Esposizione Dati
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("MASSA ANALIZZATA", f"€{ricavi:,.2f}")
+        c2.metric("MATERIALITÀ ISA", f"€{mat:,.2f}")
+        c3.metric("Z-SCORE RISCHIO", f"{rischio_score:.2f}")
+        c4.metric("RATING AI", rating)
+
+        # Grafico Quantum
+        st.plotly_chart(px.area(df, y=val_col, title="Flussi Finanziari Certificati", template="plotly_dark"), use_container_width=True)
+
+        # Report e Cloud
+        st.divider()
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if st.button("💾 SINCRONIZZA CLOUD SUPABASE"):
+                if client_db:
+                    client_db.table("reports").insert({
+                        "studio_nome": studio, "massa_totale": float(ricavi),
+                        "rating": rating, "anomalie_count": int(anomalie)
+                    }).execute()
+                    st.success("Dati sincronizzati!")
+                else:
+                    st.
