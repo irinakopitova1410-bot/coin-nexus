@@ -40,39 +40,75 @@ def calculate_hhi(df, col):
     shares = (df[col] / df[col].sum()) ** 2
     return shares.sum()
 
-# --- PDF GENERATOR 200K EDITION ---
-def genera_report_platinum(massa, mat, anom, outliers, hhi, studio, note):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_fill_color(0, 10, 31)
-    pdf.rect(0, 0, 210, 50, 'F')
-    pdf.set_text_color(0, 242, 255)
-    pdf.set_font("Arial", 'B', 28)
-    pdf.cell(190, 30, studio.upper(), ln=True, align='C')
-    pdf.set_font("Arial", 'I', 11)
-    pdf.cell(190, 10, "INDEPENDENT FORENSIC INTELLIGENCE REPORT - V.2.0", ln=True, align='C')
-    
-    pdf.set_text_color(0, 0, 0)
-    pdf.ln(30)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, "1. EXECUTIVE SUMMARY & RISK INDICATORS", ln=True)
-    
-    pdf.set_font("Arial", '', 10)
-    pdf.cell(100, 10, "Total Asset Mass Analysed", 1); pdf.cell(90, 10, f"EUR {massa:,.2f}", 1, 1, 'R')
-    pdf.cell(100, 10, "Risk Concentration Index (HHI)", 1); pdf.cell(90, 10, f"{hhi:.4f}", 1, 1, 'R')
-    
-    pdf.ln(10)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(0, 10, "2. STATISTICAL OUTLIERS (Z-SCORE > 2)", ln=True)
-    pdf.set_font("Arial", '', 9)
-    for i in range(min(len(outliers), 25)):
-        row = outliers.iloc[i]
-        desc = str(row.iloc[0]).encode('latin-1', 'ignore').decode('latin-1')
-        pdf.cell(140, 7, desc[:70], 1)
-        pdf.cell(50, 7, f"Z:{row['z_score']:.2f}", 1, 1, 'R')
+# --- GENERATORE PDF STABILIZZATO ---
+def genera_pdf_platinum(massa, mat, anom, outliers, hhi, studio, note):
+    try:
+        pdf = FPDF()
+        pdf.add_page()
         
-    return pdf.output()
+        # Header - Usiamo Arial standard per evitare problemi di font
+        pdf.set_fill_color(0, 10, 31)
+        pdf.rect(0, 0, 210, 50, 'F')
+        pdf.set_text_color(0, 242, 255)
+        pdf.set_font("Arial", 'B', 24)
+        pdf.cell(190, 30, str(studio).upper(), ln=True, align='C')
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(30)
+        
+        # Sintesi Parametri
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, "DATI DI REVISIONE", ln=True)
+        pdf.set_font("Arial", '', 10)
+        pdf.cell(100, 10, "Massa Totale:", 1); pdf.cell(90, 10, f"{massa:,.2f}", 1, 1, 'R')
+        pdf.cell(100, 10, "Materialita:", 1); pdf.cell(90, 10, f"{mat:,.2f}", 1, 1, 'R')
+        pdf.cell(100, 10, "Indice HHI:", 1); pdf.cell(90, 10, f"{hhi:.4f}", 1, 1, 'R')
+        
+        # Sezione Anomalie - Pulizia caratteri speciali
+        if not anom.empty:
+            pdf.ln(10)
+            pdf.set_font("Arial", 'B', 12)
+            pdf.cell(0, 10, "PRINCIPALI ECCEZIONI RILEVATE", ln=True)
+            pdf.set_font("Arial", '', 8)
+            for i in range(min(len(anom), 30)):
+                row = anom.iloc[i]
+                # Pulisce la descrizione da caratteri che FPDF non supporta
+                clean_desc = str(row.iloc[0]).encode('ascii', 'ignore').decode('ascii')
+                pdf.cell(150, 7, clean_desc[:75], 1)
+                pdf.cell(40, 7, f"{row.iloc[1]:,.2f}", 1, 1, 'R')
+        
+        # Note Finali
+        if note:
+            pdf.ln(10)
+            pdf.set_font("Arial", 'I', 10)
+            clean_note = str(note).encode('ascii', 'ignore').decode('ascii')
+            pdf.multi_cell(0, 7, clean_note)
 
+        # Ritorna i bytes direttamente invece di salvare su disco
+        return pdf.output(dest='S').encode('latin-1')
+    except Exception as e:
+        return f"ERRORE_PDF: {str(e)}"
+
+# --- NEL TAB DI ESPORTAZIONE (Sostituisci il blocco del pulsante) ---
+with tabs[3]:
+    st.subheader("Final Intelligence Report")
+    note_audit = st.text_area("Audit Conclusion", value=ai_text if 'ai_text' in locals() else "")
+    
+    if st.button("🚀 ESEGUI MASTER EXPORT"):
+        with st.spinner("Compilazione report in corso..."):
+            pdf_out = genera_pdf_platinum(massa, mat_val, anom, outliers, hhi_val, studio_nome, note_audit)
+            
+            if isinstance(pdf_out, str) and "ERRORE" in pdf_out:
+                st.error(pdf_out)
+            else:
+                st.success("Report generato con successo!")
+                st.download_button(
+                    label="📥 SCARICA PLATINUM REPORT (PDF)",
+                    data=pdf_out,
+                    file_name=f"Audit_Quantum_{datetime.date.today()}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
 # --- MAIN APP ---
 st.title("💠 COIN-NEXUS QUANTUM 2.0")
 st.caption("AI-Powered Forensic Suite | Strategic Risk Intelligence")
