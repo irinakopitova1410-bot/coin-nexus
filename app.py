@@ -7,14 +7,14 @@ import datetime
 from sklearn.ensemble import IsolationForest
 from supabase import create_client, Client
 
-# --- 1. CONFIGURAZIONE SICURA ---
-# Se non metti le chiavi corrette, l'app funzionerà ma ti avviserà del mancato salvataggio
-URL = "https://ipmttldwfsxuubugiyir.supabase.co"
-KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos" 
+# --- POSIZIONE: RIGA 10-15 ---
+import streamlit as st
+from supabase import create_client
 
-def get_db():
-    try: return create_client(URL, KEY)
-    except: return None
+# Inserisci qui le credenziali che trovi su Supabase -> Project Settings -> API
+URL = "https://tuo-progetto.supabase.co"
+KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos" # Usa la service role per gestire gli utenti
+supabase = create_client(URL, KEY)
 
 # --- 2. GENERATORE REPORT PDF ---
 def genera_report(studio, dati, anomalie):
