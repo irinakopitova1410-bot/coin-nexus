@@ -137,3 +137,43 @@ if uploaded:
         st.error(f"ENGINE_ERROR: {e}")
 else:
     st.info("👋 Carica un file per attivare l'analisi Quantum.")
+from sklearn.ensemble import IsolationForest
+
+def ai_predictive_audit(df, col_val):
+    """
+    Modulo AI Quantum: Utilizza Isolation Forest per rilevare 
+    anomalie multidimensionali che sfuggono alla statistica classica.
+    """
+    # Prepariamo i dati per l'AI
+    X = df[[col_val]].values
+    
+    # Inizializziamo il modello (Contaminazione al 5% di default)
+    model = IsolationForest(contamination=0.05, random_state=42)
+    
+    # L'AI impara e predice (-1 è anomalia, 1 è normale)
+    df['ai_anomaly_score'] = model.fit_predict(X)
+    
+    # Isoliama i sospetti "invisibili"
+    ai_anomalies = df[df['ai_anomaly_score'] == -1].copy()
+    return ai_anomalies
+
+# --- NEL TUO TAB AI INSIGHTS (Tab 2) ---
+# Aggiungi questo sotto lo Z-Score:
+
+st.subheader("🤖 Deep Learning: Isolation Forest Analysis")
+ai_outliers = ai_predictive_audit(df, num_col)
+
+st.write(f"L'intelligenza artificiale ha identificato **{len(ai_outliers)}** transazioni con pattern di rischio elevato.")
+st.dataframe(ai_outliers.nlargest(10, num_col), use_container_width=True)
+
+
+
+
+
+
+
+
+
+
+
+
