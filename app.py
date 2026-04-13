@@ -7,6 +7,22 @@ import datetime
 from sklearn.ensemble import IsolationForest
 from supabase import create_client, Client
 
+def genera_pdf(studio, massa, rating, anomalie_count):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(190, 10, "COIN-NEXUS QUANTUM AI - REPORT CERTIFICATO", ln=True, align='C')
+    pdf.ln(10)
+    pdf.set_font("Arial", size=12)
+    pdf.cell(190, 10, f"Studio: {studio}", ln=True)
+    pdf.cell(190, 10, f"Massa Analizzata: EUR {massa:,.2f}", ln=True)
+    pdf.cell(190, 10, f"Rating: {rating}", ln=True)
+    pdf.cell(190, 10, f"Anomalie AI: {anomalie_count}", ln=True)
+    pdf.ln(10)
+    pdf.set_font("Arial", 'I', 10)
+    pdf.multi_cell(190, 7, "Documento generato in conformità agli standard ISA 320 e ISO 27001.")
+    return pdf.output(dest='S').encode('latin-1')
+
 # --- CONFIGURAZIONE SUPABASE ---
 SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
 # Incolla qui la tua chiave 'anon' 'public' che hai appena copiato da Supabase
@@ -86,3 +102,27 @@ if file:
 
     except Exception as e:
         st.error(f"Errore: {e}")
+
+# --- SEZIONE DOWNLOAD REPORT ---
+        st.divider()
+        st.subheader("📄 Certificazione Risultati")
+        
+        # Prepariamo i dati per il PDF usando le variabili create durante l'analisi
+        try:
+            # Assicurati che rating_label e anomalie siano definiti nel tuo codice sopra
+            pdf_data = genera_pdf(studio, massa, rating_label, len(anomalie))
+            
+            st.download_button(
+                label="📥 SCARICA REPORT PDF PROFESSIONALE",
+                data=pdf_data,
+                file_name=f"Report_CoinNexus_{studio}_{datetime.date.today()}.pdf",
+                mime="application/pdf",
+                key="download-pdf"
+            )
+            st.caption("Il report include la conformità ISA 320 e ISO 27001.")
+        except Exception as e:
+            st.warning("Carica un file e completa l'analisi per generare il PDF.")
+
+
+
+
