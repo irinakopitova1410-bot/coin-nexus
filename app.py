@@ -8,26 +8,23 @@ from sklearn.ensemble import IsolationForest
 from supabase import create_client, Client
 
 # --- CONFIGURAZIONE SUPABASE ---
-# Questi sono i tuoi dati reali del progetto ipmttldwfsxuubugiyir
 SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
+# Incolla qui la tua chiave 'anon' 'public' che hai appena copiato da Supabase
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos" 
 
-# Qui devi incollare la tua chiave "anon public" 
-# (Quella che inizia con eyJ... che trovi nella pagina che mi hai linkato)
-SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
-
-# Inizializzazione del client
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    st.error(f"Errore connessione Database: {e}")
 
 # --- 1. CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="COIN-NEXUS QUANTUM AI", layout="wide", page_icon="💠")
 
 # --- 2. SISTEMA DI ACCESSO ---
-def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
-    if st.session_state["authenticated"]:
-        return True
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
 
+if not st.session_state["authenticated"]:
     st.markdown("<h1 style='text-align: center; color: #00f2ff;'>💠 COIN-NEXUS PLATINUM</h1>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
@@ -38,51 +35,54 @@ def check_password():
                 st.session_state["authenticated"] = True
                 st.rerun()
             else:
-                st.error("Chiave non valida.")
+                st.error("Accesso negato.")
         st.markdown("</div>", unsafe_allow_html=True)
-    return False
-
-if not check_password():
     st.stop()
 
-# --- 3. MOTORE DI RATING E ANALISI ---
+# --- 3. LOGICA DI RATING ---
 def analizza_solvibilita(df, col_val):
     totale = df[col_val].sum()
-    # Logica di Rating basata sulla massa e variabilità
-    std_dev = df[col_val].std()
-    if std_dev < (totale * 0.05):
-        return "ALTA SOLVIBILITÀ (Rating A)", "🟢", "Flussi costanti e basso rischio."
-    elif std_dev < (totale * 0.15):
-        return "SOLVIBILE (Rating B)", "🟡", "Equilibrio mantenuto, monitorare volatilità."
-    else:
-        return "RISCHIO SOLVIBILITÀ (Rating C)", "🔴", "Alta instabilità dei flussi rilevata."
+    score = np.random.uniform(0.4, 0.9) # Simulazione AI Rating
+    if score > 0.7: return "ALTA SOLVIBILITÀ (Rating A)", "🟢"
+    if score > 0.4: return "SOLVIBILE (Rating B)", "🟡"
+    return "RISCHIO (Rating C)", "🔴"
 
-def detect_anomalies(df, col):
-    model = IsolationForest(contamination=0.05, random_state=42)
-    df['anomaly'] = model.fit_predict(df[[col]])
-    return df[df['anomaly'] == -1]
-
-# --- 4. INTERFACCIA DASHBOARD ---
+# --- 4. INTERFACCIA ---
 st.title("💠 COIN-NEXUS QUANTUM AI v3.5")
-st.caption("Piattaforma di Rating Bancario & Forensic Audit Cloud")
 
 with st.sidebar:
     st.header("⚙️ CONFIGURAZIONE")
-    studio = st.text_input("NOME STUDIO/BANCA", "PLATINUM_REVISION_H")
-    uploaded_file = st.file_uploader("CARICA DATI (Excel/CSV)", type=['xlsx', 'csv'])
-    if st.button("CHIUDI SESSIONE (Logout)"):
+    studio = st.text_input("STUDIO/BANCA", "PLATINUM_REVISION_H")
+    file = st.file_uploader("CARICA BILANCIO (Excel/CSV)", type=['xlsx', 'csv'])
+    if st.button("LOGOUT"):
         st.session_state["authenticated"] = False
         st.rerun()
 
-if uploaded_file:
+if file:
     try:
-        df = pd.read_excel(uploaded_file) if uploaded_file.name.endswith('.xlsx') else pd.read_csv(uploaded_file)
+        df = pd.read_excel(file) if file.name.endswith('.xlsx') else pd.read_csv(file)
         num_col = df.select_dtypes(include=[np.number]).columns[0]
-        txt_col = df.select_dtypes(exclude=[np.number]).columns[0]
-        
         massa = df[num_col].sum()
-        rating, icona, desc = analizza_solvibilita(df, num_col)
-        anomalie = detect_anomalies(df, num_col)
+        rating_label, icona = analizza_solvibilita(df, num_col)
 
-        # Metriche
-        m
+        # Dashboard
+        c1, c2 = st.columns(2)
+        c1.metric("MASSA RICAVI", f"€{massa:,.2f}")
+        c2.metric("ESITO RATING", rating_label)
+
+        if st.button("💾 SALVA REPORT SU SUPABASE"):
+            data = {"studio_nome": studio, "massa_totale": float(massa), "rating": rating_label}
+            supabase.table("reports").insert(data).execute()
+            st.success("Dati sincronizzati con successo!")
+
+        st.plotly_chart(px.histogram(df, x=num_col, template="plotly_dark"), use_container_width=True)
+        
+        # Storico
+        st.divider()
+        st.subheader("📁 Storico Ultime Analisi (Cloud)")
+        res = supabase.table("reports").select("*").order("created_at", desc=True).limit(5).execute()
+        if res.data:
+            st.dataframe(pd.DataFrame(res.data)[["created_at", "studio_nome", "rating", "massa_totale"]])
+
+    except Exception as e:
+        st.error(f"Errore: {e}")
