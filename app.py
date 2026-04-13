@@ -75,9 +75,11 @@ def genera_pdf_platinum(massa, mat, ai_anom, hhi, studio, note):
         pdf.set_font("Arial", 'B', 14)
         pdf.cell(0, 10, "SINTESI ESECUTIVA - RAPPORTO AI", ln=True)
         pdf.set_font("Arial", '', 10)
-        pdf.cell(100, 10, "Massa Totale:", 1); pdf.cell(90, 10, f"{massa:,.2f}", 1, 1, 'R')
-        pdf.cell(100, 10, "Materialita:", 1); pdf.cell(90, 10, f"{mat:,.2f}", 1, 1, 'R')
-        pdf.cell(100, 10, "Anomalie AI:", 1); pdf.cell(90, 10, f"{len(ai_anom)}", 1, 1, 'R')
+      # Dati nel PDF
+        pdf.cell(100, 10, "Massa Totale Analizzata:", 1); pdf.cell(90, 10, f"Euro {massa:,.2f}", 1, 1, 'R')
+        pdf.cell(100, 10, "Soglia di Materialita (ISA 320):", 1); pdf.cell(90, 10, f"Euro {mat:,.2f}", 1, 1, 'R')
+        pdf.cell(100, 10, "Conformita Analisi Dati:", 1); pdf.cell(90, 10, "ISO/IEC 27001 compliant", 1, 1, 'R') # <--- AGGIUNTO ISO
+        pdf.cell(100, 10, "Anomalie Rilevate dall'AI:", 1); pdf.cell(90, 10, f"{len(ai_anom)}", 1, 1, 'R')
         if note:
             pdf.ln(10)
             pdf.multi_cell(0, 7, f"NOTE: {note}")
