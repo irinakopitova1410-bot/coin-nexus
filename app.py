@@ -4,7 +4,6 @@ import numpy as np
 import plotly.express as px
 from fpdf import FPDF
 import datetime
-import io
 
 # --- CONFIGURAZIONE UI ---
 st.set_page_config(page_title="COIN-NEXUS QUANTUM AI", layout="wide", page_icon="💠")
@@ -29,6 +28,7 @@ def get_stats(df, col):
     hhi = ((df[col] / df[col].sum()) ** 2).sum()
     return outliers, hhi
 
+# --- GENERATORE PDF (MEMORY-SAFE) ---
 def genera_pdf_platinum(massa, mat, anom, outliers, hhi, studio, note):
     try:
         pdf = FPDF()
@@ -56,7 +56,7 @@ def genera_pdf_platinum(massa, mat, anom, outliers, hhi, studio, note):
             pdf.set_font("Arial", '', 8)
             for i in range(min(len(anom), 30)):
                 row = anom.iloc[i]
-                # Pulizia sicura per FPDF
+                # Pulizia sicura per FPDF (solo caratteri ASCII)
                 clean_desc = str(row.iloc[0]).encode('ascii', 'ignore').decode('ascii')
                 pdf.cell(150, 7, clean_desc[:75], 1)
                 pdf.cell(40, 7, f"{row.iloc[1]:,.2f}", 1, 1, 'R')
@@ -67,8 +67,7 @@ def genera_pdf_platinum(massa, mat, anom, outliers, hhi, studio, note):
             clean_note = str(note).encode('ascii', 'ignore').decode('ascii')
             pdf.multi_cell(0, 7, clean_note)
 
-        # Importante: dest='S' su FPDF restituisce una stringa di byte (o bytearray)
-        # Non aggiungere .encode() qui!
+        # Ritorna l'output binario direttamente
         return pdf.output(dest='S')
     except Exception as e:
         return f"ERRORE_PDF: {str(e)}"
@@ -93,7 +92,6 @@ if uploaded:
         outliers, hhi_val = get_stats(df, num_col)
         anom = df[df[num_col] > mat_val].sort_values(by=num_col, ascending=False)
         
-        # Dashboard
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("TOTAL MASS", f"€{massa:,.2f}")
         m2.metric("MATERIALITY", f"€{mat_val:,.2f}")
@@ -116,23 +114,25 @@ if uploaded:
         with t3:
             st.subheader("Platinum Export System")
             note_audit = st.text_area("Audit Conclusion", value=ai_text)
-           if st.button("🚀 ESEGUI MASTER EXPORT"):
-    with st.spinner("Generazione in corso..."):
-        pdf_data = genera_pdf_platinum(massa, mat_val, anom, outliers, hhi_val, studio_nome, note_audit)
-        
-        if isinstance(pdf_data, str) and "ERRORE_PDF" in pdf_data:
-            st.error(pdf_data)
-        else:
-            # Convertiamo esplicitamente in bytes se necessario per Streamlit
-            final_pdf = bytes(pdf_data) if isinstance(pdf_data, (bytearray, str)) else pdf_data
             
-            st.success("Report Generato con successo!")
-            st.download_button(
-                label="📥 SCARICA PLATINUM REPORT (PDF)",
-                data=final_pdf,
-                file_name=f"Audit_Report_{studio_nome}.pdf",
-                mime="application/pdf"
-            )
+            if st.button("🚀 ESEGUI MASTER EXPORT"):
+                with st.spinner("Generazione in corso..."):
+                    pdf_data = genera_pdf_platinum(massa, mat_val, anom, outliers, hhi_val, studio_nome, note_audit)
+                    
+                    if isinstance(pdf_data, str) and "ERRORE_PDF" in pdf_data:
+                        st.error(pdf_data)
+                    else:
+                        # Convertiamo in bytes per sicurezza
+                        final_pdf = bytes(pdf_data) if isinstance(pdf_data, (bytearray, str)) else pdf_data
+                        
+                        st.success("Report Generato con successo!")
+                        st.download_button(
+                            label="📥 SCARICA PLATINUM REPORT (PDF)",
+                            data=final_pdf,
+                            file_name=f"Audit_Report_{studio_nome}.pdf",
+                            mime="application/pdf"
+                        )
+                
     except Exception as e:
         st.error(f"ENGINE_ERROR: {e}")
 else:
