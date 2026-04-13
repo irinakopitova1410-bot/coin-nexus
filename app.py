@@ -10,7 +10,7 @@ from supabase import create_client, Client
 # --- CONFIGURARE SUPABASE ---
 # Înlocuiește cu cheia ta reală "anon public" din Supabase
 SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
-SUPABASE_KEY = "ÎNLOCUIEȘTE_CU_CHEIA_TA_SUPABASE" 
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos" 
 
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
