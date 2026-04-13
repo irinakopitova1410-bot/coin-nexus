@@ -116,21 +116,23 @@ if uploaded:
         with t3:
             st.subheader("Platinum Export System")
             note_audit = st.text_area("Audit Conclusion", value=ai_text)
-            if st.button("🚀 ESEGUI MASTER EXPORT"):
-                with st.spinner("Generazione in corso..."):
-                    pdf_bytes = genera_pdf_platinum(massa, mat_val, anom, outliers, hhi_val, studio_nome, note_audit)
-                    
-                    if isinstance(pdf_bytes, str) and "ERRORE" in pdf_bytes:
-                        st.error(pdf_bytes)
-                    else:
-                        st.success("Report Generato!")
-                        st.download_button(
-                            label="📥 SCARICA PLATINUM REPORT (PDF)",
-                            data=pdf_bytes,
-                            file_name=f"Audit_Report_{studio_nome}.pdf",
-                            mime="application/pdf"
-                        )
-                
+           if st.button("🚀 ESEGUI MASTER EXPORT"):
+    with st.spinner("Generazione in corso..."):
+        pdf_data = genera_pdf_platinum(massa, mat_val, anom, outliers, hhi_val, studio_nome, note_audit)
+        
+        if isinstance(pdf_data, str) and "ERRORE_PDF" in pdf_data:
+            st.error(pdf_data)
+        else:
+            # Convertiamo esplicitamente in bytes se necessario per Streamlit
+            final_pdf = bytes(pdf_data) if isinstance(pdf_data, (bytearray, str)) else pdf_data
+            
+            st.success("Report Generato con successo!")
+            st.download_button(
+                label="📥 SCARICA PLATINUM REPORT (PDF)",
+                data=final_pdf,
+                file_name=f"Audit_Report_{studio_nome}.pdf",
+                mime="application/pdf"
+            )
     except Exception as e:
         st.error(f"ENGINE_ERROR: {e}")
 else:
