@@ -125,5 +125,3 @@ if uploaded:
         st.error(f"ENGINE_ERROR: {e}")
 else:
     st.info("👋 Încărcați un fișier pentru a activa auditul cu Inteligență Artificială.")
-
-
