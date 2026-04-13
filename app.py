@@ -7,9 +7,15 @@ import datetime
 from sklearn.ensemble import IsolationForest
 from supabase import create_client, Client
 
-# --- CONFIGURAZIONE SUPABASE (Inserisci i tuoi dati) ---
-SUPABASE_URL = "INSERISCI_IL_TUO_URL_QUI" 
-SUPABASE_KEY = "INSERISCI_LA_TUA_KEY_ANON_QUI"
+# --- CONFIGURAZIONE SUPABASE ---
+# Questi sono i tuoi dati reali del progetto ipmttldwfsxuubugiyir
+SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
+
+# Qui devi incollare la tua chiave "anon public" 
+# (Quella che inizia con eyJ... che trovi nella pagina che mi hai linkato)
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
+
+# Inizializzazione del client
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- 1. CONFIGURAZIONE PAGINA ---
