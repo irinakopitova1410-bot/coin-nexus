@@ -79,30 +79,73 @@ if uploaded:
         m2.metric("MATERIALITY", f"€{mat_val:,.2f}")
         m3.metric("AI OUTLIERS", len(outliers))
         m4.metric("HHI INDEX", f"{hhi_val:.3f}")
+# --- GENERATORE PDF STABILIZZATO ---
+def genera_pdf_platinum(massa, mat, anom, outliers, hhi, studio, note):
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        
+        # Header - Usiamo Arial standard per evitare problemi di font
+        pdf.set_fill_color(0, 10, 31)
+        pdf.rect(0, 0, 210, 50, 'F')
+        pdf.set_text_color(0, 242, 255)
+        pdf.set_font("Arial", 'B', 24)
+        pdf.cell(190, 30, str(studio).upper(), ln=True, align='C')
+        
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(30)
+        
+        # Sintesi Parametri
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(0, 10, "DATI DI REVISIONE", ln=True)
+        pdf.set_font("Arial", '', 10)
+        pdf.cell(100, 10, "Massa Totale:", 1); pdf.cell(90, 10, f"{massa:,.2f}", 1, 1, 'R')
+        pdf.cell(100, 10, "Materialita:", 1); pdf.cell(90, 10, f"{mat:,.2f}", 1, 1, 'R')
+        pdf.cell(100, 10, "Indice HHI:", 1); pdf.cell(90, 10, f"{hhi:.4f}", 1, 1, 'R')
+        
+        # Sezione Anomalie - Pulizia caratteri speciali
+        if not anom.empty:
+            pdf.ln(10)
+            pdf.set_font("Arial", 'B', 12)
+            pdf.cell(0, 10, "PRINCIPALI ECCEZIONI RILEVATE", ln=True)
+            pdf.set_font("Arial", '', 8)
+            for i in range(min(len(anom), 30)):
+                row = anom.iloc[i]
+                # Pulisce la descrizione da caratteri che FPDF non supporta
+                clean_desc = str(row.iloc[0]).encode('ascii', 'ignore').decode('ascii')
+                pdf.cell(150, 7, clean_desc[:75], 1)
+                pdf.cell(40, 7, f"{row.iloc[1]:,.2f}", 1, 1, 'R')
+        
+        # Note Finali
+        if note:
+            pdf.ln(10)
+            pdf.set_font("Arial", 'I', 10)
+            clean_note = str(note).encode('ascii', 'ignore').decode('ascii')
+            pdf.multi_cell(0, 7, clean_note)
 
-        t1, t2, t3 = st.tabs(["📊 RISK ANALYTICS", "🧠 AI INSIGHTS", "📄 MASTER REPORT"])
-
-        with t1:
-            fig = px.treemap(df.nlargest(30, num_col), path=[txt_col], values=num_col, 
-                             template="plotly_dark", color_discrete_sequence=['#00f2ff'])
-            st.plotly_chart(fig, use_container_width=True)
-            
-        with t2:
-            st.subheader("🧠 Intelligence Executive Summary")
-            ai_text = generate_ai_summary(massa, mat_val, len(outliers), hhi_val)
-            st.info(ai_text)
-            st.write("---")
-            st.subheader("🚩 Top Statistical Anomalies")
-            st.dataframe(outliers[[txt_col, num_col, 'z_score']].head(20), use_container_width=True)
-
-        with t3:
-            st.subheader("Platinum Export System")
-            custom_note = st.text_area("Note integrative del revisore", value=ai_text)
-            if st.button("🚀 GENERA REPORT AI-CERTIFIED"):
-                # Qui chiameresti la funzione PDF (già testata nei passi precedenti)
-                st.success("Report compilato con successo. Pronto al download.")
-                
+        # Ritorna i bytes direttamente invece di salvare su disco
+        return pdf.output(dest='S').encode('latin-1')
     except Exception as e:
-        st.error(f"ENGINE_ERROR: {e}")
-else:
-    st.info("In attesa di sincronizzazione dati per attivare l'AI...")
+        return f"ERRORE_PDF: {str(e)}"
+
+# --- NEL TAB DI ESPORTAZIONE (Sostituisci il blocco del pulsante) ---
+with tabs[3]:
+    st.subheader("Final Intelligence Report")
+    note_audit = st.text_area("Audit Conclusion", value=ai_text if 'ai_text' in locals() else "")
+    
+    if st.button("🚀 ESEGUI MASTER EXPORT"):
+        with st.spinner("Compilazione report in corso..."):
+            pdf_out = genera_pdf_platinum(massa, mat_val, anom, outliers, hhi_val, studio_nome, note_audit)
+            
+            if isinstance(pdf_out, str) and "ERRORE" in pdf_out:
+                st.error(pdf_out)
+            else:
+                st.success("Report generato con successo!")
+                st.download_button(
+                    label="📥 SCARICA PLATINUM REPORT (PDF)",
+                    data=pdf_out,
+                    file_name=f"Audit_Quantum_{datetime.date.today()}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+      
