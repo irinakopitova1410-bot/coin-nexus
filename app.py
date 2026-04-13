@@ -5,34 +5,11 @@ import plotly.express as px
 from fpdf import FPDF
 import datetime
 from sklearn.ensemble import IsolationForest
-import io
 
-# --- SISTEMA DI ACCESSO (INSERIRE QUI) ---
-def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
-    if st.session_state["authenticated"]:
-        return True
-    # Grafica di Login
-    st.markdown("<h1 style='text-align: center; color: #00f2ff;'>💠 COIN-NEXUS ACCESS</h1>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        st.write("Inserisci la chiave di licenza Platinum per accedere.")
-        pwd = st.text_input("AUDIT KEY", type="password")
-        if st.button("SBLOCCA SISTEMA"):
-            if pwd == "PLATINUM2026": # La tua password
-                st.session_state["authenticated"] = True
-                st.rerun()
-            else:
-                st.error("Chiave non valida.")
-    return False
-
-if not check_password():
-    st.stop()
-# --- FINE SISTEMA DI ACCESSO ---
-
-# Ora prosegue il tuo codice normale
+# --- CONFIGURARE UI QUANTUM ---
 st.set_page_config(page_title="COIN-NEXUS QUANTUM AI", layout="wide", page_icon="💠")
+
+st.markdown("""
     <style>
     .stApp { background: #02040a; color: #e6f1ff; }
     [data-testid="stMetricValue"] { color: #00f2ff !important; text-shadow: 0 0 10px rgba(0, 242, 255, 0.4); }
