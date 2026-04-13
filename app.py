@@ -29,7 +29,6 @@ def get_stats(df, col):
     hhi = ((df[col] / df[col].sum()) ** 2).sum()
     return outliers, hhi
 
-# --- GENERATORE PDF (MEMORY-SAFE) ---
 def genera_pdf_platinum(massa, mat, anom, outliers, hhi, studio, note):
     try:
         pdf = FPDF()
@@ -57,6 +56,7 @@ def genera_pdf_platinum(massa, mat, anom, outliers, hhi, studio, note):
             pdf.set_font("Arial", '', 8)
             for i in range(min(len(anom), 30)):
                 row = anom.iloc[i]
+                # Pulizia sicura per FPDF
                 clean_desc = str(row.iloc[0]).encode('ascii', 'ignore').decode('ascii')
                 pdf.cell(150, 7, clean_desc[:75], 1)
                 pdf.cell(40, 7, f"{row.iloc[1]:,.2f}", 1, 1, 'R')
@@ -67,8 +67,9 @@ def genera_pdf_platinum(massa, mat, anom, outliers, hhi, studio, note):
             clean_note = str(note).encode('ascii', 'ignore').decode('ascii')
             pdf.multi_cell(0, 7, clean_note)
 
-        # Output come stringa di byte (latin-1) per Streamlit download
-        return pdf.output(dest='S').encode('latin-1')
+        # Importante: dest='S' su FPDF restituisce una stringa di byte (o bytearray)
+        # Non aggiungere .encode() qui!
+        return pdf.output(dest='S')
     except Exception as e:
         return f"ERRORE_PDF: {str(e)}"
 
