@@ -10,7 +10,7 @@ from supabase import create_client, Client
 # --- 1. CONFIGURAZIONE SICURA ---
 # Se non metti le chiavi corrette, l'app funzionerà ma ti avviserà del mancato salvataggio
 URL = "https://ipmttldwfsxuubugiyir.supabase.co"
-KEY = "INSERISCI_QUI_LA_TUA_CHIAVE" 
+KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos" 
 
 def get_db():
     try: return create_client(URL, KEY)
