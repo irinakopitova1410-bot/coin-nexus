@@ -4,133 +4,197 @@ import numpy as np
 import plotly.express as px
 from fpdf import FPDF
 import datetime
+import sqlite3
+import bcrypt
 from sklearn.ensemble import IsolationForest
 
-# --- 1. CONFIGURAZIONE PAGINA (DEVE ESSERE LA PRIMA ISTRUZIONE) ---
-st.set_page_config(page_title="COIN-NEXUS QUANTUM AI", layout="wide", page_icon="💠")
+# =========================
+# CONFIG
+# =========================
+st.set_page_config(
+    page_title="COIN-NEXUS QUANTUM AI",
+    layout="wide",
+    page_icon="💠"
+)
 
-# --- 2. SISTEMA DI ACCESSO (LOGIN) ---
-def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state["authenticated"] = False
-    if st.session_state["authenticated"]:
+# =========================
+# DATABASE
+# =========================
+conn = sqlite3.connect("coin_nexus.db", check_same_thread=False)
+c = conn.cursor()
+
+c.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    email TEXT PRIMARY KEY,
+    password TEXT,
+    credits INTEGER
+)
+""")
+conn.commit()
+
+# =========================
+# AUTH FUNCTIONS
+# =========================
+def hash_password(password):
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode(), hashed)
+
+def create_user(email, password):
+    try:
+        hashed = hash_password(password)
+        c.execute("INSERT INTO users VALUES (?, ?, ?)", (email, hashed, 5))
+        conn.commit()
         return True
+    except:
+        return False
 
-    st.markdown("<h1 style='text-align: center; color: #00f2ff;'>💠 COIN-NEXUS ACCESS</h1>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        st.markdown("<div style='background: rgba(10,20,40,0.8); padding:20px; border-radius:10px; border:1px solid #00f2ff'>", unsafe_allow_html=True)
-        st.write("Inserisci la chiave di licenza Platinum per accedere.")
-        pwd = st.text_input("CHIAVE DI ACCESSO", type="password")
-        if st.button("SBLOCCA SISTEMA"):
-            if pwd == "PLATINUM2026":
-                st.session_state["authenticated"] = True
-                st.rerun()
-            else:
-                st.error("Chiave non valida.")
-        st.markdown("</div>", unsafe_allow_html=True)
+def login_user(email, password):
+    c.execute("SELECT password FROM users WHERE email=?", (email,))
+    res = c.fetchone()
+    if res:
+        return check_password(password, res[0])
     return False
 
-if not check_password():
+def get_credits(email):
+    c.execute("SELECT credits FROM users WHERE email=?", (email,))
+    row = c.fetchone()
+    return row[0] if row else 0
+
+def use_credit(email):
+    credits = get_credits(email)
+    if credits > 0:
+        c.execute("UPDATE users SET credits=? WHERE email=?", (credits - 1, email))
+        conn.commit()
+        return True
+    return False
+
+# =========================
+# SESSION
+# =========================
+if "user" not in st.session_state:
+    st.session_state["user"] = None
+
+# =========================
+# LOGIN PAGE
+# =========================
+if not st.session_state["user"]:
+    st.title("💠 COIN-NEXUS LOGIN")
+
+    mode = st.radio("Accesso", ["Login", "Register"])
+
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+
+    if mode == "Register":
+        if st.button("Crea Account"):
+            if create_user(email, password):
+                st.success("Account creato! Ora fai login.")
+            else:
+                st.error("Utente già esistente")
+
+    if mode == "Login":
+        if st.button("Accedi"):
+            if login_user(email, password):
+                st.session_state["user"] = email
+                st.success("Accesso effettuato")
+                st.rerun()
+            else:
+                st.error("Credenziali errate")
+
     st.stop()
 
-# --- 3. STILI GRAFICI (ITALIANO) ---
-st.markdown("""
-    <style>
-    .stApp { background: #02040a; color: #e6f1ff; }
-    [data-testid="stMetricValue"] { color: #00f2ff !important; text-shadow: 0 0 10px rgba(0, 242, 255, 0.4); }
-    .stMetric { background: rgba(10, 20, 40, 0.6); border: 1px solid #00f2ff; border-radius: 12px; padding: 20px; }
-    .stButton>button { 
-        background: linear-gradient(45deg, #1e40af, #00f2ff); border: none; color: white; 
-        font-weight: bold; border-radius: 8px; width: 100%; height: 55px; font-size: 18px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# =========================
+# MAIN APP
+# =========================
+st.title("💠 COIN-NEXUS QUANTUM AI")
+st.caption("Financial AI Risk & Forensic Analytics")
 
-# --- 4. FUNZIONI TECNICHE ---
-def detect_ai_anomalies(df, col_val):
-    X = df[[col_val]].values
+# Sidebar
+with st.sidebar:
+    st.write(f"👤 {st.session_state['user']}")
+    st.write(f"💰 Crediti: {get_credits(st.session_state['user'])}")
+
+    if st.button("LOGOUT"):
+        st.session_state["user"] = None
+        st.rerun()
+
+# =========================
+# FUNCTIONS
+# =========================
+def detect_ai_anomalies(df, col):
     model = IsolationForest(contamination=0.05, random_state=42)
-    df['ai_risk_score'] = model.fit_predict(X)
-    return df[df['ai_risk_score'] == -1].copy()
+    df = df.copy()
+    df["ai_risk"] = model.fit_predict(df[[col]])
+    return df[df["ai_risk"] == -1]
 
-def get_classic_stats(df, col):
-    mean, std = df[col].mean(), df[col].std()
-    df['z_score'] = (df[col] - mean) / std
-    outliers = df[df['z_score'].abs() > 2].copy()
+def get_stats(df, col):
+    mean = df[col].mean()
+    std = df[col].std()
+    df["z"] = (df[col] - mean) / std
+    outliers = df[df["z"].abs() > 2]
     hhi = ((df[col] / df[col].sum()) ** 2).sum()
     return outliers, hhi
 
-def genera_pdf_platinum(massa, mat, ai_anom, hhi, studio, note):
-    try:
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_fill_color(0, 10, 31)
-        pdf.rect(0, 0, 210, 50, 'F')
-        pdf.set_text_color(0, 242, 255)
-        pdf.set_font("Arial", 'B', 24)
-        pdf.cell(190, 30, str(studio).upper(), ln=True, align='C')
-        pdf.set_text_color(0, 0, 0)
-        pdf.ln(30)
-        pdf.set_font("Arial", 'B', 14)
-        pdf.cell(0, 10, "SINTESI ESECUTIVA - RAPPORTO AI", ln=True)
-        pdf.set_font("Arial", '', 10)
-      # Dati nel PDF
-        pdf.cell(100, 10, "Massa Totale Analizzata:", 1); pdf.cell(90, 10, f"Euro {massa:,.2f}", 1, 1, 'R')
-        pdf.cell(100, 10, "Soglia di Materialita (ISA 320):", 1); pdf.cell(90, 10, f"Euro {mat:,.2f}", 1, 1, 'R')
-        pdf.cell(100, 10, "Conformita Analisi Dati:", 1); pdf.cell(90, 10, "ISO/IEC 27001 compliant", 1, 1, 'R') # <--- AGGIUNTO ISO
-        pdf.cell(100, 10, "Anomalie Rilevate dall'AI:", 1); pdf.cell(90, 10, f"{len(ai_anom)}", 1, 1, 'R')
-        if note:
-            pdf.ln(10)
-            pdf.multi_cell(0, 7, f"NOTE: {note}")
-        return pdf.output(dest='S')
-    except Exception as e:
-        return f"ERRORE_PDF: {str(e)}"
+def generate_pdf(massa, mat, anomalies, hhi, studio, note):
+    pdf = FPDF()
+    pdf.add_page()
 
-# --- 5. LOGICA APPLICATIVA ---
-st.title("💠 COIN-NEXUS QUANTUM AI")
-st.caption("Suite Professionale di Audit Forense")
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, studio, ln=True)
 
-with st.sidebar:
-    st.header("⚙️ CONFIGURAZIONE")
-    studio_nome = st.text_input("NOME STUDIO", "PLATINUM_AI_ITALIA")
-    uploaded = st.file_uploader("CARICA DATI", type=['xlsx', 'csv'])
-    p_mat = st.slider("MATERIALITA %", 0.5, 5.0, 1.5)
-    if st.button("LOGOUT"):
-        st.session_state["authenticated"] = False
-        st.rerun()
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(0, 10, f"Massa: {massa}", ln=True)
+    pdf.cell(0, 10, f"Materialita: {mat}", ln=True)
+    pdf.cell(0, 10, f"Anomalie AI: {len(anomalies)}", ln=True)
+    pdf.cell(0, 10, f"HHI: {hhi:.3f}", ln=True)
+
+    pdf.multi_cell(0, 10, f"Note: {note}")
+
+    return pdf.output(dest="S")
+
+# =========================
+# UPLOAD
+# =========================
+uploaded = st.file_uploader("Carica file Excel/CSV", type=["xlsx", "csv"])
 
 if uploaded:
-    try:
-        df = pd.read_excel(uploaded) if uploaded.name.endswith('.xlsx') else pd.read_csv(uploaded)
-        num_col = df.select_dtypes(include=[np.number]).columns[0]
-        txt_col = df.select_dtypes(exclude=[np.number]).columns[0]
-        
-        massa = df[num_col].sum()
-        mat_val = massa * (p_mat / 100)
-        outliers, hhi_val = get_classic_stats(df, num_col)
-        ai_anomalies = detect_ai_anomalies(df, num_col)
-        
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("MASSA TOTALE", f"€{massa:,.2f}")
-        m2.metric("MATERIALITÀ", f"€{mat_val:,.2f}")
-        m3.metric("ANOMALIE AI", len(ai_anomalies))
-        m4.metric("INDICE HHI", f"{hhi_val:.3f}")
+    # CREDIT CHECK
+    if not use_credit(st.session_state["user"]):
+        st.error("❌ Crediti terminati")
+        st.stop()
 
-        t1, t2, t3 = st.tabs(["📊 ANALISI", "🧠 AI", "📄 REPORT"])
+    df = pd.read_excel(uploaded) if uploaded.name.endswith("xlsx") else pd.read_csv(uploaded)
 
-        with t1:
-            st.plotly_chart(px.treemap(df.nlargest(30, num_col), path=[txt_col], values=num_col, template="plotly_dark"), use_container_width=True)
-        with t2:
-            st.subheader("🤖 Machine Learning Insights")
-            st.dataframe(ai_anomalies[[txt_col, num_col, 'ai_risk_score']].head(20), use_container_width=True)
-        with t3:
-            st.subheader("Export Report")
-            note_audit = st.text_area("Conclusioni", value=f"Rilevate {len(ai_anomalies)} anomalie.")
-            if st.button("🚀 GENERA PDF"):
-                pdf_data = genera_pdf_platinum(massa, mat_val, ai_anomalies, hhi_val, studio_nome, note_audit)
-                st.download_button("📥 SCARICA PDF", data=bytes(pdf_data), file_name="Report.pdf", mime="application/pdf")
-    except Exception as e:
-        st.error(f"Errore: {e}")
-else:
-    st.info("👋 Carica un file per iniziare.")
+    num_col = df.select_dtypes(include=np.number).columns[0]
+
+    massa = df[num_col].sum()
+    mat = massa * 0.015
+
+    outliers, hhi = get_stats(df, num_col)
+    anomalies = detect_ai_anomalies(df, num_col)
+
+    # METRICS
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Massa", f"€{massa:,.2f}")
+    c2.metric("Materialità", f"€{mat:,.2f}")
+    c3.metric("Anomalie", len(anomalies))
+    c4.metric("HHI", f"{hhi:.3f}")
+
+    # CHART
+    st.subheader("Analisi dati")
+    st.dataframe(df.head())
+
+    # REPORT
+    st.subheader("Report")
+
+    note = st.text_area("Note audit", "Analisi automatizzata Coin Nexus AI")
+
+    if st.button("Genera PDF"):
+        pdf = generate_pdf(massa, mat, anomalies, hhi, "COIN-NEXUS", note)
+        st.download_button(
+            "Scarica Report",
+            data=pdf,
+            file_name="report.pdf"
+        )
