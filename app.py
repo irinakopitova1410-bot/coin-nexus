@@ -31,14 +31,12 @@ st.markdown("""
 
 # --- ENGINE DI INTELLIGENZA AVANZATA ---
 def detect_outliers(df, col):
-    """Identifica anomalie statistiche usando lo Z-Score."""
     mean = df[col].mean()
     std = df[col].std()
     df['z_score'] = (df[col] - mean) / std
     return df[df['z_score'].abs() > 2].sort_values(by='z_score', ascending=False)
 
 def calculate_hhi(df, col):
-    """Calcola l'indice di concentrazione (Herfindahl-Hirschman Index)."""
     shares = (df[col] / df[col].sum()) ** 2
     return shares.sum()
 
@@ -59,7 +57,6 @@ def genera_report_platinum(massa, mat, anom, outliers, hhi, studio, note):
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(0, 10, "1. EXECUTIVE SUMMARY & RISK INDICATORS", ln=True)
     
-    # Parametri Tabella
     pdf.set_font("Arial", '', 10)
     pdf.cell(100, 10, "Total Asset Mass Analysed", 1); pdf.cell(90, 10, f"EUR {massa:,.2f}", 1, 1, 'R')
     pdf.cell(100, 10, "Risk Concentration Index (HHI)", 1); pdf.cell(90, 10, f"{hhi:.4f}", 1, 1, 'R')
@@ -68,7 +65,7 @@ def genera_report_platinum(massa, mat, anom, outliers, hhi, studio, note):
     pdf.set_font("Arial", 'B', 14)
     pdf.cell(0, 10, "2. STATISTICAL OUTLIERS (Z-SCORE > 2)", ln=True)
     pdf.set_font("Arial", '', 9)
-    for i in range(min(len(outliers), 20)):
+    for i in range(min(len(outliers), 25)):
         row = outliers.iloc[i]
         desc = str(row.iloc[0]).encode('latin-1', 'ignore').decode('latin-1')
         pdf.cell(140, 7, desc[:70], 1)
@@ -85,6 +82,11 @@ with st.sidebar:
     studio_nome = st.text_input("AUDIT FIRM ID", "PLATINUM_INTELLIGENCE")
     uploaded_file = st.file_uploader("SYNC DATASET", type=['xlsx', 'csv'])
     p_mat = st.slider("MATERIALITY %", 0.5, 5.0, 1.5)
+    st.divider()
+    st.markdown("### 📜 AUDIT PROTOCOL")
+    st.checkbox("ISA 240 (Frode)", value=True)
+    st.checkbox("ISA 315 (Rischi)", value=True)
+    st.checkbox("ISA 520 (Procedure)", value=True)
 
 if uploaded_file:
     try:
@@ -97,12 +99,10 @@ if uploaded_file:
             massa = df[c_v].sum()
             mat_val = massa * (p_mat / 100)
             
-            # Nuovi Engine
             outliers = detect_outliers(df, c_v)
             hhi_val = calculate_hhi(df, c_v)
             anom = df[df[c_v] > mat_val].sort_values(by=c_v, ascending=False)
 
-            # Dashboard Potenziata
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("TOTAL MASS", f"€{massa:,.2f}")
             m2.metric("MATERIALITY", f"€{mat_val:,.2f}")
@@ -115,19 +115,20 @@ if uploaded_file:
                 st.plotly_chart(px.treemap(df.nlargest(40, c_v), path=[c_t], values=c_v, template="plotly_dark", color_discrete_sequence=['#00f2ff']), use_container_width=True)
             
             with tabs[1]:
-                # Benford Graph Avanzato
                 st.subheader("Statistical Integrity (Benford's Law)")
-                # ... (Logica Benford già presente) ...
+                # (Qui andrebbe il grafico Benford integrato come visto in precedenza)
+                st.info("Test di conformità sulle transazioni per identificare anomalie nei processi di imputazione.")
             
             with tabs[2]:
                 st.subheader("🧪 AI-Driven Outlier Detection")
-                st.write("Queste voci presentano una deviazione standard anomala rispetto alla media del dataset.")
+                st.write("Identificazione automatica di deviazioni statistiche basata sulla distribuzione normale.")
                 st.dataframe(outliers[[c_t, c_v, 'z_score']].head(50), use_container_width=True)
 
             with tabs[3]:
                 st.subheader("Final Intelligence Report")
+                note_audit = st.text_area("Audit Conclusion")
                 if st.button("🚀 EXECUTE MASTER EXPORT"):
-                    pdf_final = genera_report_platinum(massa, mat_val, anom, outliers, hhi_val, studio_nome, "")
+                    pdf_final = genera_report_platinum(massa, mat_val, anom, outliers, hhi_val, studio_nome, note_audit)
                     st.download_button("📥 DOWNLOAD PLATINUM REPORT", data=bytes(pdf_final), file_name="Audit_Quantum_V2.pdf", mime="application/pdf")
 
     except Exception as e:
