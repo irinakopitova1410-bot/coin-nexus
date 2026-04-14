@@ -1,8 +1,5 @@
 streamlit
 pandas
-numpy
 plotly
 fpdf
 openpyxl
-supabase
-python-dotenv
