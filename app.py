@@ -17,8 +17,8 @@ except:
 st.set_page_config(page_title="Coin-Nexus Quantum Audit", layout="wide", page_icon="💠")
 
 # Inserisci le tue chiavi Supabase qui
-SUPABASE_URL = "https://tuo-id.supabase.co"
-SUPABASE_KEY = "tua-chiave-anon"
+SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
 
 @st.cache_resource
 def init_db():
