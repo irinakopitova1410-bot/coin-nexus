@@ -9,8 +9,8 @@ from supabase import create_client, Client
 st.set_page_config(page_title="Coin-Nexus Quantum SaaS", layout="wide")
 
 # Sostituisci con le tue credenziali reali da Supabase Dashboard > Settings > API
-SUPABASE_URL = "IL_TUO_URL_QUI"
-SUPABASE_KEY = "LA_TUA_KEY_ANON_QUI"
+SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
 
 @st.cache_resource
 def get_supabase() -> Client:
