@@ -11,21 +11,46 @@ st.set_page_config(page_title="Coin-Nexus Quantum SaaS", layout="wide")
 if 'auth' not in st.session_state:
     st.session_state['auth'] = False
 
-def login():
-    st.sidebar.title("🔐 Area Riservata")
-    user = st.sidebar.text_input("Username")
-    pwd = st.sidebar.text_input("Password", type="password")
-    if st.sidebar.button("Accedi"):
-        if user == "admin" and pwd == "quantum2026":
+from supabase import create_client, Client
+import streamlit as st
+
+# 1. Connessione a Supabase (Inserisci i tuoi dati qui)
+# In un'app reale, questi vanno messi nei "Secrets" di Streamlit per sicurezza
+url: str = "IL_TUO_SUPABASE_URL"
+key: str = "LA_TUA_SUPABASE_ANON_KEY"
+supabase: Client = create_client(url, key)
+
+def login_supabase():
+    st.sidebar.title("🔐 Accesso Professionale")
+    email = st.sidebar.text_input("Email")
+    password = st.sidebar.text_input("Password", type="password")
+    
+    col1, col2 = st.sidebar.columns(2)
+    
+    if col1.button("Accedi"):
+        try:
+            # Tenta il login con Supabase
+            response = supabase.auth.sign_in_with_password({"email": email, "password": password})
             st.session_state['auth'] = True
+            st.session_state['user'] = response.user.email
             st.rerun()
-        else:
+        except Exception as e:
             st.sidebar.error("Credenziali errate")
 
+    if col2.button("Registrati"):
+        try:
+            # Registra un nuovo utente su Supabase
+            supabase.auth.sign_up({"email": email, "password": password})
+            st.sidebar.success("Controlla l'email per confermare!")
+        except Exception as e:
+            st.sidebar.error(f"Errore: {e}")
+
+# Sostituisci il vecchio controllo auth con questo
+if 'auth' not in st.session_state:
+    st.session_state['auth'] = False
+
 if not st.session_state['auth']:
-    st.title("💠 Coin-Nexus Quantum AI")
-    st.info("Effettua il login per accedere alle analisi ISA 320.")
-    login()
+    login_supabase()
     st.stop()
 
 # --- FUNZIONE GENERAZIONE PDF ---
