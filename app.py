@@ -10,8 +10,8 @@ import io
 st.set_page_config(page_title="Coin-Nexus Quantum Audit", layout="wide")
 
 # Credenziali (Da proteggere con st.secrets in produzione)
-SUPABASE_URL = "IL_TUO_URL" 
-SUPABASE_KEY = "LA_TUA_KEY"
+SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co" 
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
 
 # Inizializzazione sessione
 if 'auth' not in st.session_state:
