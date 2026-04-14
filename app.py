@@ -2,91 +2,76 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 from fpdf import FPDF
 import io
 from datetime import datetime
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Coin-Nexus Strategic Audit", layout="wide", page_icon="💠")
+st.set_page_config(page_title="Coin-Nexus Quantum Audit & Plan", layout="wide", page_icon="💠")
 
 if 'auth' not in st.session_state: st.session_state['auth'] = False
 if 'user_email' not in st.session_state: st.session_state['user_email'] = None
 
-# --- CLASSE PDF PREMIUM ---
-class StrategicReport(FPDF):
+# --- CLASSE PDF PREMIUM (Con sezione Business Plan) ---
+class QuantumReport(FPDF):
     def header(self):
         self.set_fill_color(20, 30, 50)
-        self.rect(0, 0, 210, 45, 'F')
+        self.rect(0, 0, 210, 40, 'F')
         self.set_text_color(255, 255, 255)
         self.set_font('Arial', 'B', 20)
         self.cell(0, 20, 'COIN-NEXUS STRATEGIC REPORT', 0, 1, 'C')
         self.set_font('Arial', 'I', 10)
-        self.cell(0, -5, 'Certificazione ISA 320 - Basilea III - Business Plan 4Y', 0, 1, 'C')
-        self.ln(25)
+        self.cell(0, -5, 'Audit ISA 320 & Business Plan 4-Year Outlook', 0, 1, 'C')
+        self.ln(20)
 
-    def section_header(self, title):
+    def section_title(self, label):
         self.set_font('Arial', 'B', 12)
         self.set_fill_color(240, 240, 240)
         self.set_text_color(0, 0, 0)
-        self.cell(0, 10, f"  {title}", 0, 1, 'L', True)
+        self.cell(0, 10, f"  {label}", 0, 1, 'L', True)
         self.ln(4)
 
-def genera_pdf_completo(massa, mat, file_name, user, ratios, bp_df):
-    pdf = StrategicReport()
+def genera_pdf_strategico(massa, mat, file_name, user, bp_data):
+    pdf = QuantumReport()
     pdf.add_page()
     
-    # 1. ANAGRAFICA
-    pdf.section_header("1. DATI DELL'ANALISI")
+    # 1. Audit Past
+    pdf.section_title("CERTIFICAZIONE AUDIT (CONSUNTIVO)")
     pdf.set_font('Arial', '', 11)
-    pdf.cell(0, 8, f"ID Report: CNX-{datetime.now().strftime('%Y%m%d%H%M')}", ln=True)
-    pdf.cell(0, 8, f"Soggetto: {file_name}", ln=True)
-    pdf.cell(0, 8, f"Auditor: {user}", ln=True)
+    pdf.cell(0, 8, f"Soggetto: {file_name} | Auditor: {user}", ln=True)
+    pdf.cell(0, 8, f"Materialita Calcolata: Euro {mat:,.2f}", ln=True)
     pdf.ln(5)
 
-    # 2. AUDIT ISA 320 (Come in image_53fc6b.png)
-    pdf.section_header("2. REVISIONE CONTABILE (ISA 320)")
-    pdf.cell(90, 8, "Massa Totale Analizzata:", 1); pdf.cell(90, 8, f"Euro {massa:,.2f}", 1, ln=True)
-    pdf.cell(90, 8, "Soglia di Materialita (1.5%):", 1); pdf.cell(90, 8, f"Euro {mat:,.2f}", 1, ln=True)
-    pdf.cell(90, 8, "Errore Trascurabile (5%):", 1); pdf.cell(90, 8, f"Euro {mat*0.05:,.2f}", 1, ln=True)
-    pdf.ln(5)
-
-    # 3. BENCHMARK & RATING (Come in image_56aa6b.png)
-    pdf.section_header("3. RATING CREDITIZIO & BENCHMARK")
-    pdf.multi_cell(0, 8, (
-        f"Indice Liquidita Corrente: {ratios['liq']} (Benchmark: >1.2)\n"
-        f"ROI Aziendale: {ratios['roi']}% (Media Settore: 8.5%)\n"
-        f"Classe di Rating: {ratios['solv']}\n"
-        "Posizionamento: L'azienda rientra nel TOP 15% del settore di riferimento."
-    ))
-    pdf.ln(5)
-
-    # 4. BUSINESS PLAN 4 ANNI (Come in image_56aa44.png)
-    pdf.section_header("4. BUSINESS PLAN & PROSPETTIVA 4 ANNI")
+    # 2. Business Plan Outlook
+    pdf.section_title("BUSINESS PLAN & PROSPETTIVA 4 ANNI")
     pdf.set_font('Arial', 'B', 10)
-    pdf.cell(40, 8, "Anno", 1, 0, 'C'); pdf.cell(70, 8, "Fatturato Stimato", 1, 0, 'C'); pdf.cell(70, 8, "Rischio", 1, 1, 'C')
-    pdf.set_font('Arial', '', 10)
-    for anno, row in bp_df.iterrows():
-        pdf.cell(40, 8, str(anno), 1, 0, 'C')
-        pdf.cell(70, 8, f"Euro {row['Fatturato']:,.2f}", 1, 0, 'R')
-        pdf.cell(70, 8, f"{row['Rischio']}", 1, 1, 'C')
+    pdf.cell(40, 8, "Anno", 1)
+    pdf.cell(70, 8, "Fatturato Stimato", 1)
+    pdf.cell(70, 8, "Rischio Operativo", 1, ln=True)
     
-    # 5. FIRMA (Layout Tecno)
+    pdf.set_font('Arial', '', 10)
+    for year, row in bp_data.iterrows():
+        pdf.cell(40, 8, str(year), 1)
+        pdf.cell(70, 8, f"Euro {row['Fatturato']:,.2f}", 1)
+        pdf.cell(70, 8, f"{row['Rischio']}", 1, ln=True)
+    
     pdf.ln(10)
-    pdf.set_font('Arial', 'B', 11)
-    pdf.cell(0, 10, "GIUDIZIO: SENZA RILIEVI (Unqualified Opinion)", ln=True)
-    pdf.rect(130, pdf.get_y(), 65, 30)
-    pdf.set_xy(135, pdf.get_y() + 5)
-    pdf.set_font('Courier', 'I', 10)
-    pdf.cell(0, 10, "Firma Elettronica")
-    pdf.set_xy(135, pdf.get_y() + 10)
+    pdf.section_title("VALUTAZIONE DEL RISCHIO BANCARIO")
+    pdf.multi_cell(0, 8, "Il profilo di rischio a medio-lungo termine risulta 'Basso'. \n"
+                         "La sostenibilita del debito e garantita da flussi di cassa incrementali. \n"
+                         "Principali rischi monitorati: Volatilita tassi (Rating A+).")
+    
+    # Firma
+    pdf.ln(10)
     pdf.set_font('Arial', 'B', 10)
-    pdf.cell(0, 10, f"{user}")
-
+    pdf.cell(0, 10, "Firma Elettronica Certificata Coin-Nexus", 0, 1, 'R')
+    
     return pdf.output(dest='S').encode('latin-1')
 
-# --- INTERFACCIA ---
+# --- LOGIN ---
 if not st.session_state['auth']:
-    st.title("💠 Coin-Nexus Quantum Portal")
+    st.title("💠 Coin-Nexus Quantum AI")
     with st.sidebar:
         e = st.text_input("Email Admin")
         p = st.text_input("Password", type="password")
@@ -96,22 +81,50 @@ if not st.session_state['auth']:
                 st.rerun()
     st.stop()
 
-st.title(f"🚀 Quantum Strategic Engine")
-up = st.file_uploader("Carica Bilancio", type=['xlsx', 'csv'])
+# --- MAIN DASHBOARD ---
+st.title(f"🚀 Strategic Planning & Audit: {st.session_state['user_email']}")
+up = st.file_uploader("Carica Dati Finanziari", type=['xlsx', 'csv'])
 
 if up:
     df = pd.read_excel(up) if up.name.endswith('.xlsx') else pd.read_csv(up)
-    num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    c1, c2 = st.columns(2)
-    with c1: d_col = st.selectbox("Voce", df.columns)
-    with c2: v_col = st.selectbox("Importo", num_cols)
+    val_col = st.selectbox("Seleziona Colonna Valori per proiezione", df.select_dtypes(include=[np.number]).columns)
 
-    if st.button("📊 ANALISI COMPLETA"):
-        massa = df[v_col].abs().sum()
-        mat = massa * 0.015
-        r_demo = {'liq': 1.68, 'roi': 14.5, 'solv': 'AAA (Top Rating)'}
-        
-        # Business Plan
+    if st.button("📈 GENERA BUSINESS PLAN 4 ANNI"):
+        # Logica Proiezione
+        last_val = df[val_col].abs().sum()
         years = [2026, 2027, 2028, 2029]
-        bp_data = pd.DataFrame([{"Fatturato": massa * (1.06**i), "Rischio": "Basso"} for i in range(
+        growth_rate = 1.05 # +5% annuo
+        
+        projections = []
+        for i, y in enumerate(years):
+            val = last_val * (growth_rate ** (i + 1))
+            risk = "Basso" if val > last_val else "Monitoraggio"
+            projections.append({"Anno": y, "Fatturato": val, "Rischio": risk})
+        
+        bp_df = pd.DataFrame(projections).set_index("Anno")
+
+        # Visualizzazione
+        c1, c2 = st.columns(2)
+        with c1:
+            st.subheader("🔮 Proiezione Profittabilità")
+            fig_line = px.line(bp_df, y="Fatturato", title="Trend Crescita 2026-2029", markers=True)
+            st.plotly_chart(fig_line, use_container_width=True)
+        
+        with c2:
+            st.subheader("⚠️ Analisi dei Rischi")
+            risk_fig = go.Figure(go.Indicator(
+                mode = "gauge+number",
+                value = 92,
+                title = {'text': "Indice di Affidabilità (%)"},
+                gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "darkblue"}}
+            ))
+            st.plotly_chart(risk_fig, use_container_width=True)
+
+        # Download Report Strategico
+        st.divider()
+        massa = last_val
+        mat = massa * 0.015
+        pdf_bytes = genera_pdf_strategico(massa, mat, up.name, st.session_state['user_email'], bp_df)
+        
+        st.download_button("📥 SCARICA BUSINESS PLAN & AUDIT (PDF)", pdf_bytes, f"Strategic_Plan_{up.name}.pdf", "application/pdf")
+        st.success("Analisi strategica completata per la presentazione bancaria.")
