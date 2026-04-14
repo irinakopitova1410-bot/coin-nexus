@@ -5,7 +5,28 @@ import numpy as np
 # --- CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="Coin-Nexus Quantum AI", layout="wide")
 st.title("💠 Coin-Nexus Quantum Financial Analytics")
+import streamlit as st
 
+# Simulazione sistema Auth (da collegare a Supabase per il vero SaaS)
+if 'authenticated' not in st.session_state:
+    st.session_state['authenticated'] = False
+
+def login():
+    st.sidebar.title("🔐 Accesso Riservato")
+    user = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        if user == "admin" and password == "quantum2024": # Esempio
+            st.session_state['authenticated'] = True
+            st.sidebar.success("Accesso effettuato")
+            st.rerun()
+        else:
+            st.sidebar.error("Credenziali errate")
+
+if not st.session_state['authenticated']:
+    login()
+    st.warning("Effettua il login per accedere alle analisi forensi.")
+    st.stop() # Blocca il resto dell'app
 # --- CARICAMENTO FILE UNIVERSALE ---
 uploaded_file = st.file_uploader("Carica Bilancio o Piano Finanziario (Excel/CSV)", type=["xlsx", "xls", "csv"])
 
