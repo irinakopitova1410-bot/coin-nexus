@@ -97,6 +97,26 @@ if file:
             df_plot = df[[descr_col, val_col]].dropna().sort_values(by=val_col, ascending=False).head(10)
             massa = df[val_col].abs().sum()
             mat = massa * 0.015 # 1.5% Materialità ISA
+
+# Dopo aver calcolato 'massa' e 'mat'
+if st.button("📊 AVVIA ANALISI"):
+    # ... i tuoi calcoli esistenti ...
+    
+    # SALVATAGGIO SU SUPABASE
+    data = {
+        "user_email": st.session_state['user'],
+        "file_name": file.name,
+        "massa_totale": massa,
+        "materialita": mat,
+        "data_analisi": str(pd.Timestamp.now())
+    }
+    
+    try:
+        supabase.table("analisi_bilanci").insert(data).execute()
+        st.success("✅ Analisi salvata nel tuo archivio cloud!")
+    except Exception as e:
+        st.error(f"Errore salvataggio: {e}")
+            
             
             # --- SEZIONE GRAFICI ---
             st.subheader("📈 Visualizzazione Analitica")
