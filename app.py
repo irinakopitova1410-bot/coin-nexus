@@ -1,4 +1,28 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+from fpdf import FPDF
+import datetime
+from sklearn.ensemble import IsolationForest
+from supabase import create_client, Client
 
+# --- POSIZIONE: RIGA 10-15 ---
+import streamlit as st
+from supabase import create_client
+
+# Inserisci qui le credenziali che trovi su Supabase -> Project Settings -> API
+URL = "https://tuo-progetto.supabase.co"
+KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos" # Usa la service role per gestire gli utenti
+supabase = create_client(URL, KEY)
+
+# --- 2. GENERATORE REPORT PDF ---
+def genera_report(studio, dati, anomalie):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_fill_color(0, 51, 102)
+    pdf.rect(0, 0, 210, 40, 'F')
+    pdf.set_font("Arial", 'B', 20)
     pdf.set_text_color(255, 255, 255)
     pdf.cell(190, 20, "COIN-NEXUS QUANTUM CERTIFICATE", ln=True, align='C')
     pdf.ln(25)
