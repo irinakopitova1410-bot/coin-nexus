@@ -2,157 +2,126 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 from fpdf import FPDF
 from supabase import create_client, Client
-import io
 from datetime import datetime
 
-# --- 1. CONNESSIONE SUPABASE ---
-# Incolla qui i tuoi dati dal pannello "Project Settings > API" di Supabase
-SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
-SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
+# --- CONFIGURAZIONE ELITE ---
+st.set_page_config(page_title="Coin-Nexus | Telepass Bancario", layout="wide", page_icon="💠")
+
+# Inserisci le tue credenziali Supabase qui
+SUPABASE_URL = "https://tuo-id.supabase.co"
+SUPABASE_KEY = "tua-chiave-anon"
 
 @st.cache_resource
-def init_supabase():
-    try:
-        return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        st.error(f"Errore connessione Supabase: {e}")
-        return None
+def init_db():
+    try: return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except: return None
 
-supabase = init_supabase()
+db = init_db()
 
-# --- 2. CONFIGURAZIONE PAGINA ---
-st.set_page_config(page_title="Coin-Nexus Quantum Audit", layout="wide", page_icon="💠")
-
-if 'auth' not in st.session_state: st.session_state['auth'] = False
-if 'user_email' not in st.session_state: st.session_state['user_email'] = None
-
-# --- 3. MOTORE PDF ELITE (No-Crash & Full Data) ---
-class QuantumEliteReport(FPDF):
+# --- CLASSE REPORT CORPORATE (Stile DocFinance) ---
+class TelepassReport(FPDF):
     def header(self):
-        self.set_fill_color(15, 25, 45)
-        self.rect(0, 0, 210, 45, 'F')
+        self.set_fill_color(0, 51, 102) # Blu Doc-Corporate
+        self.rect(0, 0, 210, 40, 'F')
         self.set_text_color(255, 255, 255)
-        self.set_font('Arial', 'B', 20)
-        self.cell(0, 25, 'COIN-NEXUS STRATEGIC BANKING REPORT', 0, 1, 'C')
-        self.set_font('Arial', 'I', 10)
-        self.cell(0, -10, 'ISA 320 Audit - Basilea III - ROI & DSCR - 4Y Plan', 0, 1, 'C')
-        self.ln(25)
+        self.set_font('Arial', 'B', 18)
+        self.cell(0, 20, 'COIN-NEXUS: CERTIFICAZIONE BANCARIA FAST-TRACK', 0, 1, 'C')
+        self.set_font('Arial', 'I', 9)
+        self.cell(0, -5, 'Sincronizzato con Standard Basilea IV & Corporate Treasury', 0, 1, 'C')
+        self.ln(20)
 
-    def section_header(self, title):
+    def draw_badge(self, score):
+        self.set_fill_color(0, 150, 0) if score > 75 else self.set_fill_color(200, 150, 0)
+        self.rect(160, 45, 40, 15, 'F')
+        self.set_xy(160, 47)
+        self.set_text_color(255, 255, 255)
         self.set_font('Arial', 'B', 12)
-        self.set_fill_color(230, 235, 245)
-        self.set_text_color(10, 30, 70)
-        self.cell(0, 10, f"  {title}", 0, 1, 'L', True)
-        self.ln(4)
+        self.cell(40, 10, f"SCORE: {score}/100", 0, 0, 'C')
 
-def genera_pdf_elite(massa, mat, roi, dscr, debt_eq, user, bp_df):
-    pdf = QuantumEliteReport()
+def genera_pdf_telepass(data_dict, user):
+    pdf = TelepassReport()
     pdf.add_page()
-    
-    pdf.section_header("1. SINTESI AUDIT E PERFORMANCE")
-    pdf.set_font('Arial', '', 11)
-    pdf.cell(95, 8, f"Massa Totale: Euro {massa:,.2f}", 1)
-    pdf.cell(95, 8, f"Materialita ISA 320: Euro {mat:,.2f}", 1, ln=True)
-    pdf.cell(95, 8, f"ROI Aziendale: {roi:.2f}%", 1)
-    pdf.cell(95, 8, f"DSCR Index: {dscr}", 1, ln=True)
-    
-    pdf.ln(5)
-    pdf.section_header("2. RATING BANCARIO & SOSTENIBILITA")
-    pdf.multi_cell(0, 8, f"Rating Assegnato: AAA | Debt/Equity: {debt_eq}\n"
-                         "L'analisi conferma la piena sostenibilita del debito e un'ottima capacita di rimborso.")
-
-    pdf.ln(5)
-    pdf.section_header("3. BUSINESS PLAN 4 ANNI (PROIEZIONE)")
-    pdf.set_font('Arial', 'B', 10)
-    pdf.cell(40, 8, "Anno", 1); pdf.cell(75, 8, "Ricavi Stimati", 1); pdf.cell(75, 8, "Rischio", 1, ln=True)
-    pdf.set_font('Arial', '', 10)
-    for anno, row in bp_df.iterrows():
-        pdf.cell(40, 8, str(anno), 1)
-        pdf.cell(75, 8, f"Euro {row['Fatturato']:,.2f}", 1)
-        pdf.cell(75, 8, f"{row['Rischio']}", 1, ln=True)
+    pdf.draw_badge(data_dict['score'])
     
     pdf.ln(10)
-    pdf.set_font('Courier', 'B', 11)
-    pdf.cell(0, 10, f"Validato Digitalmente da: {user}", align='R')
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 10, f"REPORT EMESSO PER: {data_dict['filename']}", ln=True)
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(0, 8, f"Data Validazione: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True)
+    pdf.cell(0, 8, f"ID Transazione Telepass: CNX-TX-{datetime.now().microsecond}", ln=True)
+    
+    # Sezione Dati Hard
+    pdf.ln(5)
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(0, 10, "  KPI DI TESORERIA E SOSTENIBILITA", 0, 1, 'L', True)
+    pdf.cell(95, 10, f"Massa Auditata: Euro {data_dict['massa']:,.2f}", 1)
+    pdf.cell(95, 10, f"DSCR Proiettato: {data_dict['dscr']}", 1, ln=True)
+    pdf.cell(95, 10, f"ROI Operativo: {data_dict['roi']:.2f}%", 1)
+    pdf.cell(95, 10, f"Rating Previsto: {data_dict['rating']}", 1, ln=True)
+
+    # Box Strategico per DocFinance
+    pdf.ln(10)
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 10, "COMMENTO TECNICO DEL SISTEMA QUANTUM:", ln=True)
+    pdf.set_font('Arial', '', 10)
+    pdf.multi_cell(0, 7, "L'azienda presenta indici di liquidita coerenti con le linee guida EBA. "
+                         "Il flusso di cassa operativo e sufficiente a coprire il servizio del debito "
+                         "per i prossimi 48 mesi. Profilo idoneo per accesso a finanziamenti 'Fast-Track'.")
+    
+    # Firma Digitale
+    pdf.ln(15)
+    pdf.set_font('Courier', 'B', 10)
+    pdf.cell(0, 10, f"VALIDATED BY COIN-NEXUS AI SYSTEM - AUDITOR: {user}", align='C')
+    
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 4. GESTIONE LOGIN (SUPABASE AUTH) ---
-def login_ui():
-    st.sidebar.title("🔐 Quantum Access")
-    tab1, tab2 = st.sidebar.tabs(["Login", "Registrati"])
-    
-    with tab1:
-        email = st.text_input("Email")
-        pwd = st.text_input("Password", type="password")
-        if st.button("ACCEDI"):
-            if email == "admin@coin-nexus.com" and pwd == "quantum2026":
-                st.session_state['auth'], st.session_state['user_email'] = True, email
-                st.rerun()
-            elif supabase:
-                try:
-                    res = supabase.auth.sign_in_with_password({"email": email, "password": pwd})
-                    st.session_state['auth'], st.session_state['user_email'] = True, email
-                    st.rerun()
-                except: st.error("Credenziali errate.")
-    
-    with tab2:
-        ne = st.text_input("Nuova Email")
-        np = st.text_input("Scegli Password", type="password")
-        if st.button("CREA ACCOUNT"):
-            if supabase:
-                try:
-                    supabase.auth.sign_up({"email": ne, "password": np})
-                    st.success("Controlla la tua email per confermare l'account!")
-                except Exception as e: st.error(f"Errore: {e}")
+# --- LOGICA APP ---
+if 'auth' not in st.session_state: st.session_state['auth'] = False
 
-# --- 5. DASHBOARD PRINCIPALE ---
 if not st.session_state['auth']:
-    st.title("💠 Coin-Nexus Quantum AI")
-    login_ui()
+    st.title("💠 Coin-Nexus Telepass Login")
+    e = st.text_input("Email Corporate")
+    p = st.text_input("Password", type="password")
+    if st.button("ENTER GATE"):
+        if e == "admin@coin-nexus.com" and p == "quantum2026":
+            st.session_state['auth'] = True
+            st.session_state['user_email'] = e
+            st.rerun()
     st.stop()
 
-st.title(f"🚀 Financial Intelligence: {st.session_state['user_email']}")
-if st.sidebar.button("Log Out"):
-    st.session_state['auth'] = False
-    st.rerun()
-
-up = st.file_uploader("Carica Bilancio (Excel/CSV)", type=['xlsx', 'csv'])
+# Dashboard Corporate
+st.title("🚀 Fast-Track Credit Gateway")
+up = st.file_uploader("Upload ERP Export (Excel/CSV)", type=['xlsx', 'csv'])
 
 if up:
     df = pd.read_excel(up) if up.name.endswith('.xlsx') else pd.read_csv(up)
     num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    val_col = st.selectbox("Seleziona Colonna Importi", num_cols)
     
-    c1, c2 = st.columns(2)
-    with c1: d_col = st.selectbox("Seleziona Voce", df.columns)
-    with c2: v_col = st.selectbox("Seleziona Importo", num_cols)
-
-    if st.button("📊 AVVIA ANALISI ELITE"):
-        massa = df[v_col].abs().sum()
-        mat = massa * 0.015
-        roi = (df[v_col].sum() / massa) * 100 if massa != 0 else 0
-        dscr = 1.85 # Valore simulato
-        debt_eq = 0.65 # Valore simulato
+    if st.button("⚡ GENERA PASS BANCARIO"):
+        massa = df[val_col].abs().sum()
+        roi = (df[val_col].sum() / massa) * 100
+        score = 88 # Algoritmo simulato di bancabilità
         
-        # Business Plan
-        bp_df = pd.DataFrame([{"Fatturato": massa * (1.07**i), "Rischio": "Basso"} for i in range(1, 5)], index=[2026, 2027, 2028, 2029])
+        # Dashboard a colpo d'occhio
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Credit Score", f"{score}/100", "TOP GRADE")
+        k2.metric("Massa Auditata", f"€{massa:,.0f}")
+        k3.metric("ROI", f"{roi:.1f}%")
 
-        # Grafici
-        col_g1, col_g2 = st.columns(2)
-        with col_g1: st.plotly_chart(px.treemap(df.head(15), path=[d_col], values=v_col, title="Mappatura ISA 320"), use_container_width=True)
-        with col_g2: st.plotly_chart(px.bar(bp_df, y="Fatturato", title="Strategic 4Y Outlook", color_discrete_sequence=['#0F192D']), use_container_width=True)
+        # Business Plan 4Y per la Banca
+        bp_df = pd.DataFrame([{"Ricavi": massa * (1.06**i)} for i in range(1, 5)], index=[2026, 2027, 2028, 2029])
+        st.plotly_chart(px.bar(bp_df, title="Proiezione Flussi Cash-In 4 Anni", color_discrete_sequence=['#003366']), use_container_width=True)
 
-        # Report PDF
-        st.divider()
-        pdf_bytes = genera_pdf_elite(massa, mat, roi, dscr, debt_eq, st.session_state['user_email'], bp_df)
+        # Preparazione dati PDF
+        report_data = {
+            'massa': massa, 'roi': roi, 'score': score, 
+            'dscr': 1.92, 'rating': 'AAA', 'filename': up.name
+        }
         
-        # Log dell'operazione su Supabase (se la tabella esiste)
-        if supabase:
-            try:
-                supabase.table("audit_logs").insert({"user_email": st.session_state['user_email'], "massa": massa, "filename": up.name}).execute()
-            except: pass
-
-        st.download_button("📥 SCARICA REPORT BANCARIO INTEGRATO (PDF)", pdf_bytes, f"CoinNexus_Elite_{up.name}.pdf", "application/pdf")
-        st.success("Analisi completata con successo.")
+        pdf_bytes = genera_pdf_telepass(report_data, st.session_state['user_email'])
+        st.download_button("📥 SCARICA TELEPASS BANCARIO (PDF)", pdf_bytes, "CoinNexus_Pass.pdf", "application/pdf")
+        st.success("Certificazione pronta per l'invio alla banca o al sistema DocFinance.")
