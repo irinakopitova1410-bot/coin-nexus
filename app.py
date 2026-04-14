@@ -65,12 +65,22 @@ with st.sidebar:
 if file:
     try:
         df = pd.read_excel(file) if file.name.endswith('.xlsx') else pd.read_csv(file)
-        val_col = df.select_dtypes(include=[np.number]).columns[0]
         
-        # Calcoli Professionali
-        ricavi = df[val_col].sum()
-        materialita = ricavi * 0.015
-        rischio = "ALTO" if df[val_col].std() > (ricavi * 0.2) else "BASSO"
+        # Cerchiamo le colonne numeriche
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if len(numeric_cols) == 0:
+            st.error("❌ Errore: Il file non contiene colonne numeriche valide. Controlla i dati!")
+        else:
+            # Selezioniamo la prima colonna numerica trovata
+            val_col = numeric_cols[0]
+            # --- PROCEDI CON I CALCOLI ---
+            ricavi = df[val_col].sum()
+            materialita = ricavi * 0.015
+            # ... resto del codice ...
+            st.success(f"Analisi completata sulla colonna: {val_col}")
+    except Exception as e:
+        st.error(f"Errore tecnico: {e}")
         
         # AI Detection
         model = IsolationForest(contamination=0.05).fit(df[[val_col]])
