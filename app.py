@@ -10,8 +10,8 @@ from datetime import datetime
 
 # --- 1. CONNESSIONE SUPABASE ---
 # Incolla qui i tuoi dati dal pannello "Project Settings > API" di Supabase
-SUPABASE_URL = "https://tuo-id.supabase.co"
-SUPABASE_KEY = "tua-chiave-anon-public"
+SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
 
 @st.cache_resource
 def init_supabase():
