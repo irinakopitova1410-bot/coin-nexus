@@ -1,24 +1,18 @@
-def compute_metrics(d):
-
-    dscr = d["ebitda"] / d["debt"] if d["debt"] else 0
-    liquidity = (d["cash"] + d["receivables"]) / (d["payables"] + 1)
-
-    score = 0
-    reasons = []
-
-    if dscr > 1.5:
-        score += 40
-        reasons.append("DSCR solido")
-
-    if liquidity > 1.2:
-        score += 30
-        reasons.append("Liquidità buona")
-
-    if d["debt"] < d["ebitda"] * 3:
-        score += 30
-        reasons.append("Leva sostenibile")
-
+def calculate_metrics(data):
+    rev = data.get('revenue', 0)
+    ebitda = data.get('ebitda', 0)
+    debt = data.get('debt', 0)
+    
+    # Calcolo DSCR (Debt Service Coverage Ratio)
+    # Ipotizziamo ammortamento 5 anni + 5% interessi
+    annual_service = (debt / 5) + (debt * 0.05) if debt > 0 else 0
+    dscr = ebitda / annual_service if annual_service > 0 else (ebitda if ebitda > 0 else 0)
+    
+    # Leverage (Indebitamento)
+    leverage = debt / ebitda if ebitda > 0 else (99 if debt > 0 else 0)
+    
     return {
-        "score": score,
-        "reasons": reasons
+        "dscr": round(float(dscr), 2),
+        "leverage": round(float(leverage), 2),
+        "margin": round(float((ebitda / rev * 100) if rev > 0 else 0), 2)
     }
