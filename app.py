@@ -1,54 +1,76 @@
 import streamlit as st
-from supabase import create_client, Client
-from scoring import NexusScorer
 import plotly.graph_objects as go
+from supabase import create_client, Client
 
-# Collegamento sicuro ai Secrets (da impostare sulla dashboard di Streamlit)
-# Metti questo esattamente così nel codice
-SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
-SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
-supabase: Client = create_client(url, key)
+# --- CONNESSIONE DATABASE ---
+# Recupera le chiavi dai Secrets di Streamlit Cloud
+try:
+    url: str = st.secrets["SUPABASE_URL"]
+    key: str = st.secrets["SUPABASE_KEY"]
+    supabase: Client = create_client(url, key)
+except Exception as e:
+    st.error("Errore di configurazione: controlla i Secrets su Streamlit Cloud.")
+    st.stop()
 
-st.set_page_config(page_title="Coin-Nexus SaaS", layout="wide", page_icon="🏛️")
+# --- LOGICA DI SCORING ---
+class NexusScorer:
+    def __init__(self, revenue, costs, debt):
+        self.revenue = float(revenue)
+        self.costs = float(costs)
+        self.debt = float(debt)
+        self.ebitda = self.revenue - self.costs
 
+    def get_nexus_rating(self):
+        dscr = self.ebitda / (self.debt if self.debt > 0 else 1)
+        score = ((self.ebitda / self.revenue) * 60) + (min(dscr, 5) * 8)
+        if score > 75: return "AAA", "Massima Solvibilità"
+        if score > 50: return "BBB", "Solvibilità Buona"
+        return "CCC", "Rischio Monitorato"
+
+# --- INTERFACCIA UI ---
+st.set_page_config(page_title="Coin-Nexus SaaS", layout="wide")
 st.title("🏛️ Coin-Nexus | Cloud Terminal")
 
-# Sidebar per Input
 with st.sidebar:
-    st.header("👤 Utente Enterprise")
-    company = st.text_input("Ragione Sociale", "Azienda Beta S.r.l.")
-    rev = st.number_input("Ricavi (€)", value=2500000)
-    costs = st.number_input("Costi (€)", value=1800000)
-    debt = st.number_input("Debito (€)", value=400000)
-    run = st.button("🚀 ESEGUI & SALVA")
+    st.header("📥 ERP Data Input")
+    company = st.text_input("Ragione Sociale", "Azienda Esempio S.r.l.")
+    rev = st.number_input("Ricavi (€)", value=1000000)
+    costs = st.number_input("Costi (€)", value=800000)
+    debt = st.number_input("Debito (€)", value=200000)
+    run = st.button("🚀 ESEGUI & SALVA NEL CLOUD")
 
 if run:
     scorer = NexusScorer(rev, costs, debt)
     rating, desc = scorer.get_nexus_rating()
     
-    # SALVATAGGIO NEL DATABASE
+    # SALVATAGGIO SU SUPABASE
     try:
-        data = {
+        report_data = {
             "company_name": company,
             "rating": rating,
-            "revenue": rev,
-            "ebitda": rev - costs
+            "revenue": rev
         }
-        supabase.table("audit_reports").insert(data).execute()
-        st.success(f"Analisi per {company} salvata nel Cloud!")
+        supabase.table("audit_reports").insert(report_data).execute()
+        st.success(f"Analisi di {company} salvata!")
     except Exception as e:
         st.error(f"Errore database: {e}")
 
-    # Visualizzazione Risultati
+    # RISULTATI VISIVI
     st.metric("Rating Basilea IV", rating, desc)
-    # Qui aggiungi i tuoi grafici professionali...
+    fig = go.Figure(go.Scatterpolar(
+        r=[80, 70, 90, 85, 75],
+        theta=['Liquidità','Solvibilità','Efficienza','Resilienza','Rating'],
+        fill='toself', line_color='cyan'
+    ))
+    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), template="plotly_dark")
+    st.plotly_chart(fig, use_container_width=True)
 
-# VISUALIZZAZIONE STORICO (Il vero valore del SaaS)
+# --- VISUALIZZAZIONE DATABASE ---
 st.divider()
-st.subheader("📑 Database Storico Aziende Analizzate")
+st.subheader("📑 Database Storico Real-Time")
 try:
-    response = supabase.table("audit_reports").select("*").order("created_at", desc=True).execute()
-    if response.data:
-        st.dataframe(response.data, use_container_width=True)
-except Exception as e:
-    st.info("Inizia la prima analisi per popolare il database.")
+    history = supabase.table("audit_reports").select("*").order("created_at", desc=True).execute()
+    if history.data:
+        st.dataframe(history.data, use_container_width=True)
+except:
+    st.info("In attesa del primo salvataggio...")
