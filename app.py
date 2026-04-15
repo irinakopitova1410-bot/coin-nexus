@@ -3,72 +3,51 @@ from supabase import create_client, Client
 from scoring import NexusScorer
 import plotly.graph_objects as go
 
-# Connessione a Supabase
-url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
-key = st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
+# Collegamento sicuro ai Secrets (da impostare sulla dashboard di Streamlit)
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
 
-st.set_page_config(page_title="Coin-Nexus SaaS", layout="wide")
+st.set_page_config(page_title="Coin-Nexus SaaS", layout="wide", page_icon="🏛️")
 
-# --- LOGICA DI AUTENTICAZIONE ---
-if 'user' not in st.session_state:
-    st.session_state.user = None
+st.title("🏛️ Coin-Nexus | Cloud Terminal")
 
-def login():
-    with st.sidebar:
-        st.subheader("🔐 Accesso Area Riservata")
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        if st.button("Accedi"):
-            res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-            st.session_state.user = res.user
-            st.rerun()
-        if st.button("Registrati"):
-            supabase.auth.sign_up({"email": email, "password": password})
-            st.info("Controlla la mail per confermare!")
+# Sidebar per Input
+with st.sidebar:
+    st.header("👤 Utente Enterprise")
+    company = st.text_input("Ragione Sociale", "Azienda Beta S.r.l.")
+    rev = st.number_input("Ricavi (€)", value=2500000)
+    costs = st.number_input("Costi (€)", value=1800000)
+    debt = st.number_input("Debito (€)", value=400000)
+    run = st.button("🚀 ESEGUI & SALVA")
 
-# --- INTERFACCIA PRINCIPALE ---
-if st.session_state.user is None:
-    st.title("🏛️ Benvenuto in Coin-Nexus")
-    st.warning("Effettua il login per accedere al terminale di scoring e ai tuoi dati salvati.")
-    login()
-else:
-    st.sidebar.success(f"Connesso come: {st.session_state.user.email}")
-    if st.sidebar.button("Logout"):
-        st.session_state.user = None
-        st.rerun()
-
-    st.title("🏛️ Coin-Nexus | Enterprise Terminal")
+if run:
+    scorer = NexusScorer(rev, costs, debt)
+    rating, desc = scorer.get_nexus_rating()
     
-    # Area Input
-    col_in1, col_in2 = st.columns(2)
-    with col_in1:
-        company = st.text_input("Ragione Sociale")
-        rev = st.number_input("Ricavi (€)", value=1000000)
-    with col_in2:
-        costs = st.number_input("Costi (€)", value=800000)
-        debt = st.number_input("Debito (€)", value=200000)
-
-    if st.button("🚀 ESEGUI AUDIT & SALVA NEL CLOUD"):
-        scorer = NexusScorer(rev, costs, debt)
-        rating, desc = scorer.get_nexus_rating()
-        
-        # Salvataggio su Database
+    # SALVATAGGIO NEL DATABASE
+    try:
         data = {
-            "user_id": st.session_state.user.id,
             "company_name": company,
             "rating": rating,
-            "revenue": rev
+            "revenue": rev,
+            "ebitda": rev - costs
         }
         supabase.table("audit_reports").insert(data).execute()
-        st.success(f"Report per {company} salvato correttamente!")
-        
-        # Qui metti i tuoi grafici professionali...
-        st.metric("Rating", rating, desc)
+        st.success(f"Analisi per {company} salvata nel Cloud!")
+    except Exception as e:
+        st.error(f"Errore database: {e}")
 
-    # --- STORICO DATI ---
-    st.divider()
-    st.subheader("📑 I tuoi Audit precedenti")
-    history = supabase.table("audit_reports").select("*").execute()
-    if history.data:
-        st.table(history.data)
+    # Visualizzazione Risultati
+    st.metric("Rating Basilea IV", rating, desc)
+    # Qui aggiungi i tuoi grafici professionali...
+
+# VISUALIZZAZIONE STORICO (Il vero valore del SaaS)
+st.divider()
+st.subheader("📑 Database Storico Aziende Analizzate")
+try:
+    response = supabase.table("audit_reports").select("*").order("created_at", desc=True).execute()
+    if response.data:
+        st.dataframe(response.data, use_container_width=True)
+except Exception as e:
+    st.info("Inizia la prima analisi per popolare il database.")
