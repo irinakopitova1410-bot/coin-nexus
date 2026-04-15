@@ -4,6 +4,7 @@ from scoring import NexusScorer
 import plotly.graph_objects as go
 
 # Collegamento sicuro ai Secrets (da impostare sulla dashboard di Streamlit)
+# Metti questo esattamente così nel codice
 url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
 key = st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
 supabase: Client = create_client(url, key)
