@@ -4,75 +4,80 @@ from supabase import create_client, Client
 import pandas as pd
 from fpdf import FPDF
 
-# --- CONFIGURAZIONE INTERFACCIA ---
-st.set_page_config(page_title="Coin-Nexus Terminal", layout="wide", page_icon="🏛️")
+# --- 1. SETUP & CONNESSIONE ---
+st.set_page_config(page_title="Coin-Nexus Terminal", layout="wide")
 
-# --- CONNESSIONE DATABASE (CLOUD SYNC) ---
 try:
+    # Recupero credenziali dai Secrets di Streamlit
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
-    supabase: Client = create_client(url, key)
-except Exception as e:
-    st.error("Configurazione Database non trovata. Verifica i 'Secrets' su Streamlit Cloud.")
+    supabase = create_client(url, key)
+except:
+    st.error("Configura SUPABASE_URL e SUPABASE_KEY nei Secrets di Streamlit Cloud!")
     st.stop()
 
-# --- MOTORE REPORT BANCARIO (PDF) ---
-def crea_report_bancario(azienda, rating, m):
+# --- 2. FUNZIONE PER IL PDF ---
+def genera_pdf(nome, rating, dati):
     pdf = FPDF()
     pdf.add_page()
-    
-    # Header Istituzionale
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, f"DOSSIER DI RATING: {azienda.upper()}", ln=True, align='L')
-    pdf.set_font("Arial", 'I', 9)
-    pdf.cell(0, 5, f"Data Analisi: {pd.to_datetime('today').strftime('%d/%m/%Y')} | Protocollo: CN-PRIV", ln=True)
+    pdf.cell(0, 10, f"COIN-NEXUS AUDIT: {nome.upper()}", ln=True)
     pdf.ln(10)
-
-    # Box Score Finale
-    pdf.set_fill_color(235, 235, 235)
-    pdf.set_font("Arial", 'B', 18)
-    pdf.cell(0, 20, f"VALUTAZIONE FINALE: {rating}", 1, 1, 'C', True)
-    pdf.ln(10)
-
-    # Sintesi Finanziaria
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "1. SINTESI DEI PARAMETRI", ln=True)
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(0, 8, f"Fatturato: EUR {m['rev']:,.0f}", ln=True)
-    pdf.cell(0, 8, f"EBITDA: EUR {m['ebitda']:,.0f}", ln=True)
-    pdf.cell(0, 8, f"Indice DSCR: {m['dscr']:.2f}", ln=True)
-    
-    # Stress Test (Scenario Avverso)
-    pdf.ln(5)
-    pdf.set_fill_color(255, 245, 245)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(0, 10, "2. STRESS TEST SCENARIO (-20%)", 1, 1, 'L', True)
-    pdf.set_font("Arial", '', 10)
-    stress_ebitda = (m['rev'] * 0.8) - (m['rev'] - m['ebitda'])
-    resilienza = "ALTA" if stress_ebitda > 0 else "CRITICA"
-    pdf.multi_cell(0, 8, f"In caso di contrazione dei ricavi del 20%, l'EBITDA stimato scenderebbe a EUR {stress_ebitda:,.0f}. Resilienza del modello: {resilienza}.")
-    
-    # Verdetto
-    pdf.ln(5)
-    pdf.set_font("Arial", 'B', 12)
-    verdetto = "CREDITO APPROVATO" if rating != "CCC" else "REVISIONE MANUALE"
-    pdf.cell(0, 10, f"ESITO AUTOMATIZZATO: {verdetto}", 0, 1, 'C')
-
+    pdf.set_font("Arial", '', 12)
+    pdf.cell(0, 10, f"Rating Assegnato: {rating}", ln=True)
+    pdf.cell(0, 10, f"Ricavi: EUR {dati['rev']:,.0f}", ln=True)
+    pdf.cell(0, 10, f"DSCR: {dati['dscr']:.2f}", ln=True)
     return pdf.output(dest='S').encode('latin-1')
 
-# --- MOTORE DI SCORING (LOGICA) ---
-def esegui_audit(ricavi, costi, debito):
-    ebitda = ricavi - costi
-    dscr = ebitda / (debito if debito > 0 else 1)
-    if dscr > 2.5: rating = "AAA"
-    elif dscr > 1.2: rating = "BBB"
-    else: rating = "CCC"
-    return rating, dscr, ebitda
+# --- 3. INTERFACCIA UTENTE ---
+st.title("🏛️ Coin-Nexus | Financial Terminal")
 
-# --- SIDEBAR (INPUT DATI) ---
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/checked-user-male.png", width=80)
-    st.header("Nexus Terminal")
-    azienda = st.text_input("Ragione Sociale", "Azienda Esempio S.r.l.")
-    ricavi = st.number_input("Ricavi (€)", value=1000000)
-    costi = st.number_input("Costi Operativi (€)", value=80000
+    st.header("Dati Aziendali")
+    azienda = st.text_input("Ragione Sociale", "Azienda S.r.l.")
+    rev = st.number_input("Ricavi (€)", value=1000000)
+    costi = st.number_input("Costi (€)", value=800000)
+    debito = st.number_input("Debito (€)", value=200000)
+    tasto = st.button("🚀 GENERA ANALISI")
+
+if tasto:
+    # Calcoli immediati
+    ebitda = rev - costi
+    dscr = ebitda / (debito if debito > 0 else 1)
+    voto = "AAA" if dscr > 2.0 else "BBB" if dscr > 1.1 else "CCC"
+    
+    # Metriche a video
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Rating", voto)
+    c2.metric("EBITDA", f"€{ebitda:,.0f}")
+    c3.metric("DSCR", f"{dscr:.2f}")
+
+    # Generazione PDF
+    info = {'rev': rev, 'ebitda': ebitda, 'dscr': dscr}
+    pdf_file = genera_pdf(azienda, voto, info)
+    
+    st.download_button(
+        label="📄 SCARICA REPORT PDF",
+        data=pdf_file,
+        file_name=f"Report_{azienda}.pdf",
+        mime="application/pdf"
+    )
+
+    # Salvataggio su Supabase
+    try:
+        supabase.table("audit_reports").insert({
+            "company_name": azienda, "rating": voto, "revenue": rev
+        }).execute()
+        st.success("Dati salvati nel Cloud!")
+    except:
+        st.info("Database non aggiornato.")
+
+# --- 4. VISUALIZZAZIONE STORICO ---
+st.divider()
+st.subheader("📑 Ultime Analisi nel Database")
+try:
+    res = supabase.table("audit_reports").select("*").order("created_at", desc=True).limit(5).execute()
+    if res.data:
+        st.table(pd.DataFrame(res.data)[['company_name', 'rating', 'revenue']])
+except:
+    st.write("Nessun dato ancora disponibile.")
