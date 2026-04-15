@@ -1,21 +1,28 @@
-# api/main.py
 from fastapi import FastAPI
-from engine.scoring import calculate_metrics
-from services.decision import get_credit_approval
+from pydantic import BaseModel
+from engine.scoring import compute_metrics
+from services.decision import credit_decision
 
-app = FastAPI(title="Coin-Nexus API Gateway")
+app = FastAPI(title="Coin-Nexus Risk Engine")
 
-@app.post("/v1/analyze")
-async def analyze_and_decide(data: dict):
-    # 1. Calcola indici (Engine)
-    metrics = calculate_metrics(data)
-    
-    # 2. Prendi decisione (Services)
-    decision = get_credit_approval(metrics)
-    
+class CompanyData(BaseModel):
+    cash: float
+    receivables: float
+    inventory: float
+    payables: float
+    ebitda: float
+    debt: float
+
+
+@app.post("/analyze")
+def analyze(data: CompanyData):
+
+    metrics = compute_metrics(data)
+    decision = credit_decision(metrics)
+
     return {
-        "status": "processed",
-        "company": data.get("name"),
         "metrics": metrics,
-        "bank_decision": decision
+        "decision": decision["status"],
+        "risk_score": decision["score"],
+        "reason": decision["reason"]
     }
