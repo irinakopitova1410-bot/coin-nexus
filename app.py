@@ -82,7 +82,41 @@ if btn:
     st.divider()
     g1, g2 = st.columns(2)
     with g1:
+        # Gauge Chart Corretto
         fig_g = go.Figure(go.Indicator(
-            mode="gauge+number", value=dscr,
-            gauge={'axis':{'range':[0,5]}, 'bar':{'color':"#00f2ff"},
-                   'steps':[{'range':[0,1.2],'color':"#ff4b4b"},{'range':[1.2,2.5],'color':"#ffa500"},{'range
+            mode="gauge+number", 
+            value=dscr,
+            gauge={
+                'axis': {'range': [0, 5]},
+                'bar': {'color': "#00f2ff"},
+                'steps': [
+                    {'range': [0, 1.2], 'color': "#ff4b4b"},
+                    {'range': [1.2, 2.5], 'color': "#ffa500"},
+                    {'range': [2.5, 5], 'color': "#00cc66"}
+                ]
+            }
+        ))
+        fig_g.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+        st.plotly_chart(fig_g, use_container_width=True)
+        
+    with g2:
+        # Radar Chart
+        fig_r = go.Figure(go.Scatterpolar(
+            r=[80, 70, dscr*20, 90, 85], 
+            theta=['Fatturato','Margine','Solvibilita','Leva','Resilienza'], 
+            fill='toself', 
+            line_color='#00f2ff'
+        ))
+        fig_r.update_layout(height=300, polar=dict(radialaxis=dict(visible=True, range=[0, 100])), paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+        st.plotly_chart(fig_r, use_container_width=True)
+
+    st.divider()
+    try:
+        pdf_out = create_banking_report(comp, rating, metrics)
+        st.download_button("📄 SCARICA REPORT DECISIONALE", data=pdf_out, file_name=f"Report_{comp}.pdf", mime="application/pdf", use_container_width=True)
+    except Exception as e:
+        st.error(f"Errore PDF: {e}")
+
+    if supabase:
+        try:
+            supabase.table("audit_reports").insert({"company_name": comp, "rating": rating
