@@ -1,4 +1,7 @@
 streamlit
-supabase
+fastapi
+uvicorn
 pandas
-plotly
+numpy
+pydantic
+openpyxl
