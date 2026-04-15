@@ -1,10 +1,24 @@
-def get_credit_approval(metrics):
-    dscr = metrics.get('dscr', 0)
-    leverage = metrics.get('leverage', 0)
-    
-    if dscr >= 1.5 and leverage <= 3.0:
-        return {"rating": "AAA", "decision": "APPROVATO", "color": "#00CC66"}
-    elif dscr >= 1.1:
-        return {"rating": "BBB", "decision": "REVISIONE", "color": "#FFCC00"}
-    else:
-        return {"rating": "CCC", "decision": "NEGATO", "color": "#FF3300"}
+def credit_decision(m):
+
+    score = 0
+    reasons = []
+
+    if m["dscr"] > 1.5:
+        score += 40
+        reasons.append("DSCR solido")
+
+    if m["liquidity"] > 1.2:
+        score += 30
+        reasons.append("Liquidità buona")
+
+    if m["leverage"] < 3:
+        score += 30
+        reasons.append("Leva controllata")
+
+    if score >= 80:
+        return {"status": "APPROVED", "score": score, "reason": reasons}
+
+    elif score >= 50:
+        return {"status": "CONDITIONAL", "score": score, "reason": reasons}
+
+    return {"status": "REJECTED", "score": score, "reason": reasons}
