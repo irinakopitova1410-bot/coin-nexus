@@ -12,15 +12,21 @@ def init_connection():
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
 supabase = init_connection()
-
-# --- LOGICA DI SALVATAGGIO ---
 def push_to_db(company_name, metrics, decision):
     try:
-        # 1. Recuperiamo il Tenant ID (Doc Finance Test creato via SQL)
-        tenant = supabase.table("tenants").select("id").eq("name", "Doc Finance Partner").single().execute()
-        t_id = tenant.data['id']
+        # 1. Recuperiamo il Tenant ID
+        tenant_res = supabase.table("tenants").select("id").eq("name", "Doc Finance Partner").execute()
+        
+        # Se il tenant non esiste, lo creiamo al volo
+        if not tenant_res.data:
+            tenant_res = supabase.table("tenants").insert({
+                "name": "Doc Finance Partner", 
+                "api_key": "nexus_test_key_2024"
+            }).execute()
+            
+        t_id = tenant_res.data[0]['id']
 
-        # 2. Upsert dell'azienda (la crea o la aggiorna se esiste)
+        # 2. Upsert dell'azienda
         comp_res = supabase.table("companies").upsert({
             "company_name": company_name,
             "tenant_id": t_id
@@ -37,9 +43,8 @@ def push_to_db(company_name, metrics, decision):
         }).execute()
         return True
     except Exception as e:
-        st.error(f"Errore Database: {e}")
+        st.error(f"Errore tecnico: {e}")
         return False
-
 # --- UI STREAMLIT ---
 st.title("🏛️ Coin-Nexus | Credit Decision Engine")
 
