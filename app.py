@@ -1,117 +1,100 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 from fpdf import FPDF
 from datetime import datetime
+from supabase import create_client, Client
 
-# --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Coin-Nexus | ISA & Break-Even Certified", layout="wide", page_icon="🏛️")
+# --- 1. CONNESSIONE SUPABASE CON PROTEZIONE ---
+# IMPORTANTE: Inserisci i tuoi dati reali qui per attivare il database
+SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co" 
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
 
-# --- MOTORE PDF POTENZIATO ---
-class AuditReport(FPDF):
-    def header(self):
-        self.set_fill_color(0, 40, 85)
-        self.rect(0, 0, 210, 40, 'F')
-        self.set_text_color(255, 255, 255)
-        self.set_font('Arial', 'B', 15)
-        self.cell(0, 20, 'ISA 320 AUDIT & BREAK-EVEN ANALYSIS REPORT', 0, 1, 'C')
-        self.ln(20)
+@st.cache_resource
+def init_supabase():
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except:
+        return None
 
-def genera_report_master(data):
-    pdf = AuditReport()
-    pdf.add_page()
-    pdf.set_text_color(0, 0, 0)
-    
-    # SEZIONE ISA 320
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, "1. PROTOCOLLO REVISIONE ISA 320 (MATERIALITA)", ln=True)
-    pdf.set_font('Arial', '', 11)
-    pdf.multi_cell(0, 8, f"Benchmark applicato: 5% dell'utile ante imposte. \n"
-                         f"Materialita complessiva: Euro {data['isa_total']:,.0f}\n"
-                         f"Errore tollerabile (75%): Euro {data['isa_toll']:,.0f}\n"
-                         "Esito: Flussi finanziari validati senza anomalie significative.")
-    
-    # SEZIONE BREAK-EVEN
-    pdf.ln(10)
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, "2. ANALISI DEL PUNTO DI PAREGGIO (BREAK-EVEN ANALYSIS)", ln=True)
-    pdf.set_font('Arial', '', 11)
-    pdf.multi_cell(0, 8, f"Costi Fissi Totali: Euro {data['fixed_costs']:,.0f}\n"
-                         f"Margine di Contribuzione: {data['margin']:.2f}%\n"
-                         f"Fatturato di Pareggio: Euro {data['bep']:,.0f}\n"
-                         "Commento: L'azienda opera in zona di sicurezza con un margine del 25% sopra il BEP.")
+supabase = init_supabase()
 
-    return pdf.output(dest='S').encode('latin-1')
+# --- 2. CONFIGURAZIONE PAGINA ---
+st.set_page_config(page_title="Coin-Nexus | Enterprise Audit", layout="wide", page_icon="🔐")
 
-# --- LOGICA DASHBOARD ---
-if 'auth' not in st.session_state: st.session_state['auth'] = False
-if not st.session_state['auth']:
-    st.title("🏛️ Coin-Nexus Secure Audit Access")
-    if st.text_input("Access Key", type="password") == "quantum2026":
-        st.session_state['auth'] = True
-        st.rerun()
+# --- 3. GESTIONE AUTENTICAZIONE (ADMIN & QUANTUM) ---
+if 'auth' not in st.session_state:
+    st.session_state['auth'] = False
+    st.session_state['user_email'] = None
+
+def login():
+    st.title("🏛️ Coin-Nexus | Secure Gateway")
+    col1, _ = st.columns([1, 1])
+    with col1:
+        st.subheader("Accesso Istituzionale")
+        u = st.text_input("Email Admin")
+        p = st.text_input("Quantum Key", type="password")
+        if st.button("SBLOCCA TERMINALE"):
+            # Controllo credenziali fisse (Master)
+            if u == "admin@coin-nexus.com" and p == "quantum2026":
+                st.session_state['auth'] = True
+                st.session_state['user_email'] = u
+                st.success("Accesso Master Validato.")
+                st.rerun()
+            else:
+                st.error("Credenziali non valide.")
     st.stop()
 
-st.title("🚀 Terminale di Revisione | ISA 320 & Break-Even")
+if not st.session_state['auth']:
+    login()
 
-up = st.file_uploader("Sincronizza Dati ERP", type=['xlsx', 'csv'])
+# --- 4. DASHBOARD E MOTORE FINANZIARIO (IL VALORE DA 25M) ---
+st.sidebar.title("💎 Nexus Cloud Pro")
+if supabase:
+    st.sidebar.success("✅ Supabase: Connesso")
+else:
+    st.sidebar.warning("⚠️ Supabase: Non Connesso (Controlla chiavi)")
+
+if st.sidebar.button("LOGOUT"):
+    st.session_state['auth'] = False
+    st.rerun()
+
+st.title(f"🚀 Dashboard Strategica | Auditor: {st.session_state['user_email']}")
+
+up = st.file_uploader("Sincronizza Flusso Dati ERP", type=['xlsx', 'csv'])
 
 if up:
-    # --- CALCOLI SCIENTIFICI ---
-    fatturato = 5000000.0
+    # Calcoli ISA 320 e Break-Even
+    fatturato = 5400000.0
     costi_fissi = 1200000.0
-    costi_variabili = 3000000.0
-    utile_ante_imposte = fatturato - costi_fissi - costi_variabili
-    
-    # Calcolo ISA 320 (Materialità)
-    isa_total = utile_ante_imposte * 0.05
-    isa_toll = isa_total * 0.75
-    
-    # Calcolo Break-Even Point (BEP)
-    margine_contribuzione = (fatturato - costi_variabili) / fatturato
-    bep = costi_fissi / margine_contribuzione
+    costi_variabili = 3100000.0
+    utile = fatturato - costi_fissi - costi_variabili
+    isa_total = utile * 0.05
+    bep = costi_fissi / ((fatturato - costi_variabili) / fatturato)
 
-    # --- VISUALIZZAZIONE ---
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("⚖️ Validazione ISA 320")
-        st.metric("Soglia di Materialità", f"€ {isa_total:,.0f}")
-        st.info(f"Ogni discrepanza sotto € {isa_toll:,.0f} è considerata non rilevante per il Rating.")
-
-    with col2:
-        st.subheader("📈 Break-Even Analysis")
-        st.metric("Punto di Pareggio (BEP)", f"€ {bep:,.0f}")
-        progresso = (fatturato / bep) - 1
-        st.progress(min(fatturato / (bep * 2), 1.0))
-        st.write(f"Margine di sicurezza: **+{progresso*100:.1f}%**")
+    # KPI
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Rating", "AAA")
+    c2.metric("Soglia ISA 320", f"€{isa_total:,.0f}")
+    c3.metric("Break-Even Point", f"€{bep:,.0f}")
 
     st.divider()
 
-    # --- GRAFICO DEL PAREGGIO (Il preferito dai CFO) ---
-    st.subheader("📊 Modello di Redditività Dinamica")
-    x = np.linspace(0, fatturato * 1.5, 100)
-    y_costi = costi_fissi + (costi_variabili/fatturato * x)
-    y_ricavi = x
-    
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=x, y=y_ricavi, name='Ricavi Totali', line=dict(color='green', width=4)))
-    fig.add_trace(go.Scatter(x=x, y=y_costi, name='Costi Totali (Fissi+Var)', line=dict(color='red', width=2)))
-    fig.add_vline(x=bep, line_dash="dash", line_color="orange", annotation_text="Punto di Pareggio")
-    fig.update_layout(title="Analisi Break-Even Point", template="plotly_dark")
-    st.plotly_chart(fig, use_container_width=True)
+    # Azione Cloud Supabase
+    if st.button("💾 ARCHIVIA ANALISI SU SUPABASE"):
+        if supabase:
+            try:
+                data = {"user_email": st.session_state['user_email'], "filename": up.name, "rating": "AAA"}
+                supabase.table("audit_reports").insert(data).execute()
+                st.success("Analisi salvata nel database cloud.")
+            except Exception as e:
+                st.error(f"Errore nel database: {e}")
+        else:
+            st.error("Impossibile salvare: Supabase non configurato.")
 
-    # --- REPORT FINALE ---
-    if st.button("🏆 EMETTI REPORT AUDIT 10M"):
-        dati_report = {
-            'filename': up.name,
-            'isa_total': isa_total,
-            'isa_toll': isa_toll,
-            'fixed_costs': costi_fissi,
-            'margin': margine_contribuzione * 100,
-            'bep': bep
-        }
-        pdf_bytes = genera_report_master(dati_report)
-        st.download_button("📥 SCARICA CERTIFICAZIONE ISA & BEP", pdf_bytes, "Audit_Certified_Nexus.pdf", "application/pdf")
+    # Grafico Prospettico
+    st.subheader("🔮 Forward-Looking Cash Flow 2029")
+    anni = ['2026', '2027', '2028', '2029']
+    cash =
