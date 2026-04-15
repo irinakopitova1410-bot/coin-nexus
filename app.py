@@ -5,8 +5,8 @@ import plotly.graph_objects as go
 
 # Collegamento sicuro ai Secrets (da impostare sulla dashboard di Streamlit)
 # Metti questo esattamente così nel codice
-url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
-key = st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
+SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
+SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
 supabase: Client = create_client(url, key)
 
 st.set_page_config(page_title="Coin-Nexus SaaS", layout="wide", page_icon="🏛️")
