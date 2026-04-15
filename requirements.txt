@@ -3,11 +3,5 @@ fastapi
 uvicorn
 pandas
 numpy
-plotly
 scikit-learn
-pydantic
-fpdf
-supabase
 openpyxl
-sqlalchemy
-python-dotenv
