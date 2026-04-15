@@ -6,12 +6,19 @@ import plotly.express as px
 from fpdf import FPDF
 from datetime import datetime
 from supabase import create_client, Client
+import streamlit as st
+import pandas as pd
+# ... (altri import) ...
 
-# --- 1. CONNESSIONE SUPABASE (MODIFICA CON LE TUE CHIAVI) ---
-# Vai su Supabase -> Settings -> API per trovare questi valori
-SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
-SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# --- CONNESSIONE SUPABASE CON "PARACADUTE" ---
+try:
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase_active = True
+except:
+    supabase_active = False
+    # L'app non si blocca se le chiavi mancano, semplicemente disabilita il salvataggio cloud
 
 # --- 2. CONFIGURAZIONE INTERFACCIA ---
 st.set_page_config(page_title="Coin-Nexus | Cloud Audit Enterprise", layout="wide", page_icon="🔐")
