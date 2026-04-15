@@ -16,19 +16,80 @@ except:
     st.error("Configura SUPABASE_URL e SUPABASE_KEY nei Secrets di Streamlit Cloud!")
     st.stop()
 
-# --- 2. FUNZIONE PER IL PDF ---
-def genera_pdf(nome, rating, dati):
+def create_banking_report(company, rating, metrics):
     pdf = FPDF()
     pdf.add_page()
+    
+    # --- 1. HEADER ISTITUZIONALE ---
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, f"COIN-NEXUS AUDIT: {nome.upper()}", ln=True)
+    pdf.cell(0, 10, "COIN-NEXUS FINANCIAL INTELLIGENCE", ln=True, align='C')
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(0, 5, "Confidential Credit Assessment Report", ln=True, align='C')
     pdf.ln(10)
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(0, 10, f"Rating Assegnato: {rating}", ln=True)
-    pdf.cell(0, 10, f"Ricavi: EUR {dati['rev']:,.0f}", ln=True)
-    pdf.cell(0, 10, f"DSCR: {dati['dscr']:.2f}", ln=True)
-    return pdf.output(dest='S').encode('latin-1')
 
+    # --- 2. EXECUTIVE SUMMARY (Decision Box) ---
+    pdf.set_fill_color(245, 245, 245)
+    pdf.rect(10, 35, 190, 30, 'F')
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, f"Azienda: {company.upper()}", ln=True)
+    pdf.set_font("Arial", 'B', 15)
+    pdf.set_text_color(0, 100, 0) if rating == "AAA" else pdf.set_text_color(200, 0, 0)
+    pdf.cell(0, 10, f"SCORE FINALE: {rating} / 100", ln=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(10)
+
+    # --- 3. FINANCIAL SNAPSHOT (Tabella Pura) ---
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 10, "SECTION 1: FINANCIAL SNAPSHOT", ln=True)
+    pdf.set_font("Arial", '', 10)
+    
+    rows = [
+        ["Ricavi (LTM)", f"EUR {metrics['rev']:,.0f}"],
+        ["EBITDA", f"EUR {metrics['ebitda']:,.0f}"],
+        ["DSCR (Debt Cover)", f"{metrics['dscr']:.2f}"],
+        ["Net Working Capital", "Analisi in corso..."]
+    ]
+    for row in rows:
+        pdf.cell(95, 8, row[0], 1)
+        pdf.cell(95, 8, row[1], 1, 1, 'R')
+    pdf.ln(5)
+
+    # --- 4. AI SCORE EXPLANATION (Il "Perché") ---
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 10, "SECTION 2: AI SCORE EXPLANATION", ln=True)
+    pdf.set_font("Arial", '', 10)
+    
+    # Logica di spiegazione automatica
+    explanations = []
+    if metrics['dscr'] > 1.5: explanations.append("[+] Solida capacita' di rimborso del debito (+20 pts)")
+    else: explanations.append("[-] Flusso di cassa teso rispetto alle scadenze (-15 pts)")
+    
+    if (metrics['ebitda']/metrics['rev']) > 0.15: explanations.append("[+] Elevata marginalita' operativa (+15 pts)")
+    
+    for line in explanations:
+        pdf.cell(0, 7, line, ln=True)
+    pdf.ln(5)
+
+    # --- 5. STRESS TEST SCENARIO (-20%) ---
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(0, 10, "SECTION 3: STRESS TEST (SCENARIO AVVERSO -20%)", ln=True)
+    pdf.set_font("Arial", '', 10)
+    
+    stress_rev = metrics['rev'] * 0.8
+    stress_ebitda = stress_rev - (metrics['rev'] - metrics['ebitda'])
+    resilienza = "ALTA" if stress_ebitda > 0 else "CRITICA"
+    
+    pdf.multi_cell(0, 7, f"Simulazione contrazione ricavi: In caso di calo del 20% del fatturato, l'azienda genererebbe un EBITDA di EUR {stress_ebitda:,.0f}. Grado di resilienza: {resilienza}.")
+
+    # --- 6. FINAL VERDICT (The "Verdict") ---
+    pdf.ln(10)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_fill_color(0, 0, 0)
+    pdf.set_text_color(255, 255, 255)
+    verdict = "CREDIT APPROVED" if rating != "CCC" else "CREDIT REJECTED / REVIEW REQUIRED"
+    pdf.cell(0, 15, f"FINAL VERDICT: {verdict}", 0, 1, 'C', True)
+
+    return pdf.output(dest='S').encode('latin-1')
 # --- 3. INTERFACCIA UTENTE ---
 st.title("🏛️ Coin-Nexus | Financial Terminal")
 
