@@ -1,3 +1,4 @@
+
 import streamlit as st
 import plotly.graph_objects as go
 from supabase import create_client, Client
@@ -7,8 +8,8 @@ st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide", page_icon=
 
 # Connessione Database (Verifica Secrets)
 try:
-    url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
-    key = st.secrets[sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos""]
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
     supabase = create_client(url, key)
 except:
     st.error("⚠️ Errore: Configura SUPABASE_URL e SUPABASE_KEY nei Secrets di Streamlit!")
