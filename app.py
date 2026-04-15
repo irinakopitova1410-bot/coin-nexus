@@ -58,10 +58,26 @@ if run_audit:
     c2.metric("ISA 320", f"€{mat:,.0f}")
     c3.metric("BEP", f"€{bep:,.0f}")
     c4.metric("Sicurezza", f"{safety}%")
-
+# Sotto il tasto di download, aggiungiamo il salvataggio automatico
+if st.button("💾 Salva nel mio Archivio Cloud"):
+    try:
+        report_data = {
+            "company_name": company_name,
+            "rating": rating,
+            "revenue": rev,
+            "costs": costs,
+            "debt": debt,
+            "isa_320_threshold": mat,
+            "bep": bep,
+            "safety_margin": safety,
+            "user_id": st.session_state.user.id # Richiede il login attivo
+        }
+        supabase.table("audit_reports").insert(report_data).execute()
+        st.success("Analisi salvata con successo nel tuo account!")
+    except Exception as e:
+        st.error(f"Errore nel salvataggio: {e}")
     # GRAFICI PROFESSIONALI
     col_l, col_r = st.columns(2)
-    
     with col_l:
         st.subheader("🎯 Posizionamento Asset")
         fig_radar = go.Figure()
