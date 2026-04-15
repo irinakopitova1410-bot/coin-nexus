@@ -1,14 +1,7 @@
-# app_streamlit/app.py
+# app.py (nella cartella principale)
 import streamlit as st
+# Import dai nuovi moduli strutturati
 from engine.scoring import calculate_metrics
-from services.decision import get_credit_approval
+from services.decision import get_credit_approval 
 
-# UI per mostrare al cliente come lavora l'API
-st.title("🏛️ Coin-Nexus | Decision Engine Demo")
-
-with st.sidebar:
-    st.header("⚙️ API Configuration")
-    st.info("Connected to local Credit Engine v1.0")
-
-# Form di input...
-# (Codice UI precedente aggiornato per importare da ..services.decision)
+# ... resto del codice per la UI e Supabase ...
