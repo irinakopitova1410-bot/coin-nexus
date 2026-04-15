@@ -13,7 +13,9 @@ file = st.file_uploader("Upload file", type=["csv", "xlsx"])
 if file:
 
     df = load_data(file)
-    metrics = compute_metrics(df)
+   from utils.parser import extract_financials
+financials = extract_financials(df)
+metrics = compute_metrics(financials)
     decision = credit_decision(metrics)
 
     st.metric("Score", metrics["score"])
