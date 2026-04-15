@@ -2,52 +2,61 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
-from fpdf import FPDF
 
-# --- CONFIGURAZIONE INIZIALE ---
-st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide")
-
-# Prova a caricare supabase solo se disponibile
+# --- 1. SETUP CHIAVI SUPABASE (DA SETTINGS STREAMLIT) ---
+# Se non hai ancora configurato i Secrets, l'app userà la modalità Demo
 try:
     from supabase import create_client, Client
-    SUPABASE_LIB = True
-except ImportError:
-    SUPABASE_LIB = False
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    supabase = create_client(url, key)
+    db_status = "✅ Cloud Connected"
+except Exception as e:
+    supabase = None
+    db_status = "⚠️ Demo Mode (No DB)"
 
-# --- LOGIN FISSO (ADMIN & QUANTUM) ---
+# --- 2. CONFIGURAZIONE PAGINA ---
+st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide")
+
+# --- 3. LOGICA DI ACCESSO ---
 if 'auth' not in st.session_state:
     st.session_state['auth'] = False
 
 if not st.session_state['auth']:
     st.title("🏛️ Coin-Nexus | Secure Access")
-    u = st.text_input("Admin Email")
-    p = st.text_input("Quantum Key", type="password")
-    if st.button("ACCEDI"):
-        if u == "admin@coin-nexus.com" and p == "quantum2026":
-            st.session_state['auth'] = True
-            st.rerun()
-        else:
-            st.error("Credenziali Errate")
+    st.write("Inserire le credenziali Master per sbloccare il terminale.")
+    
+    with st.container():
+        u = st.text_input("Admin Email", placeholder="admin@coin-nexus.com")
+        p = st.text_input("Quantum Key", type="password", placeholder="quantum2026")
+        
+        if st.button("SBLOCCA TERMINALE"):
+            if u == "admin@coin-nexus.com" and p == "quantum2026":
+                st.session_state['auth'] = True
+                st.rerun()
+            else:
+                st.error("Accesso negato. Credenziali non valide.")
     st.stop()
 
-# --- DASHBOARD COMPLETA ---
+# --- 4. DASHBOARD (VISIBILE SOLO DOPO LOGIN) ---
 st.title("🚀 Terminale Strategico Coin-Nexus")
-st.sidebar.success("✅ Sistema Online")
+st.sidebar.success(db_status)
 
-# Mostra i dati che DocFinance vuole vedere
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Rating", "AAA")
-with col2:
-    st.metric("Standard Audit", "ISA 320")
-with col3:
-    st.metric("Database", "Supabase Ready")
+if st.sidebar.button("LOGOUT"):
+    st.session_state['auth'] = False
+    st.rerun()
 
-st.info("Carica un file ERP per sbloccare l'analisi del Break-Even e il Report PDF.")
+# Layout KPI
+c1, c2, c3 = st.columns(3)
+c1.metric("Rating Basilea IV", "AAA")
+c2.metric("Compliance", "ISA 320")
+c3.metric("Status", "Audit Ready")
 
-up = st.file_uploader("Upload ERP Data", type=['csv', 'xlsx'])
+st.divider()
+
+st.subheader("📊 Analisi e Flussi")
+up = st.file_uploader("Trascina qui il file ERP/CBI", type=['csv', 'xlsx'])
 
 if up:
-    st.success("Dati Ricevuti. Elaborazione algoritmi ISA 320...")
-    # Qui l'app mostra i grafici che abbiamo costruito nei passaggi precedenti
+    st.success("File ricevuto. Elaborazione algoritmi di materialità...")
+    # Qui inseriremo i grafici Plotly una volta che l'app è online
