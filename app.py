@@ -1,99 +1,105 @@
 import streamlit as st
 import plotly.graph_objects as go
 from supabase import create_client, Client
-from fpdf import FPDF
 import pandas as pd
+from fpdf import FPDF
 
-# --- SETUP PAGINA ---
-st.set_page_config(page_title="Coin-Nexus SaaS", layout="wide", page_icon="🏛️")
+# --- CONFIGURAZIONE PREMIUM ---
+st.set_page_config(page_title="Coin-Nexus Terminal", layout="wide", page_icon="🏛️")
+
+# Stile CSS per rendere l'interfaccia simile a un terminale bancario
+st.markdown("""
+    <style>
+    .main { background: #0e1117; }
+    div[data-testid="stMetricValue"] { font-size: 2rem; color: #00f2ff; }
+    .stTable { background-color: #161b22; border-radius: 10px; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- CONNESSIONE DATABASE ---
-try:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    supabase = create_client(url, key)
-except:
-    st.error("Configura i Secrets (URL/KEY) su Streamlit Cloud!")
-    st.stop()
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase = create_client(url, key)
 
-# --- LOGICA FINANZIARIA ---
-def get_audit(rev, costs, debt):
+# --- LOGICA DI AUDIT ---
+def perform_audit(rev, costs, debt):
     ebitda = rev - costs
     dscr = ebitda / (debt if debt > 0 else 1)
-    isa_320 = max(ebitda * 0.05, rev * 0.01)
-    safety = round(((rev - costs) / rev) * 100, 2)
-    rating = "AAA" if dscr > 2.5 else "BBB" if dscr > 1.2 else "CCC"
-    return rating, isa_320, dscr, safety
+    # Calcolo Rating Basel IV semplificato
+    if dscr > 2.5 and (ebitda/rev) > 0.15: rating = "AAA"
+    elif dscr > 1.2: rating = "BBB"
+    else: rating = "CCC"
+    return rating, dscr, ebitda
 
-# --- FUNZIONE PDF ---
-def create_pdf(company, rating, isa, dscr, safety):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "COIN-NEXUS FINANCIAL AUDIT", ln=True, align='C')
-    pdf.set_font("Arial", size=12)
-    pdf.ln(10)
-    pdf.cell(0, 10, f"Azienda: {company}", ln=True)
-    pdf.cell(0, 10, f"Rating: {rating}", ln=True)
-    pdf.cell(0, 10, f"Soglia ISA 320: EUR {isa:,.0f}", ln=True)
-    pdf.cell(0, 10, f"DSCR: {dscr:.2f}", ln=True)
-    return pdf.output(dest='S').encode('latin-1')
-
-# --- INTERFACCIA ---
-st.title("🏛️ Coin-Nexus | Risk & Rating Terminal")
-st.markdown("---")
-
+# --- UI SIDEBAR ---
 with st.sidebar:
-    st.header("📥 ERP Input")
-    company = st.text_input("Ragione Sociale", "Azienda Target S.p.A.")
-    rev = st.number_input("Ricavi (€)", value=5000000)
-    costs = st.number_input("Costi (€)", value=4200000)
-    debt = st.number_input("Debito (€)", value=1000000)
-    run = st.button("🚀 GENERA AUDIT")
+    st.image("https://img.icons8.com/fluency/96/bank.png")
+    st.title("Nexus Terminal")
+    company = st.text_input("Ragione Sociale", "Nuova Azienda S.p.A.")
+    rev = st.number_input("Ricavi Annuo (€)", value=5000000)
+    costs = st.number_input("Costi Operativi (€)", value=4200000)
+    debt = st.number_input("Esposizione Debitoria (€)", value=1000000)
+    run = st.button("🚀 ESEGUI ANALISI DEEP-TECH")
+
+# --- DASHBOARD PRINCIPALE ---
+st.title("🏛️ Coin-Nexus | Financial Risk Intelligence")
 
 if run:
-    rating, isa, dscr, safety = get_audit(rev, costs, debt)
+    rating, dscr, ebitda = perform_audit(rev, costs, debt)
     
-    # 1. KPI ROW
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Rating", rating)
-    col2.metric("ISA 320", f"€{isa:,.0f}")
-    col3.metric("DSCR", f"{dscr:.2f}")
-    col4.metric("Margine", f"{safety}%")
+    # Salvataggio immediato
+    supabase.table("audit_reports").insert({
+        "company_name": company, "rating": rating, "revenue": rev
+    }).execute()
 
-    # 2. GRAFICI
-    c_left, c_right = st.columns(2)
+    # Layout a Colonne
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Rating Attribuito", rating)
+    c2.metric("Indice DSCR", f"{dscr:.2f}")
+    c3.metric("EBITDA", f"€{ebitda:,.0f}")
+
+    st.divider()
+
+    # Grafici Professionali
+    col_l, col_r = st.columns(2)
     
-    with c_left:
-        # Gauge Chart
+    with col_l:
+        st.subheader("🎯 Credit Gauge")
         fig_gauge = go.Figure(go.Indicator(
-            mode = "gauge+number", value = dscr,
-            title = {'text': "Creditworthiness (DSCR)"},
-            gauge = {'axis': {'range': [0, 5]}, 'bar': {'color': "cyan"}}
+            mode = "gauge+number",
+            value = dscr,
+            gauge = {
+                'axis': {'range': [0, 5]},
+                'bar': {'color': "#00f2ff"},
+                'steps': [
+                    {'range': [0, 1.2], 'color': "#ff4b4b"},
+                    {'range': [1.2, 2.5], 'color': "#ffa500"},
+                    {'range': [2.5, 5], 'color': "#00ff00"}]
+            }
         ))
-        fig_gauge.update_layout(template="plotly_dark", height=300)
+        fig_gauge.update_layout(template="plotly_dark", height=300, margin=dict(l=20, r=20, t=50, b=20))
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-    with c_right:
-        # Radar Chart
+    with col_r:
+        st.subheader("🛡️ Risk Radar")
         fig_radar = go.Figure(go.Scatterpolar(
-            r=[85, 90, 70, 80, 75],
-            theta=['Liquidità','Solvibilità','Efficienza','Resilienza','Rating'],
-            fill='toself', line_color='cyan'
+            r=[85, 90, 70, 80, 88],
+            theta=['Liquidità','Solvibilità','Efficienza','Resilienza','Crescita'],
+            fill='toself', line_color='#00f2ff'
         ))
-        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), template="plotly_dark", height=300)
+        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=False, range=[0, 100])), template="plotly_dark", height=300)
         st.plotly_chart(fig_radar, use_container_width=True)
 
-    # 3. SALVATAGGIO & PDF
-    pdf_file = create_pdf(company, rating, isa, dscr, safety)
-    st.download_button("📥 SCARICA REPORT CERTIFICATO", pdf_file, f"Audit_{company}.pdf", "application/pdf")
-    
-    try:
-        supabase.table("audit_reports").insert({"company_name": company, "rating": rating, "revenue": rev}).execute()
-        st.success("Analisi salvata nel Cloud.")
-    except:
-        st.warning("Database offline: salvataggio non riuscito.")
+    st.success(f"Analisi completata per {company}. Dati sincronizzati con il Cloud.")
 
-# --- STORICO CLOUD ---
+# --- STORICO REAL-TIME ---
 st.divider()
-st.subheader("📑 Archivio Audit Real-Time")
+st.subheader("📑 Archivio Audit Globali")
+try:
+    res = supabase.table("audit_reports").select("*").order("created_at", desc=True).limit(10).execute()
+    if res.data:
+        df = pd.DataFrame(res.data)[['created_at', 'company_name', 'rating', 'revenue']]
+        df.columns = ['Data', 'Azienda', 'Rating', 'Fatturato (€)']
+        st.dataframe(df, use_container_width=True, hide_index=True)
+except Exception as e:
+    st.info("Configurazione database in corso...")
