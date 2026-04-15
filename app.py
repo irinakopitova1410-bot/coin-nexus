@@ -98,23 +98,42 @@ with st.sidebar:
 
 # --- DASHBOARD PRINCIPALE ---
 st.title("🏛️ Coin-Nexus | Financial Risk Intelligence")
-
 if run:
+    # 1. Esegui i calcoli tecnici
     rating, dscr, ebitda = perform_audit(rev, costs, debt)
+    safety = round(((rev - costs) / rev) * 100, 2)
     
-    # Salvataggio immediato
+    # 2. Prepara i dati per il report
+    metrics_bundle = {
+        'rev': rev, 
+        'ebitda': ebitda, 
+        'dscr': dscr, 
+        'safety': safety
+    }
+
+    # 3. Mostra i risultati a video (Grafici/Metriche che hai già)
+    st.metric("Rating Attribuito", rating)
+    # ... qui tieni i tuoi grafici ...
+
+    # 4. IL TASTO DOWNLOAD (Incollalo qui sotto!)
+    st.divider()
+    st.subheader("📥 Export Professionale")
+    
+    # Genera il PDF Banking al volo
+    pdf_report = create_banking_report(company, rating, metrics_bundle)
+
+    st.download_button(
+        label="📄 SCARICA REPORT BANCARIO (PDF)",
+        data=pdf_report,
+        file_name=f"Nexus_Report_{company}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
+    
+    # 5. Salva su Supabase (quello che hai già)
     supabase.table("audit_reports").insert({
         "company_name": company, "rating": rating, "revenue": rev
     }).execute()
-
-    # Layout a Colonne
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Rating Attribuito", rating)
-    c2.metric("Indice DSCR", f"{dscr:.2f}")
-    c3.metric("EBITDA", f"€{ebitda:,.0f}")
-
-    st.divider()
-
     # Grafici Professionali
     col_l, col_r = st.columns(2)
     
