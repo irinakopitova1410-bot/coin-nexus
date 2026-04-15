@@ -9,8 +9,8 @@ st.set_page_config(page_title="Coin-Nexus Terminal", layout="wide")
 
 try:
     # Recupero credenziali dai Secrets di Streamlit
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
+    key = st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
     supabase = create_client(url, key)
 except:
     st.error("Configura SUPABASE_URL e SUPABASE_KEY nei Secrets di Streamlit Cloud!")
