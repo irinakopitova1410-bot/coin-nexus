@@ -3,7 +3,62 @@ import plotly.graph_objects as go
 from supabase import create_client, Client
 import pandas as pd
 from fpdf import FPDF
+def create_banking_report(company, rating, metrics):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # Header Istituzionale
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, f"Dossier Creditizio: {company.upper()}", ln=True)
+    pdf.set_font("Arial", 'I', 9)
+    pdf.cell(0, 5, f"Protocollo: CN-{pd.to_datetime('today').strftime('%Y%m%d')}-X", ln=True)
+    pdf.ln(10)
 
+    # Box Score - Colore in base al rating
+    pdf.set_fill_color(230, 230, 230)
+    pdf.set_font("Arial", 'B', 20)
+    pdf.cell(0, 20, f"RATING FINALE: {rating}", 1, 1, 'C', True)
+    pdf.ln(5)
+
+    # 1. ANALISI DEI NUMERI (Snapshot)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, "1. SINTESI FINANZIARIA VALIDATA", ln=True)
+    pdf.set_font("Arial", '', 10)
+    
+    # Tabella Dati
+    for label, val in [("Ricavi", f"€ {metrics['rev']:,.0f}"), 
+                       ("EBITDA", f"€ {metrics['ebitda']:,.0f}"),
+                       ("DSCR (Debt Cover)", f"{metrics['dscr']:.2f}"),
+                       ("Safety Margin", f"{metrics['safety']}%")]:
+        pdf.cell(90, 8, label, 1)
+        pdf.cell(100, 8, val, 1, 1, 'R')
+
+    # 2. STRESS TEST (Il valore aggiunto)
+    pdf.ln(10)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.set_fill_color(255, 240, 240) # Sfondo leggermente rosso per allerta
+    pdf.cell(0, 10, "2. SIMULAZIONE DI STRESS (-20% RICAVI)", 1, 1, 'L', True)
+    
+    pdf.set_font("Arial", '', 10)
+    # Calcolo rapido dello scenario peggiore
+    stress_rev = metrics['rev'] * 0.8
+    stress_ebitda = stress_rev - (metrics['rev'] - metrics['ebitda'])
+    
+    resilienza = "ALTA" if stress_ebitda > 0 else "CRITICA"
+    pdf.multi_cell(0, 8, f"In uno scenario di contrazione del mercato (-20%), l'EBITDA stimato scenderebbe a € {stress_ebitda:,.0f}. "
+                         f"Capacità di assorbimento urti: {resilienza}.")
+
+    # 3. VERDETTO DECISIONALE (Explainable AI)
+    pdf.ln(10)
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, "3. CONCLUSIONI DELL'ALGORITMO", ln=True)
+    pdf.set_font("Arial", '', 10)
+    
+    verdetto = "CREDITO APPROVATO" if rating != "CCC" else "REVISIONE MANUALE NECESSARIA"
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, f"Esito Automatizzato: {verdetto}", 0, 1, 'C')
+
+    return pdf.output(dest='S').encode('latin-1')
 # --- CONFIGURAZIONE PREMIUM ---
 st.set_page_config(page_title="Coin-Nexus Terminal", layout="wide", page_icon="🏛️")
 
