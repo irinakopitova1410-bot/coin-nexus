@@ -86,4 +86,29 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
         fig.update_layout(height=250, margin=dict(l=20, r=20, t=50, b=20))
         st.plotly_chart(fig, use_container_width=True)
 
-    tab1, tab2 = st.tabs(["📊 Analisi Dettagliata", "💡 Strateg
+    tab1, tab2 = st.tabs(["📊 Analisi Dettagliata", "💡 Strategia di Miglioramento"])
+    
+    with tab1:
+        c1, c2 = st.columns(2)
+        c1.write(f"**EBITDA Margin:** {metrics.get('margin', 0):.2f}%")
+        c1.write(f"**Leverage (PFN/EBITDA):** {metrics.get('leverage', 0):.2f}")
+        c2.write(f"**Liquidity Pressure:** {metrics.get('liquidity_pressure', 0):.2f}")
+        
+        if res.get('issues'):
+            st.warning("🚨 **Criticità rilevate:**")
+            for issue in res['issues']: 
+                st.write(f"- {issue}")
+
+    with tab2:
+        st.info("Consigli per migliorare il merito creditizio:")
+        if res.get('suggestions'):
+            for sug in res['suggestions']:
+                st.write(f"✅ {sug}")
+        
+        simulation_data = res.get('simulation', {})
+        sim_score = simulation_data.get('improved_score', res['score'])
+        st.success(f"📈 **Simulazione:** Lo score potenziale sale a **{sim_score}**")
+
+# Questo 'else' deve essere allineato perfettamente al margine sinistro
+else:
+    st.info("Configura i dati nella sidebar e clicca su 'Esegui Audit' per analizzare il merito creditizio.")
