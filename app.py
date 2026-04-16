@@ -1,84 +1,90 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from supabase import create_client, Client
-from fpdf import FPDF
 import io
 
-# --- 1. CONFIGURAZIONE E SETUP ---
-st.set_page_config(page_title="Nexus Enterprise", layout="wide", page_icon="🏛️")
+# --- 1. IMPORT PROTETTI ---
+try:
+    from supabase import create_client
+except ImportError:
+    st.error("Errore: Libreria 'supabase' non trovata nel requirements.txt")
+try:
+    from fpdf import FPDF
+except ImportError:
+    st.error("Errore: Libreria 'fpdf2' non trovata nel requirements.txt")
 
-# Inizializzazione Session State per stabilità dati
-if 'pdf_data' not in st.session_state:
-    st.session_state.pdf_data = None
-if 'metrics' not in st.session_state:
-    st.session_state.metrics = None
-if 'generated' not in st.session_state:
-    st.session_state.generated = False
+# --- 2. CONFIGURAZIONE ---
+st.set_page_config(page_title="Nexus Enterprise", layout="wide")
 
-# Connessione Database
-@st.cache_resource
-def init_connection():
+# Init Session State
+for key in ['pdf_data', 'generated', 'metrics']:
+    if key not in st.session_state:
+        st.session_state[key] = None
+
+# Connessione Database Protetta
+def get_supabase():
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
-        return create_client(url, key)
+        return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
     except:
         return None
 
-supabase = init_connection()
+supabase = get_supabase()
 
-# --- 2. MOTORI TECNICI (LOGICA INTERNA) ---
-
+# --- 3. LOGICA CORE ---
 def calculate_metrics(d):
-    rev = d.get('revenue', 1)
+    rev = max(d.get('revenue', 1), 1)
     ebitda = d.get('ebitda', 0)
     debt = d.get('debt', 0)
     dscr = ebitda / (debt * 0.1 + 1)
     margin = (ebitda / rev) * 100
     return {"dscr": dscr, "margin": margin, "ebitda": ebitda, "debt": debt, "revenue": rev}
 
-def extract_from_excel(df):
-    cols = {c.lower(): c for c in df.columns}
-    ext = {}
-    if 'fatturato' in cols: ext['revenue'] = df[cols['fatturato']].sum()
-    elif 'revenue' in cols: ext['revenue'] = df[cols['revenue']].sum()
-    if 'ebitda' in cols: ext['ebitda'] = df[cols['ebitda']].sum()
-    elif 'mol' in cols: ext['ebitda'] = df[cols['mol']].sum()
-    if 'debiti' in cols: ext['debt'] = df[cols['debiti']].sum()
-    elif 'debt' in cols: ext['debt'] = df[cols['debt']].sum()
-    return ext
-
-# --- 3. MOTORE DECISIONALE (PILASTRO SAAS) ---
 def get_decision_engine(m):
-    score = 0
-    if m['dscr'] > 1.25: score += 40
-    if m['margin'] > 15: score += 30
-    if m['ebitda'] > 500000: score += 30
-    
-    # Limite di credito automatico: 50% dell'EBITDA
-    limit_credit = m['ebitda'] * 0.5 
-    
-    if score >= 70:
-        return {"status": "APPROVATO", "color": "#00CC66", "limit": limit_credit}
-    elif score >= 40:
-        return {"status": "REVISIONE UMANA", "color": "#FFA500", "limit": limit_credit * 0.3}
-    else:
-        return {"status": "RESPINTO", "color": "#FF4B4B", "limit": 0}
+    if m['dscr'] > 1.25 and m['margin'] > 10:
+        return {"status": "APPROVATO", "color": "#00CC66", "limit": m['ebitda'] * 0.5}
+    return {"status": "REVISIONE", "color": "#FFA500", "limit": m['ebitda'] * 0.2}
 
-# --- 4. MOTORE PDF (OUTPUT CERTIFICATO) ---
-def create_pdf_bytes(nome, m):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("helvetica", 'B', 16)
-    pdf.cell(0, 10, "NEXUS ENTERPRISE - REPORT CERTIFICATO", ln=True, align='C')
-    pdf.set_font("helvetica", '', 10)
-    pdf.cell(0, 10, "Rating Merito Creditizio conforme ISA 320", ln=True, align='C')
-    pdf.ln(10)
+# --- 4. SIDEBAR ---
+with st.sidebar:
+    st.title("🏛️ CFO Dashboard")
+    nome_azienda = st.text_input("Azienda", "Azienda Target S.p.A.")
+    rev_in = st.number_input("Fatturato (€)", value=1000000)
+    ebit_in = st.number_input("EBITDA (€)", value=200000)
+    pfn_in = st.number_input("Debito (€)", value=400000)
+
+# --- 5. MAIN UI ---
+st.title("📊 Financial Dossier")
+
+if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
+    m = calculate_metrics({"revenue": rev_in, "ebitda": ebit_in, "debt": pfn_in})
+    st.session_state.metrics = m
     
-    pdf.set_font("helvetica", 'B', 12)
-    pdf.cell(0, 10, f"Azienda: {nome}", ln=True)
-    pdf.ln(5)
+    dec = get_decision_engine(m)
+    st.session_state.generated = True
+
+    # Display Decision
+    st.subheader("💰 Decision Engine")
+    st.markdown(f"<div style='background:{dec['color']};padding:20px;border-radius:10px;text-align:center;color:white;'><h2>{dec['status']}</h2></div>", unsafe_allow_html=True)
     
-    pdf.set_font("helvetica", '', 10)
-    pdf.cell(90, 10, "Indicatore", 1); pdf.cell(90, 10, "Valore", 1, ln
+    # Display KPI
+    c1, c2 = st.columns(2)
+    c1.metric("Rating", "A1" if m['dscr'] > 1.2 else "B2")
+    c2.metric("Fido Consigliato", f"€ {dec['limit']:,.0f}")
+
+    # Generazione PDF (Byte puro per evitare AttributeError)
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("helvetica", 'B', 16)
+        pdf.cell(0, 10, f"REPORT: {nome_azienda}", ln=True)
+        pdf.set_font("helvetica", '', 12)
+        pdf.cell(0, 10, f"Fatturato: {rev_in}", ln=True)
+        pdf.cell(0, 10, f"Esito: {dec['status']}", ln=True)
+        st.session_state.pdf_data = bytes(pdf.output())
+    except Exception as e:
+        st.error(f"Errore PDF: {e}")
+
+# --- 6. EXPORT ---
+st.divider()
+if st.session_state.pdf_data:
+    st.download_button("📄 SCARICA PDF", st.session_state.pdf_data, "Report.pdf", "application/pdf", use_container_width=True)
