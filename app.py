@@ -12,10 +12,12 @@ base_path = os.path.dirname(os.path.abspath(__file__))
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
 
-# 3. Import Moduli (Assicurati che non ci siano spazi prima di 'from')
+# 3. Import Moduli
 from engine.scoring import calculate_metrics
 from services.decision import get_credit_approval
 from utils.parser import extract_financials
+
+# --- INTERFACCIA SIDEBAR ---
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/bank.png", width=80)
     st.title("Nexus Control Panel")
@@ -42,6 +44,7 @@ with st.sidebar:
     d_tot = st.number_input("Debito Totale (€)", value=int(input_data["debt"]))
     d_short = st.number_input("Breve Termine (€)", value=int(input_data["short_debt"]))
 
+# --- LOGICA DI CALCOLO E DASHBOARD ---
 st.title("🏛️ Coin-Nexus | Decision Intelligence")
 st.caption(f"Analisi per: {name}")
 
@@ -53,13 +56,16 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
     with col1:
         st.metric("RATING", res['rating'])
         st.subheader(f"Esito: {res['decision']}")
+    
     with col2:
         st.metric("SCORE", f"{res['score']}/100")
         st.write("Capacità Credito:")
         st.title(f"€ {res.get('estimated_credit', 0):,}")
+    
     with col3:
         fig = go.Figure(go.Indicator(
-            mode="gauge+number", value=metrics.get('dscr', 0),
+            mode="gauge+number", 
+            value=metrics.get('dscr', 0),
             gauge={'axis': {'range': [0, 5]}, 'bar': {'color': res['color']}}
         ))
         st.plotly_chart(fig, use_container_width=True)
@@ -68,9 +74,15 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
     with t1:
         st.write(f"Margin: {metrics.get('margin', 0)}% | Leverage: {metrics.get('leverage', 0)}")
         if res.get('issues'):
-            for i in res['issues']: st.warning(i)
+            for i in res['issues']: 
+                st.warning(i)
     with t2:
         if res.get('suggestions'):
-            for s in res['suggestions']: st.info(s)
+            for s in res['suggestions']: 
+                st.info(s)
+        else:
+            st.write("Nessun suggerimento particolare al momento.")
+
+# L'istruzione ELSE deve essere allineata esattamente all'istruzione IF del pulsante iniziale
 else:
-    st.info("Configura i dati e clicca su 'Esegui Audit'")
+    st.info("Configura i dati nella sidebar e clicca su 'Esegui Audit' per iniziare l'analisi.")
