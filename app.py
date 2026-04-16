@@ -1,6 +1,34 @@
 import os
 import sys
 import streamlit as st
+from supabase import create_client, Client
+
+# Inizializzazione sicura
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(url, key)
+
+def save_to_nexus_cloud(company_name, metrics, result):
+    # Prepariamo il record per la tua nuova tabella SQL
+    audit_data = {
+        "company_name": company_name, # Se hai aggiunto questa colonna
+        "dscr_value": float(metrics['dscr']),
+        "rating_code": result['rating'],
+        "decision_output": result['decision'],
+        "financial_data": metrics # Salva tutto il dizionario nel campo JSONB
+    }
+    
+    # Inserimento nella tabella potenziata
+    try:
+        supabase.table("credit_analyses").insert(audit_data).execute()
+        st.success("✅ Analisi sincronizzata nel Cloud di Doc Finance")
+    except Exception as e:
+        st.error(f"Errore di sincronizzazione: {e}")
+
+# Nel tuo tasto "GENERA REPORT" aggiungi:
+if st.button("🚀 ESEGUI AUDIT"):
+    # ... i tuoi calcoli ...
+    save_to_nexus_cloud(azienda_input, m, res)
 import pandas as pd
 import plotly.graph_objects as go
 from supabase import create_client, Client # INTEGRAZIONE SUPABASE
