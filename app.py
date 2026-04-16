@@ -2,83 +2,219 @@ import streamlit as st
 import plotly.graph_objects as go
 from supabase import create_client
 import pandas as pd
+
 from engine.scoring import calculate_metrics
 from services.decision import get_credit_approval
 
-# --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide")
 
-# Inizializzazione Supabase
+# ---------------- CONFIG ----------------
+st.set_page_config(
+    page_title="Coin-Nexus Credit Intelligence",
+    layout="wide"
+)
+
+st.title("🏛️ Coin-Nexus | Credit Intelligence Platform")
+
+
+# ---------------- SUPABASE ----------------
 @st.cache_resource
 def init_connection():
-    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+    return create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"]
+    )
 
 supabase = init_connection()
 
-# --- FUNZIONE SALVATAGGIO ---
-def push_to_db(name, m, d):
+
+# ---------------- DB ----------------
+def push_to_db(name, metrics, decision):
     try:
-        # Recupero l'ID del Partner (Tenant)
-        res = supabase.table("tenants").select("id").eq("name", "Doc Finance Partner").execute()
+        res = supabase.table("tenants") \
+            .select("id") \
+            .eq("name", "Doc Finance Partner") \
+            .execute()
+
         if not res.data:
-            res = supabase.table("tenants").insert({"name": "Doc Finance Partner", "api_key": "test"}).execute()
-        t_id = res.data[0]['id']
-        
-        # Upsert Azienda
-        comp = supabase.table("companies").upsert({"company_name": name, "tenant_id": t_id}, on_conflict="company_name").execute()
-        c_id = comp.data[0]['id']
-        
-        # Inserimento Analisi
+            res = supabase.table("tenants").insert({
+                "name": "Doc Finance Partner",
+                "api_key": "test"
+            }).execute()
+
+        t_id = res.data[0]["id"]
+
+        comp = supabase.table("companies").upsert({
+            "company_name": name,
+            "tenant_id": t_id
+        }, on_conflict="company_name").execute()
+
+        c_id = comp.data[0]["id"]
+
         supabase.table("credit_analyses").insert({
             "company_id": c_id,
-            "dscr_value": m['dscr'],
-            "leverage_value": m['leverage'],
-            "rating_code": d['rating'],
-            "decision_output": d['decision']
+            "dscr_value": metrics["dscr"],
+            "leverage_value": metrics["leverage"],
+            "rating_code": decision["rating"],
+            "decision_output": decision["decision"]
         }).execute()
+
         return True
+
     except Exception as e:
-        st.error(f"Errore DB: {e}")
+        st.error(f"DB error: {e}")
         return False
 
-# --- INTERFACCIA ---
-st.title("🏛️ Coin-Nexus | Credit Decision Engine")
 
-tab1, tab2 = st.tabs(["📊 Analisi e Report", "📜 Registro Storico"])
+# ---------------- UI ----------------
+tab1, tab2 = st.tabs(["📊 Credit Analysis", "📜 History"])
 
+
+# ================= TAB 1 =================
 with tab1:
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        st.subheader("Input Dati")
-        name = st.text_input("Ragione Sociale", "Azienda Target S.p.A.")
-        rev = st.number_input("Ricavi (€)", value=1500000)
-        ebit = st.number_input("EBITDA (€)", value=300000)
-        debt = st.number_input("Debito (€)", value=400000)
-        
-        if st.button("ESEGUI AUDIT"):
-            m = calculate_metrics({"revenue": rev, "ebitda": ebit, "debt": debt})
-            d = get_credit_approval(m)
-            st.session_state['res'] = (m, d, name)
-            push_to_db(name, m, d)
 
-    with c2:
-        if 'res' in st.session_state:
-            m, d, n = st.session_state['res']
-            st.header(f"Rating: {d['rating']}")
-            st.write(f"Esito: **{d['decision']}**")
-            
-            fig = go.Figure(go.Indicator(mode="gauge+number", value=m['dscr'], 
-                            title={'text': "Indice DSCR (Affidabilità)"},
-                            gauge={'axis': {'range': [0, 5]}, 'bar': {'color': d['color']}}))
+    col1, col2 = st.columns([1, 2])
+
+    with col1:
+        st.subheader("📥 Input Financial Data")
+
+        name = st.text_input("Company Name", "Target S.p.A.")
+
+        revenue = st.number_input("Revenue (€)", value=1_500_000)
+        ebitda = st.number_input("EBITDA (€)", value=300_000)
+        debt = st.number_input("Total Debt (€)", value=400_000)
+
+        short_debt = st.number_input("Short-term Debt (€)", value=150_000)
+        cash = st.number_input("Cash (€)", value=100_000)
+        receivables = st.number_input("Receivables (€)", value=200_000)
+
+        run = st.button("🚀 RUN CREDIT ANALYSIS")
+
+
+    with col2:
+
+        if run:
+
+            # ---------------- METRICS ----------------
+            metrics = calculate_metrics({
+                "revenue": revenue,
+                "ebitda": ebitda,
+                "debt": debt,
+                "short_debt": short_debt,
+                "cash": cash,
+                "receivables": receivables
+            })
+
+            decision = get_credit_approval(metrics)
+
+            st.session_state["result"] = (metrics, decision, name)
+
+            push_to_db(name, metrics, decision)
+
+        # ---------------- OUTPUT ----------------
+        if "result" in st.session_state:
+
+            metrics, d, n = st.session_state["result"]
+
+            st.markdown(f"## 🏢 {n}")
+
+            # SCORE BLOCK
+            st.markdown(f"## 🏆 Rating: {d['rating']}")
+            st.markdown(f"### {d['decision']}")
+
+            if d["decision"] == "APPROVATO":
+                st.success("High probability of credit approval")
+            elif d["decision"] == "REVISIONE MANUALE":
+                st.warning("Requires manual review")
+            else:
+                st.error("Low probability of credit approval")
+
+            # FINANCIAL RESULT
+            st.markdown("## 💰 Estimated Credit Capacity")
+            st.markdown(f"### € {d.get('estimated_credit', 0):,.0f}")
+
+            # GAUGE DSCR
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=metrics["dscr"],
+                title={"text": "DSCR (Debt Service Coverage Ratio)"},
+                gauge={
+                    "axis": {"range": [0, 5]},
+                    "bar": {"color": d["color"]}
+                }
+            ))
+
             st.plotly_chart(fig, use_container_width=True)
-            
-            # --- TASTO REPORT ---
-            report_txt = f"AUDIT REPORT - COIN-NEXUS\nAzienda: {n}\nRating: {d['rating']}\nDSCR: {m['dscr']}\nDecisione: {d['decision']}"
-            st.download_button("📥 SCARICA REPORT AUDIT", report_txt, file_name=f"Audit_{n}.txt")
 
+            # METRICS
+            st.markdown("## 📊 Key Metrics")
+
+            st.write({
+                "DSCR": metrics["dscr"],
+                "Leverage": metrics["leverage"],
+                "Margin": metrics["margin"],
+                "Current Ratio": metrics.get("current_ratio", None)
+            })
+
+            # ISSUES
+            if d.get("issues"):
+                st.markdown("## ⚠️ Risk Factors")
+                for i in d["issues"]:
+                    st.write(f"- {i}")
+
+            # SUGGESTIONS
+            if d.get("suggestions"):
+                st.markdown("## ✅ Improvement Actions")
+                for s in d["suggestions"]:
+                    st.write(f"- {s}")
+
+            # SIMULATION
+            if "simulation" in d:
+                st.markdown("## 📈 Scenario Simulation")
+                st.info(d["simulation"]["message"])
+                st.metric(
+                    "Potential Improved Score",
+                    d["simulation"]["improved_score"]
+                )
+
+            # REPORT
+            report = f"""
+CREDIT INTELLIGENCE REPORT
+
+Company: {n}
+
+Rating: {d['rating']}
+Decision: {d['decision']}
+
+DSCR: {metrics['dscr']}
+Leverage: {metrics['leverage']}
+
+Estimated Credit: € {d.get('estimated_credit', 0):,.0f}
+
+Risk Factors:
+{', '.join(d.get('issues', []))}
+
+Recommendations:
+{', '.join(d.get('suggestions', []))}
+"""
+
+            st.download_button(
+                "📥 Download Credit Report",
+                report,
+                file_name=f"Credit_Report_{n}.txt"
+            )
+
+
+# ================= TAB 2 =================
 with tab2:
-    if st.button("Aggiorna Storico"):
-        res = supabase.table("credit_analyses").select("created_at, rating_code, decision_output, companies(company_name)").execute()
+
+    st.subheader("📜 Credit History")
+
+    if st.button("Refresh History"):
+
+        res = supabase.table("credit_analyses") \
+            .select("created_at, rating_code, decision_output, companies(company_name)") \
+            .execute()
+
         if res.data:
             df = pd.json_normalize(res.data)
             st.dataframe(df, use_container_width=True)
