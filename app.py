@@ -20,8 +20,8 @@ st.title("🏛️ Coin-Nexus | Credit Intelligence Platform")
 @st.cache_resource
 def init_connection():
     return create_client(
-        st.secrets["SUPABASE_URL"],
-        st.secrets["SUPABASE_KEY"]
+        st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"],
+        st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
     )
 
 supabase = init_connection()
