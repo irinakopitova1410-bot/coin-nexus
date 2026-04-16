@@ -79,16 +79,25 @@ def get_decision_engine(m):
 # --- POI INIZIA LA SIDEBAR ---
 with st.sidebar:
 # ...
-
-
-
 # Nel bottone di generazione:
-if st.button("🚀 GENERA REPORT CERTIFICATO"):
-    m = internal_calculate_metrics({"revenue": rev_in, "ebitda": ebit_in, "debt": pfn_in})
-    # Genera i bytes e salvali nello stato
-    st.session_state.pdf_data = create_pdf_bytes(nome_azienda, m)
-    st.session_state.generated = True
-    st.success("Report Generato con Successo!")
+if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
+    m = calculate_metrics({"revenue": rev_in, "ebitda": ebit_in, "debt": pfn_in})
+    
+    # --- LOGICA DECISIONALE ---
+    decision = get_decision_engine(m)
+    
+    st.subheader("💰 Decision Automation Engine")
+    c_dec1, c_dec2 = st.columns(2)
+    with c_dec1:
+        st.markdown(f"""
+            <div style="background-color:{decision['color']}; padding:20px; border-radius:10px; text-align:center;">
+                <h2 style="color:white; margin:0; font-family:sans-serif;">{decision['status']}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+    with c_dec2:
+        st.metric("Fido Massimo Consigliato", f"€ {decision['limit']:,.0f}")
+        st.caption("Analisi automatica basata sulla capacità di rimborso.")
+    # ... (sotto continuano i grafici e il resto)
 
 # Nel bottone di download:
 if st.session_state.get('pdf_data'):
