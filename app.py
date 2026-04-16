@@ -4,15 +4,15 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# 1. CONFIGURAZIONE PAGINA (Deve essere la prima istruzione)
+# 1. Configurazione pagina (Deve essere la prima funzione Streamlit)
 st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide", page_icon="🏛️")
 
-# 2. FIX PERCORSI PER STREAMLIT CLOUD
+# 2. Fix per i percorsi dei moduli
 base_path = os.path.dirname(os.path.abspath(__file__))
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
 
-# 3. IMPORT MODULI DIRETTI
+# 3. IMPORT MODULI (Allineati a sinistra)
 from engine.scoring import calculate_metrics
 from services.decision import get_credit_approval
 from utils.parser import extract_financials
@@ -22,9 +22,8 @@ with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/bank.png", width=80)
     st.title("Nexus Control Panel")
     st.divider()
-    
     upload_mode = st.radio("Metodo Inserimento:", ["Manuale", "Upload ERP (Excel/CSV)"])
-    
+
     # Valori di default iniziali
     input_data = {
         "revenue": 1000000, 
@@ -44,7 +43,7 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Errore parser: {e}")
 
-    # Campi Input (si aggiornano se il parser trova dati)
+    # Campi Input (Aggiornati dinamicamente)
     st.subheader("Parametri Finanziari")
     name = st.text_input("Ragione Sociale", "Azienda Target S.p.A.")
     rev = st.number_input("Ricavi (€)", value=int(input_data["revenue"]))
@@ -66,7 +65,6 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
     })
     
     res = get_credit_approval(metrics)
-    
     st.divider()
     
     # Riga 1: KPI Principali
@@ -115,8 +113,4 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
             for sug in res['suggestions']:
                 st.write(f"✅ {sug}")
         
-        sim_score = res.get('simulation', {}).get('improved_score', res['score'])
-        st.success(f"📈 **Simulazione:** Ottimizzando il debito a breve, lo score potenziale sale a **{sim_score}**")
-
-else:
-    st.info("Configura i dati nella sidebar e clicca su 'Esegui Audit' per analizzare il merito creditizio.")
+        sim_score = res.get('simulation', {}).get('
