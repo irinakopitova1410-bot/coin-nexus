@@ -27,6 +27,29 @@ def init_connection():
 supabase = init_connection()
 
 # --- 2. MOTORI INTERNI (Nessun file esterno richiesto) ---
+def get_altman_z_score(m):
+    # Versione adattata per aziende private (Non quotate)
+    # X1: Capitale circolante / Attività totali (stima basata su fatturato)
+    # X2: Utili trattenuti / Attività totali
+    # X3: EBIT (EBITDA - ammortamenti stimati) / Attività totali
+    # X4: Patrimonio Netto / Debiti Totali
+    # X5: Fatturato / Attività totali
+    
+    # Parametri semplificati per il calcolo immediato
+    x1 = (m['revenue'] * 0.1) / max(m['debt'], 1) 
+    x2 = (m['ebitda'] * 0.5) / max(m['debt'], 1)
+    x3 = m['ebitda'] / max(m['debt'], 1)
+    x4 = (m['revenue'] * 0.2) / max(m['debt'], 1)
+    
+    z = (1.2 * x1) + (1.4 * x2) + (3.3 * x3) + (0.6 * x4) + (1.0 * (m['revenue']/max(m['debt'],1)))
+    
+    if z > 2.9:
+        return {"score": round(z, 2), "zone": "SICURA (Safe)", "color": "#00CC66", "risk": "Molto Basso"}
+    elif z > 1.23:
+        return {"score": round(z, 2), "zone": "GRIGIA (Grey)", "color": "#FFA500", "risk": "Moderato"}
+    else:
+        return {"score": round(z, 2), "zone": "PERICOLO (Distress)", "color": "#FF4B4B", "risk": "Alto - Probabile Fallimento"}
+
 def calculate_metrics(d):
     rev = d.get('revenue', 1)
     ebitda = d.get('ebitda', 0)
