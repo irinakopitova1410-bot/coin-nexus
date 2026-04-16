@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# 1. Configurazione pagina (Deve essere la prima funzione Streamlit)
+# 1. Configurazione pagina
 st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide", page_icon="🏛️")
 
 # 2. Fix per i percorsi dei moduli
@@ -12,7 +12,7 @@ base_path = os.path.dirname(os.path.abspath(__file__))
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
 
-# 3. IMPORT MODULI (Allineati a sinistra)
+# 3. Import moduli
 from engine.scoring import calculate_metrics
 from services.decision import get_credit_approval
 from utils.parser import extract_financials
@@ -24,7 +24,6 @@ with st.sidebar:
     st.divider()
     upload_mode = st.radio("Metodo Inserimento:", ["Manuale", "Upload ERP (Excel/CSV)"])
 
-    # Valori di default iniziali
     input_data = {
         "revenue": 1000000, 
         "ebitda": 200000, 
@@ -43,7 +42,6 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Errore parser: {e}")
 
-    # Campi Input (Aggiornati dinamicamente)
     st.subheader("Parametri Finanziari")
     name = st.text_input("Ragione Sociale", "Azienda Target S.p.A.")
     rev = st.number_input("Ricavi (€)", value=int(input_data["revenue"]))
@@ -55,8 +53,8 @@ with st.sidebar:
 st.title("🏛️ Coin-Nexus | Decision Intelligence")
 st.caption(f"Analisi Creditizia in tempo reale per: **{name}**")
 
+# Inizio blocco logico principale
 if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
-    # Esecuzione calcoli
     metrics = calculate_metrics({
         "revenue": rev, 
         "ebitda": ebit, 
@@ -67,7 +65,6 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
     res = get_credit_approval(metrics)
     st.divider()
     
-    # Riga 1: KPI Principali
     col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
@@ -80,43 +77,13 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
         st.title(f"€ {res.get('estimated_credit', 0):,}")
 
     with col3:
-        # Gauge Chart per DSCR
         fig = go.Figure(go.Indicator(
             mode="gauge+number", 
             value=metrics.get('dscr', 0),
             title={'text': "Indice DSCR"},
-            gauge={
-                'axis': {'range': [0, 5]}, 
-                'bar': {'color': res['color']}
-            }
+            gauge={'axis': {'range': [0, 5]}, 'bar': {'color': res['color']}}
         ))
         fig.update_layout(height=250, margin=dict(l=20, r=20, t=50, b=20))
         st.plotly_chart(fig, use_container_width=True)
 
-    # Riga 2: Dettagli e Suggerimenti
-    tab1, tab2 = st.tabs(["📊 Analisi Dettagliata", "💡 Strategia di Miglioramento"])
-    
-    with tab1:
-        c1, c2 = st.columns(2)
-        c1.write(f"**EBITDA Margin:** {metrics.get('margin', 0):.2f}%")
-        c1.write(f"**Leverage (PFN/EBITDA):** {metrics.get('leverage', 0):.2f}")
-        c2.write(f"**Liquidity Pressure:** {metrics.get('liquidity_pressure', 0):.2f}")
-        
-        if res.get('issues'):
-            st.warning("🚨 **Criticità rilevate:**")
-            for issue in res['issues']: 
-                st.write(f"- {issue}")
-with tab2:
-        st.info("Consigli per migliorare il merito creditizio:")
-        if res.get('suggestions'):
-            for sug in res['suggestions']:
-                st.write(f"✅ {sug}")
-        
-        # FIX RIGA 116: Recupero dello score simulato in modo sicuro
-        simulation_data = res.get('simulation', {})
-        sim_score = simulation_data.get('improved_score', res['score'])
-        
-        st.success(f"📈 **Simulazione:** Ottimizzando il debito a breve, lo score potenziale sale a **{sim_score}**")
-
-else:
-    st.info("Configura i dati nella sidebar e clicca su 'Esegui Audit' per analizzare il merito creditizio.")
+    tab1, tab2 = st.tabs(["📊 Analisi Dettagliata", "💡 Strateg
