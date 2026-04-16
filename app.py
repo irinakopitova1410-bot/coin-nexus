@@ -25,17 +25,53 @@ with st.sidebar:
     debt = st.number_input("Debito Totale (€)", value=400000)
 
 if st.button("ESEGUI AUDIT BANCARIO"):
-    # Esegue i calcoli usando i tuoi moduli engine e services
-    metrics = calculate_metrics({"revenue": rev, "ebitda": ebitda, "debt": debt})
+
+    metrics = calculate_metrics({
+        "revenue": rev,
+        "ebitda": ebitda,
+        "debt": debt
+    })
+
     decision = get_credit_approval(metrics)
-    
-    # Mostra i risultati
-    col1, col2 = st.columns(2)
-    col1.metric("Rating", decision['rating'])
-    col2.metric("Esito", decision['decision'])
-    
-    st.write("### Dettaglio Metriche")
-    st.json(metrics)
-    
-    # Tasto Report
-    st.download_button("📥 Scarica Report Audit", f"Audit per {name}: {decision['decision']}", file_name="audit.txt")
+
+    st.markdown("## 🏛️ Credit Decision Report")
+
+    # --- KPI BUSINESS ---
+    st.markdown(f"### 🏆 Rating: {decision['rating']}")
+    st.markdown(f"### {decision['decision']}")
+
+    st.markdown("---")
+
+    # --- RISULTATO ECONOMICO ---
+    if "estimated_credit" in decision:
+        st.markdown("## 💰 Estimated Credit Capacity")
+        st.markdown(f"### € {decision['estimated_credit']:,.0f}")
+
+    # --- METRICHE (NON JSON GREZZO) ---
+    st.markdown("## 📊 Financial Indicators")
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("DSCR", metrics.get("dscr", 0))
+    col2.metric("Leverage", metrics.get("leverage", 0))
+    col3.metric("Margin %", metrics.get("margin", 0))
+
+    # --- REPORT DOWNLOAD ---
+    report_text = f"""
+CREDIT AUDIT REPORT
+
+Company: {name}
+Rating: {decision['rating']}
+Decision: {decision['decision']}
+
+DSCR: {metrics.get('dscr')}
+Leverage: {metrics.get('leverage')}
+
+Estimated Credit: {decision.get('estimated_credit', 0)}
+"""
+
+    st.download_button(
+        "📥 Download Credit Report",
+        report_text,
+        file_name=f"Credit_Report_{name}.txt"
+    )
