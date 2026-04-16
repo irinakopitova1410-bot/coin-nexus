@@ -10,8 +10,8 @@ st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide", page_icon=
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # --- CONNESSIONE DATABASE (Prendi i dati da Supabase Settings > API) ---
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://tuo_id.supabase.co")
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "tua_anon_key")
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://ipmttldwfsxuubugiyir.supabase.co")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 try:
