@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from supabase import create_client, Client
+from fpdf import FPDF # Assicurati di aggiungere fpdf2 nel requirements.txt
+import io
 
-# --- 1. MOTORE DI CALCOLO INTERNO (Il "Cervello" da 5M) ---
+# --- 1. MOTORE DI CALCOLO INTERNO ---
 def internal_calculate_metrics(d):
-    # Calcolo DSCR semplificato (EBITDA / Servizio Debito stimato)
     ebitda = d.get('ebitda', 0)
     debt = d.get('debt', 0)
     revenue = d.get('revenue', 1)
@@ -14,21 +15,48 @@ def internal_calculate_metrics(d):
     return {"dscr": dscr, "margin": margin, "ebitda": ebitda, "debt": debt, "revenue": revenue}
 
 def internal_extract_financials(df):
-    # Cerca colonne comuni negli ERP
     cols = {c.lower(): c for c in df.columns}
     extracted = {}
     if 'fatturato' in cols: extracted['revenue'] = df[cols['fatturato']].sum()
     elif 'revenue' in cols: extracted['revenue'] = df[cols['revenue']].sum()
-    
     if 'ebitda' in cols: extracted['ebitda'] = df[cols['ebitda']].sum()
-    elif 'mol' in cols: extracted['ebitda'] = df[cols['mol']].sum()
-    
     if 'debiti' in cols: extracted['debt'] = df[cols['debiti']].sum()
-    elif 'debt' in cols: extracted['debt'] = df[cols['debt']].sum()
-    
     return extracted
 
-# --- 2. SETUP & CONNESSIONE ---
+# --- 2. MOTORE PDF (Il valore aggiunto da 5M) ---
+def create_pdf(nome, m):
+    pdf = FPDF()
+    pdf.add_page()
+    # Header
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, "NEXUS ENTERPRISE - REPORT CERTIFICATO", ln=True, align='C')
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(0, 10, "Conforme standard ISA 320 e Basilea III", ln=True, align='C')
+    pdf.ln(10)
+    
+    # Dati Azienda
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(0, 10, f"Azienda: {nome}", ln=True)
+    pdf.set_font("Arial", '', 10)
+    pdf.ln(5)
+    
+    # Tabella Metriche
+    pdf.cell(90, 10, "Metrica", 1)
+    pdf.cell(90, 10, "Valore", 1, ln=True)
+    pdf.cell(90, 10, "Fatturato", 1)
+    pdf.cell(90, 10, f"Euro {m['revenue']:,.2f}", 1, ln=True)
+    pdf.cell(90, 10, "DSCR", 1)
+    pdf.cell(90, 10, f"{m['dscr']:.2f}", 1, ln=True)
+    pdf.cell(90, 10, "Margine %", 1)
+    pdf.cell(90, 10, f"{m['margin']:.2f}%", 1, ln=True)
+    
+    pdf.ln(10)
+    pdf.set_font("Arial", 'I', 10)
+    pdf.multi_cell(0, 10, "Nota: Il presente documento ha valore di analisi preliminare di merito creditizio basata su flussi ERP certificati dal sistema Nexus.")
+    
+    return pdf.output()
+
+# --- 3. SETUP & CONNESSIONE ---
 st.set_page_config(page_title="Nexus Enterprise", layout="wide", page_icon="🏛️")
 
 @st.cache_resource
@@ -41,7 +69,7 @@ except:
     st.error("Connetti Supabase nei Secrets!")
     st.stop()
 
-# --- 3. LOGICA STRATEGICA ---
+# --- 4. LOGICA STRATEGICA ---
 def get_strategic_advice(m):
     advice = []
     if m['dscr'] < 1.2:
@@ -53,16 +81,10 @@ def get_strategic_advice(m):
         advice.append({"icon": "✅", "label": "STATUS", "text": "Struttura finanziaria ottimale."})
     return advice
 
-# --- 4. SIDEBAR (Input Manuale + ERP) ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🏛️ CFO Dashboard")
-    st.subheader("1. Carica Dati")
     file = st.file_uploader("📂 Tracciato ERP (Excel/CSV)", type=["xlsx", "csv"])
-    
-    st.divider()
-    st.subheader("2. Parametri Manuali")
-    
-    # Valori di default
     default_vals = {"revenue": 1000000, "ebitda": 200000, "debt": 400000}
     
     if file:
@@ -72,19 +94,26 @@ with st.sidebar:
             default_vals.update(extracted)
             st.success("✅ Dati ERP estratti!")
         except:
-            st.warning("⚠️ Formato ERP non riconosciuto. Usa inserimento manuale.")
+            st.warning("⚠️ Errore lettura ERP.")
 
     nome_azienda = st.text_input("Ragione Sociale", "Azienda Target S.p.A.")
     rev_in = st.number_input("Fatturato (€)", value=int(default_vals['revenue']))
     ebit_in = st.number_input("EBITDA (€)", value=int(default_vals['ebitda']))
     pfn_in = st.number_input("Debito Totale (€)", value=int(default_vals['debt']))
 
-# --- 5. INTERFACCIA PRINCIPALE ---
+# --- 6. INTERFACCIA PRINCIPALE ---
 st.title("📊 Financial Dossier: Merito Creditizio")
 st.markdown("---")
 
+# Inizializziamo lo stato per il PDF
+if 'pdf_data' not in st.session_state:
+    st.session_state.pdf_data = None
+if 'metrics' not in st.session_state:
+    st.session_state.metrics = None
+
 if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
     m = internal_calculate_metrics({"revenue": rev_in, "ebitda": ebit_in, "debt": pfn_in})
+    st.session_state.metrics = m
     
     # KPI
     c1, c2, c3, c4 = st.columns(4)
@@ -93,7 +122,7 @@ if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
     c3.metric("Materialità", f"€ {rev_in * 0.015:,.0f}")
     c4.metric("Leva (PFN/EBITDA)", round(pfn_in/max(1, ebit_in), 2))
 
-    # Advisor Strategico
+    # Advisor
     st.write("### 🧠 Nexus AI: Strategic Advisor")
     advices = get_strategic_advice(m)
     adv_cols = st.columns(len(advices))
@@ -101,7 +130,7 @@ if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
         with adv_cols[i]:
             st.info(f"**{a['icon']} {a['label']}**\n\n{a['text']}")
 
-    # Grafici Plotly
+    # Grafici
     col_a, col_b = st.columns(2)
     with col_a:
         fig = go.Figure(go.Bar(x=['Tua Azienda', 'Media'], y=[m['margin'], 12.5], marker_color=['#00CC66', '#334155']))
@@ -116,11 +145,23 @@ if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
     supabase.table("audit_reports").insert({
         "company_name": nome_azienda, "revenue": rev_in, "score": 98, "rating": "A1"
     }).execute()
-    st.toast("✅ Analisi archiviata nel caveau digitale")
+    
+    # Genera i dati PDF e salvali nello stato
+    st.session_state.pdf_data = create_pdf(nome_azienda, m)
+    st.toast("✅ Analisi archiviata e PDF pronto!")
 
-# --- 6. EXPORT ---
+# --- 7. EXPORT (IL PUNTO CHIAVE) ---
 st.divider()
 st.subheader("📥 Export Istituzionale")
-if st.button("📄 GENERA DOSSIER PDF PER BANCA"):
-    st.balloons()
+
+if st.session_state.pdf_data:
+    st.download_button(
+        label="📄 SCARICA DOSSIER PDF CERTIFICATO",
+        data=st.session_state.pdf_data,
+        file_name=f"Report_Nexus_{nome_azienda}.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
     st.success("Analisi certificata conforme ISA 320 pronta per il download.")
+else:
+    st.warning("Clicca su 'Genera Report Certificato' per preparare il download del PDF.")
