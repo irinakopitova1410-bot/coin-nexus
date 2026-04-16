@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-# 1. Configurazione pagina
+# 1. Configurazione pagina (DEVE essere la prima istruzione Streamlit)
 st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide", page_icon="🏛️")
 
 # 2. Fix per i percorsi dei moduli
@@ -12,7 +12,7 @@ base_path = os.path.dirname(os.path.abspath(__file__))
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
 
-# 3. Import moduli
+# 3. IMPORT MODULI (Tutti a colonna 0, senza spazi iniziali)
 from engine.scoring import calculate_metrics
 from services.decision import get_credit_approval
 from utils.parser import extract_financials
@@ -24,6 +24,7 @@ with st.sidebar:
     st.divider()
     upload_mode = st.radio("Metodo Inserimento:", ["Manuale", "Upload ERP (Excel/CSV)"])
 
+    # Valori di default
     input_data = {
         "revenue": 1000000, 
         "ebitda": 200000, 
@@ -53,8 +54,8 @@ with st.sidebar:
 st.title("🏛️ Coin-Nexus | Decision Intelligence")
 st.caption(f"Analisi Creditizia in tempo reale per: **{name}**")
 
-# Inizio blocco logico principale
 if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
+    # Esecuzione calcoli
     metrics = calculate_metrics({
         "revenue": rev, 
         "ebitda": ebit, 
@@ -65,6 +66,7 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
     res = get_credit_approval(metrics)
     st.divider()
     
+    # Riga 1: KPI Principali
     col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
@@ -86,6 +88,7 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
         fig.update_layout(height=250, margin=dict(l=20, r=20, t=50, b=20))
         st.plotly_chart(fig, use_container_width=True)
 
+    # Riga 2: Dettagli e Suggerimenti
     tab1, tab2 = st.tabs(["📊 Analisi Dettagliata", "💡 Strategia di Miglioramento"])
     
     with tab1:
@@ -109,6 +112,5 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
         sim_score = simulation_data.get('improved_score', res['score'])
         st.success(f"📈 **Simulazione:** Lo score potenziale sale a **{sim_score}**")
 
-# Questo 'else' deve essere allineato perfettamente al margine sinistro
 else:
     st.info("Configura i dati nella sidebar e clicca su 'Esegui Audit' per analizzare il merito creditizio.")
