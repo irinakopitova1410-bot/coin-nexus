@@ -1,7 +1,6 @@
 streamlit
-supabase
 pandas
 plotly
+supabase
 fpdf2
 openpyxl
-postgrest
