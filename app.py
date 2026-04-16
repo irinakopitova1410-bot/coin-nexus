@@ -57,6 +57,31 @@ def create_pdf_bytes(nome, m):
     # Ritorna i bytes puri dell'output
     return bytes(pdf.output())
 
+# ... (sopra c'è create_pdf_bytes) ...
+
+# --- NUOVA FUNZIONE DECISIONALE (Inseriscila qui) ---
+def get_decision_engine(m):
+    score = 0
+    if m['dscr'] > 1.25: score += 40
+    if m['margin'] > 15: score += 30
+    if m['ebitda'] > 500000: score += 30
+    
+    # Limite di credito: 50% dell'EBITDA (prudenziale)
+    limit_credit = m['ebitda'] * 0.5 
+    
+    if score >= 70:
+        return {"status": "APPROVATO", "color": "#00CC66", "limit": limit_credit}
+    elif score >= 40:
+        return {"status": "REVISIONE UMANA", "color": "#FFA500", "limit": limit_credit * 0.3}
+    else:
+        return {"status": "RESPINTO", "color": "#FF4B4B", "limit": 0}
+
+# --- POI INIZIA LA SIDEBAR ---
+with st.sidebar:
+# ...
+
+
+
 # Nel bottone di generazione:
 if st.button("🚀 GENERA REPORT CERTIFICATO"):
     m = internal_calculate_metrics({"revenue": rev_in, "ebitda": ebit_in, "debt": pfn_in})
