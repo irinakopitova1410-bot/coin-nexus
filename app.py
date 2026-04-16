@@ -1,15 +1,18 @@
-
-import sys
 import os
-# Aggiunge la cartella corrente al percorso di ricerca di Python
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import sys
+
+# Forza Python a guardare nella cartella principale del progetto
+root_path = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, root_path)
+
 import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-# Ora gli import funzioneranno
-from services.decision import get_credit_approval
-from engine.scoring import calculate_metrics
-from utils.parser import extract_financials # Assicurati di averlo in utils/parser.py
+# Ora gli import dovrebbero funzionare
+try:
+    from services.decision import get_credit_approval
+    from engine.scoring import calculate_metrics
+    from utils.parser import extract_financials
+except ImportError as e:
+    st.error(f"Errore critico di importazione: {e}")
 st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide")
 st.title("🏛️ Coin-Nexus | Decision Intelligence")
 # --- SIDEBAR: INPUT DATI ---
