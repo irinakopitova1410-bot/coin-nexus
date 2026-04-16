@@ -1,107 +1,36 @@
-def get_credit_approval(metrics):
-    dscr = metrics.get('dscr', 0)
-    leverage = metrics.get('leverage', 0)
-    ebitda = metrics.get('ebitda', 0)
-    revenue = metrics.get('revenue', 0)
-    short_debt = metrics.get('short_debt', 0)
+def calculate_metrics(data):
+    """
+    Estrae metriche finanziarie per credit decision engine
+    """
 
-    # --- SCORE BASE ---
-    score = 0
+    rev = float(data.get('revenue', 0))
+    ebitda = float(data.get('ebitda', 0))
+    debt = float(data.get('debt', 0))
+    short_debt = float(data.get('short_debt', 0))
 
-    # DSCR
-    if dscr >= 1.5:
-        score += 30
-        dscr_status = "ottimo"
-    elif dscr >= 1.1:
-        score += 20
-        dscr_status = "accettabile"
-    else:
-        score += 5
-        dscr_status = "critico"
+    # --- DSCR ---
+    annual_service = (debt * 0.20) + (debt * 0.05)
 
-    # Leverage
-    if leverage <= 3:
-        score += 30
-        lev_status = "basso"
-    elif leverage <= 5:
-        score += 20
-        lev_status = "medio"
-    else:
-        score += 5
-        lev_status = "alto"
+    dscr = ebitda / annual_service if annual_service > 0 else (10.0 if ebitda > 0 else 0.0)
 
-    # Marginalità
-    margin = ebitda / revenue if revenue > 0 else 0
-    if margin > 0.15:
-        score += 20
-        margin_status = "buona"
-    elif margin > 0.05:
-        score += 10
-        margin_status = "media"
-    else:
-        score += 5
-        margin_status = "bassa"
+    # --- LEVERAGE (safe) ---
+    leverage = debt / ebitda if ebitda > 0 else (99.0 if debt > 0 else 0.0)
 
-    # Debito breve
-    if short_debt < ebitda:
-        score += 20
-        debt_status = "sotto controllo"
-    else:
-        score += 5
-        debt_status = "critico"
+    # --- EBITDA MARGIN (utile per decision layer) ---
+    margin = (ebitda / rev * 100) if rev > 0 else 0.0
 
-    # --- DECISIONE ---
-    if score >= 75:
-        decision = "APPROVATO"
-        rating = "A"
-        color = "#00CC66"
-    elif score >= 55:
-        decision = "REVISIONE MANUALE"
-        rating = "BBB"
-        color = "#FFCC00"
-    else:
-        decision = "NEGATO"
-        rating = "CCC"
-        color = "#FF3300"
-
-    # --- IMPORTO STIMATO (💰 IMPORTANTE) ---
-    estimated_credit = max(0, ebitda * 4 - short_debt)
-
-    # --- CRITICITÀ ---
-    issues = []
-    if dscr < 1.2:
-        issues.append("DSCR basso")
-    if leverage > 4:
-        issues.append("Indebitamento elevato")
-    if margin < 0.05:
-        issues.append("Marginalità debole")
-
-    # --- SUGGERIMENTI ---
-    suggestions = []
-    if dscr < 1.5:
-        suggestions.append("Aumentare flussi di cassa operativi")
-    if leverage > 3:
-        suggestions.append("Ridurre il livello di debito")
-    if short_debt > ebitda:
-        suggestions.append("Ristrutturare debito a breve termine")
-
-    # --- SIMULAZIONE (🔥 KILLER FEATURE) ---
-    improved_score = score
-    if leverage > 3:
-        improved_score += 10
-    if dscr < 1.5:
-        improved_score += 10
+    # --- LIQUIDITY SIGNAL (IMPORTANTISSIMO) ---
+    liquidity_pressure = short_debt / ebitda if ebitda > 0 else 99.0
 
     return {
-        "score": score,
-        "rating": rating,
-        "decision": decision,
-        "color": color,
-        "estimated_credit": round(estimated_credit, 2),
-        "issues": issues,
-        "suggestions": suggestions,
-        "simulation": {
-            "improved_score": improved_score,
-            "message": "Riducendo il debito e migliorando il cash flow, il rating può aumentare"
-        }
+        "dscr": dscr,
+        "leverage": leverage,
+        "margin": margin,
+        "liquidity_pressure": liquidity_pressure,
+
+        # raw data per decision engine
+        "ebitda": ebitda,
+        "revenue": rev,
+        "debt": debt,
+        "short_debt": short_debt
     }
