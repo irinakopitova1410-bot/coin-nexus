@@ -20,7 +20,23 @@ def run_deep_audit(rev, ebitda, debt):
     leverage = debt / max(ebitda, 1)
     break_even = (rev * 0.7) # Stima del punto di pareggio
     return {"ros": ros, "leverage": leverage, "bep": break_even}
-
+def calculate_credit_pricing(rev, ebitda, z_score):
+    # PD (Probabilità di Default) semplificata basata sullo Z-Score
+    pd = max(0.01, min(0.99, 1 / (z_score + 0.1) * 0.2))
+    
+    # Esposizione (EAD): ipotizziamo il 10% del fatturato come linea di credito
+    ead = rev * 0.10 
+    lgd = 0.45  # Loss Given Default (standard Basilea)
+    
+    expected_loss = ead * pd * lgd
+    suggested_rate = (0.05 + pd + 0.02) * 100 # Costo base + Rischio + Margine
+    
+    return {
+        "pd": pd * 100,
+        "el": expected_loss,
+        "rate": suggested_rate,
+        "exp": ead
+    }
 # --- 3. SIDEBAR ---
 with st.sidebar:
     st.title("🏛️ Nexus Dashboard")
