@@ -56,7 +56,20 @@ def create_pdf_bytes(nome, m):
     
     # Ritorna i bytes puri dell'output
     return bytes(pdf.output())
-
+def get_failure_prediction(m):
+    # Simulazione di un modello di scoring predittivo (Z-Score semplificato)
+    # Calcoliamo un indice di "Salute Finanziaria"
+    liquidity_index = (m['revenue'] * 0.2) / max(m['debt'], 1)
+    profitability_index = m['ebitda'] / max(m['revenue'], 1)
+    
+    health_score = (liquidity_index * 1.2) + (profitability_index * 3.3)
+    
+    if health_score > 1.8:
+        return {"risk": "BASSO", "prob": "2%", "color": "#00CC66"}
+    elif health_score > 1.0:
+        return {"risk": "MEDIO", "prob": "15%", "color": "#FFA500"}
+    else:
+        return {"risk": "ALTO", "prob": "45%+", "color": "#FF4B4B"}
 # Nel bottone di generazione:
 if st.button("🚀 GENERA REPORT CERTIFICATO"):
     m = internal_calculate_metrics({"revenue": rev_in, "ebitda": ebit_in, "debt": pfn_in})
