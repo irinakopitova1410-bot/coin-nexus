@@ -4,8 +4,8 @@ import streamlit as st
 from supabase import create_client, Client
 
 # Inizializzazione sicura
-url = st.secrets["SUPABASE_URL"]
-key = st.secrets["SUPABASE_KEY"]
+url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
+key = st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
 supabase: Client = create_client(url, key)
 
 def save_to_nexus_cloud(company_name, metrics, result):
