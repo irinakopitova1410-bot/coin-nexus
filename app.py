@@ -76,6 +76,38 @@ def create_pdf_bytes(nome, m):
     pdf.cell(0, 10, f"Azienda: {nome}", ln=True)
     pdf.cell(0, 10, f"Fatturato: Euro {m['revenue']:,.2f}", ln=True)
     pdf.cell(0, 10, f"DSCR: {m['dscr']:.2f}", ln=True)
+
+# --- RIGHE 60-75 CIRCA ---
+
+def get_decision_engine(m):
+    score = 0
+    if m['dscr'] > 1.25: score += 40
+    if m['margin'] > 15: score += 30
+    if m['ebitda'] > 500000: score += 30
+    
+    limit_credit = m['ebitda'] * 0.5 
+    
+    if score >= 70:
+        return {"status": "APPROVATO", "color": "#00CC66", "limit": limit_credit}
+    elif score >= 40:
+        return {"status": "REVISIONE UMANA", "color": "#FFA500", "limit": limit_credit * 0.3}
+    else:
+        return {"status": "RESPINTO", "color": "#FF4B4B", "limit": 0}
+
+# --- AGGIUNGI QUI SOTTO LO Z-SCORE (Riga 76+) ---
+def get_altman_z_score(m):
+    # Logica predittiva fallimento
+    x1 = (m['revenue'] * 0.1) / max(m['debt'], 1) 
+    x2 = (m['ebitda'] * 0.5) / max(m['debt'], 1)
+    z = (1.2 * x1) + (1.4 * x2) # ... (continua come sopra)
+    # ... ritorno dati ...
+
+
+
+
+
+
+    
     
     # Ritorna i bytes puri dell'output
     return bytes(pdf.output())
