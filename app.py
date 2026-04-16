@@ -96,7 +96,7 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
         c1.write(f"**EBITDA Margin:** {metrics['margin']:.2f}%")
         c1.write(f"**Leverage (D/E):** {metrics['leverage']:.2f}")
         c2.write(f"**Liquidity Pressure:** {metrics['liquidity_pressure']:.2f}")
-        
+
         if res['issues']:
             st.warning("🚨 **Criticità rilevate:**")
             for issue in res['issues']: st.write(f"- {issue}")
