@@ -3,19 +3,22 @@ import sys
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-# --- 1. CONFIGURAZIONE AMBIENTE ---
+
+# 1. Configurazione - DEVE essere la prima chiamata Streamlit
 st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide", page_icon="🏛️")
-# Aggiunge la cartella principale al sistema
+
+# 2. Fix Path - Aggiunta della root al sistema
 base_path = os.path.dirname(os.path.abspath(__file__))
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
-# --- 2. IMPORT MODULI (Controlla bene gli spazi qui!) ---
+
+# 3. Import Moduli - Allineamento millimetrico richiesto qui
 try:
     from engine.scoring import calculate_metrics
     from services.decision import get_credit_approval
     from utils.parser import extract_financials
 except ImportError as e:
-    st.error(f"❌ Errore di configurazione moduli: {e}")
+    st.error(f"❌ Errore moduli: {e}")
     st.stop()
 # --- 3. INTERFACCIA SIDEBAR ---
 with st.sidebar:
