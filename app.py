@@ -13,8 +13,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # --- CONNESSIONE SICURA A SUPABASE ---
 try:
     # Nota i 4 spazi (TAB) prima di ogni riga qui sotto
-    SUPABASE_URL = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
-    SUPABASE_KEY = st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
+    SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
+    SUPABASE_KEY = "sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
     st.error("❌ Errore Secrets: Configura SUPABASE_URL e SUPABASE_KEY nelle impostazioni di Streamlit.")
