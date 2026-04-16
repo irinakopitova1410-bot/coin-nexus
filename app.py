@@ -106,11 +106,17 @@ if st.button("ESEGUI AUDIT BANCARIO", type="primary", use_container_width=True):
             st.warning("🚨 **Criticità rilevate:**")
             for issue in res['issues']: 
                 st.write(f"- {issue}")
-
-    with tab2:
+with tab2:
         st.info("Consigli per migliorare il merito creditizio:")
         if res.get('suggestions'):
             for sug in res['suggestions']:
                 st.write(f"✅ {sug}")
         
-        sim_score = res.get('simulation', {}).get('
+        # FIX RIGA 116: Recupero dello score simulato in modo sicuro
+        simulation_data = res.get('simulation', {})
+        sim_score = simulation_data.get('improved_score', res['score'])
+        
+        st.success(f"📈 **Simulazione:** Ottimizzando il debito a breve, lo score potenziale sale a **{sim_score}**")
+
+else:
+    st.info("Configura i dati nella sidebar e clicca su 'Esegui Audit' per analizzare il merito creditizio.")
