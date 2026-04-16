@@ -42,68 +42,47 @@ def extract_from_excel(df):
     if 'ebitda' in cols: ext['ebitda'] = df[cols['ebitda']].sum()
     if 'debiti' in cols: ext['debt'] = df[cols['debiti']].sum()
     return ext
-# --- 1. MOTORE PDF CON BUFFER DI MEMORIA (SOLUZIONE DEFINITIVA) ---
+
 def create_pdf_bytes(nome, m):
     pdf = FPDF()
     pdf.add_page()
-    
-    # Header
-    pdf.set_font("helvetica", 'B', 16)
+    pdf.set_font("Arial", 'B', 16)
     pdf.cell(0, 10, "NEXUS ENTERPRISE - REPORT CERTIFICATO", ln=True, align='C')
-    pdf.set_font("helvetica", '', 10)
-    pdf.cell(0, 10, "Rating conforme standard ISA 320", ln=True, align='C')
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(0, 10, "Rating Merito Creditizio conforme ISA 320", ln=True, align='C')
     pdf.ln(10)
-    
-    # Dati
-    pdf.set_font("helvetica", 'B', 12)
+    pdf.set_font("Arial", 'B', 12)
     pdf.cell(0, 10, f"Azienda: {nome}", ln=True)
     pdf.ln(5)
-    
-    # Tabella
-    pdf.set_font("helvetica", '', 10)
+    # Tabella KPI
+    pdf.set_font("Arial", '', 10)
     pdf.cell(90, 10, "Indicatore", 1); pdf.cell(90, 10, "Valore", 1, ln=True)
     pdf.cell(90, 10, "Fatturato", 1); pdf.cell(90, 10, f"Euro {m['revenue']:,.0f}", 1, ln=True)
     pdf.cell(90, 10, "DSCR", 1); pdf.cell(90, 10, f"{m['dscr']:.2f}", 1, ln=True)
     pdf.cell(90, 10, "Margine Operativo %", 1); pdf.cell(90, 10, f"{m['margin']:.2f}%", 1, ln=True)
-    
-    # Invece di output(dest='S'), usiamo bytearray direttamente
-    # Questo garantisce la compatibilità con il download_button
-    return bytes(pdf.output())
+    return pdf.output(dest='S').encode('latin-1')
 
-# --- 2. LOGICA NEL TASTO "GENERA REPORT" ---
-if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
-    # ... (calcoli delle metriche m) ...
-    m = internal_calculate_metrics({"revenue": rev_in, "ebitda": ebit_in, "debt": pfn_in})
-    st.session_state.metrics = m
-    st.session_state.generated = True
+# --- 3. SIDEBAR (LOGICA INPUT) ---
+with st.sidebar:
+    st.title("🏛️ CFO Dashboard")
+    uploaded_file = st.file_uploader("📂 Carica ERP (Excel/CSV)", type=["xlsx", "csv"])
     
-    # Visualizzazione KPI e Grafici (omessi per brevità)
+    # Valori Base
+    defaults = {"revenue": 1000000, "ebitda": 200000, "debt": 400000}
     
-    # GENERAZIONE PDF SICURA
-    try:
-        # Generiamo i bytes puri
-        st.session_state.pdf_data = create_pdf_bytes(nome_azienda, m)
-        st.toast("✅ PDF generato e pronto al download")
-    except Exception as e:
-        st.error(f"Errore generazione file: {e}")
+    if uploaded_file:
+        try:
+            df_erp = pd.read_excel(uploaded_file) if "xlsx" in uploaded_file.name else pd.read_csv(uploaded_file)
+            defaults.update(extract_from_excel(df_erp))
+            st.success("✅ Dati ERP caricati")
+        except:
+            st.warning("⚠️ Formato non standard")
 
-# --- 3. EXPORT ISTITUZIONALE (PULITO) ---
-st.divider()
-st.subheader("📥 Export Istituzionale")
+    nome_azienda = st.text_input("Ragione Sociale", "Azienda Target S.p.A.")
+    rev_in = st.number_input("Fatturato (€)", value=int(defaults['revenue']))
+    ebit_in = st.number_input("EBITDA (€)", value=int(defaults['ebitda']))
+    pfn_in = st.number_input("Debito (€)", value=int(defaults['debt']))
 
-if st.session_state.pdf_data is not None:
-    # IMPORTANTE: Passiamo i bytes direttamente
-    st.download_button(
-        label="📄 SCARICA DOSSIER PDF CERTIFICATO",
-        data=st.session_state.pdf_data,
-        file_name=f"Report_Nexus_{nome_azienda}.pdf",
-        mime="application/pdf",
-        use_container_width=True,
-        key="download_pdf_final"
-    )
-    st.success("Analisi pronta. Clicca sopra per salvare il PDF.")
-else:
-    st.info("💡 Genera il report per attivare il download.")
 # --- 4. MAIN UI ---
 st.title("📊 Financial Dossier: Analisi Merito Creditizio")
 st.markdown("---")
