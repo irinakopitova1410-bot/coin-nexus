@@ -4,16 +4,18 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide", page_icon="🏛️")
+# 1. Configurazione (Deve essere la prima istruzione Streamlit)
+st.set_page_config(page_title="Coin-Nexus", layout="wide")
 
+# 2. Fix Path (Tutto a sinistra, zero spazi)
 base_path = os.path.dirname(os.path.abspath(__file__))
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
 
+# 3. Import Moduli (Assicurati che non ci siano spazi prima di 'from')
 from engine.scoring import calculate_metrics
 from services.decision import get_credit_approval
 from utils.parser import extract_financials
-
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/bank.png", width=80)
     st.title("Nexus Control Panel")
