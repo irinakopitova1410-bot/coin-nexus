@@ -1,6 +1,6 @@
 def extract_financials(df):
     """
-    Estrae dati finanziari base da ERP generico con logica robusta
+    Estrae dati finanziari con controllo qualità per credit engine
     """
 
     if "descrizione" not in df.columns or "saldo" not in df.columns:
@@ -14,35 +14,27 @@ def extract_financials(df):
             mask &= ~df["descrizione"].str.contains("|".join(exclude))
         return df[mask]["saldo"].sum()
 
-    # --- CASH ---
     cash = get(["cassa", "banca"])
-
-    # --- CREDITI (solo operativi) ---
-    receivables = get(
-        ["crediti"],
-        exclude=["tributari", "fiscali"]
-    )
-
-    # --- MAGAZZINO ---
+    receivables = get(["crediti"], exclude=["tributari", "fiscali"])
     inventory = get(["magazzino", "rimanenze"])
-
-    # --- DEBITI ---
-    payables = get(
-        ["debiti"],
-        exclude=["tributari", "fiscali"]
-    )
-
-    # --- DEBITI BREVE (stima) ---
+    payables = get(["debiti"], exclude=["tributari", "fiscali"])
     short_debt = get(["debiti", "fornitori", "entro 12"])
 
-    # --- CONTROLLO QUALITÀ (🔥 importante) ---
-    detected_items = sum([
-        cash != 0,
-        receivables != 0,
-        payables != 0
-    ])
+    # --- DATA QUALITY CHECK ---
+    issues = []
 
-    confidence = "alta" if detected_items >= 3 else "media" if detected_items == 2 else "bassa"
+    if receivables < 0:
+        issues.append("Crediti negativi rilevati")
+    if payables < 0:
+        issues.append("Debiti negativi rilevati")
+    if cash < 0:
+        issues.append("Cassa negativa rilevata")
+
+    confidence = (
+        "alta" if len(issues) == 0
+        else "media" if len(issues) <= 2
+        else "bassa"
+    )
 
     return {
         "cash": cash,
@@ -51,8 +43,9 @@ def extract_financials(df):
         "payables": payables,
         "short_debt": short_debt,
 
-        # 🔥 valore percepito
-        "data_quality": confidence
+        # 🔥 importante per il prodotto
+        "data_quality": confidence,
+        "data_issues": issues
     }
 
 
@@ -63,5 +56,6 @@ def default_financials():
         "inventory": 0,
         "payables": 0,
         "short_debt": 0,
-        "data_quality": "bassa"
+        "data_quality": "bassa",
+        "data_issues": ["Dati mancanti o non leggibili"]
     }
