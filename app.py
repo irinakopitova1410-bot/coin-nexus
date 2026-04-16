@@ -42,7 +42,6 @@ def extract_from_excel(df):
     if 'ebitda' in cols: ext['ebitda'] = df[cols['ebitda']].sum()
     if 'debiti' in cols: ext['debt'] = df[cols['debiti']].sum()
     return ext
-
 def create_pdf_bytes(nome, m):
     pdf = FPDF()
     pdf.add_page()
@@ -51,16 +50,21 @@ def create_pdf_bytes(nome, m):
     pdf.set_font("Arial", '', 10)
     pdf.cell(0, 10, "Rating Merito Creditizio conforme ISA 320", ln=True, align='C')
     pdf.ln(10)
+    
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(0, 10, f"Azienda: {nome}", ln=True)
     pdf.ln(5)
+    
     # Tabella KPI
     pdf.set_font("Arial", '', 10)
     pdf.cell(90, 10, "Indicatore", 1); pdf.cell(90, 10, "Valore", 1, ln=True)
     pdf.cell(90, 10, "Fatturato", 1); pdf.cell(90, 10, f"Euro {m['revenue']:,.0f}", 1, ln=True)
     pdf.cell(90, 10, "DSCR", 1); pdf.cell(90, 10, f"{m['dscr']:.2f}", 1, ln=True)
     pdf.cell(90, 10, "Margine Operativo %", 1); pdf.cell(90, 10, f"{m['margin']:.2f}%", 1, ln=True)
-    return pdf.output(dest='S').encode('latin-1')
+    
+    # IMPORTANTE: In fpdf2, output() restituisce bytes. 
+    # Non serve .encode() se dest è 'S' o se invocato senza argomenti
+    return pdf.output()
 
 # --- 3. SIDEBAR (LOGICA INPUT) ---
 with st.sidebar:
