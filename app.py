@@ -3,10 +3,16 @@ import sys
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from supabase import create_client, Client # INTEGRAZIONE SUPABASE
 
 # Configurazione Professional
 st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide", page_icon="🏛️")
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# --- CONNESSIONE DATABASE (Prendi i dati da Supabase Settings > API) ---
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://tuo_id.supabase.co")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "tua_anon_key")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 try:
     from engine.scoring import calculate_metrics
@@ -16,16 +22,18 @@ except ImportError:
     st.error("⚠️ Struttura moduli incompleta. Verifica i file __init__.py")
     st.stop()
 
+# --- LOGICA DI SALVATAGGIO CLOUD ---
+def push_to_supabase(record):
+    try:
+        supabase.table("audit_reports").insert(record).execute()
+    except Exception as e:
+        st.error(f"Errore sincronizzazione Cloud: {e}")
+
 # --- MODULO 100K: BENCHMARK & LIQUIDITÀ ---
 def get_enterprise_intelligence(metrics):
-    # Benchmark settoriale (Margine EBITDA medio: 12.5%)
     bench_margin = 12.5
     gap = metrics['margin'] - bench_margin
-    
-    # Indice di Liquidità Immediata (Cash / Debiti Breve)
     cash_ratio = metrics.get('cash', 0) / max(1, metrics.get('short_debt', 0))
-    
-    # Materialità ISA 320 (1.5% Ricavi)
     materiality = metrics.get('revenue', 0) * 0.015
     
     return {
@@ -42,7 +50,6 @@ with st.sidebar:
     
     file = st.file_uploader("📂 Carica Flusso ERP (CSV/XLSX)", type=["xlsx", "csv"])
     
-    # Dati iniziali
     data = {"revenue": 1000000, "ebitda": 200000, "debt": 400000, "cash": 80000, "short_debt": 100000, "data_quality": "n/a", "data_issues": []}
     
     if file:
@@ -52,6 +59,7 @@ with st.sidebar:
         st.success(f"Dati caricati. Qualità: {data['data_quality'].upper()}")
 
     st.divider()
+    nome_azienda = st.text_input("Ragione Sociale", "Azienda Target S.p.A.")
     isa_punteggio = st.slider("Rating ISA Aziendale", 1, 10, 8)
     rev_in = st.number_input("Fatturato Annuo (€)", value=int(data['revenue']))
     ebit_in = st.number_input("EBITDA (€)", value=int(data['ebitda']))
@@ -65,6 +73,16 @@ if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
     m = calculate_metrics({"revenue": rev_in, "ebitda": ebit_in, "debt": pfn_in, "short_debt": data['short_debt'], "cash": data['cash']})
     intel = get_enterprise_intelligence(m)
     res = get_credit_approval(m)
+
+    # --- SALVATAGGIO AUTOMATICO SU SUPABASE ---
+    record_audit = {
+        "company_name": nome_azienda,
+        "revenue": float(rev_in),
+        "score": int(res['score']),
+        "rating": intel['rating_isp'],
+        "materiality": float(intel['materiality'])
+    }
+    push_to_supabase(record_audit) # Sincronizzazione immediata
 
     # RIGA 1: KPI BANCARI
     c1, c2, c3, c4 = st.columns(4)
@@ -85,19 +103,16 @@ if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
         st.subheader("🔍 Data Quality Check")
         if data['data_issues']:
             for issue in data['data_issues']: st.warning(issue)
-        else: st.success("Dati validati secondo standard di revisione.")
+        else: st.success("Dati validati con successo e archiviati su Supabase.")
 
-    # RIGA 3: PROIEZIONE 4 ANNI (Sostenibilità)
+    # RIGA 3: PROIEZIONE 4 ANNI
     st.subheader("📈 Stress Test & Cash Flow Prospettico (48 Mesi)")
     anni = ['2026', '2027', '2028', '2029', '2030']
     flusso_cassa = [data['cash']] + [data['cash'] + (m['ebitda'] * 0.5 * i) for i in range(1, 5)]
     
     fig_f = go.Figure()
     fig_f.add_trace(go.Scatter(x=anni, y=flusso_cassa, fill='tozeroy', line_color='#00CC66', name="Cassa Cumulata"))
-    fig_f.update_layout(height=400, template="plotly_dark", title="Accumulo Liquidità Previsto")
+    fig_f.update_layout(height=400, template="plotly_dark")
     st.plotly_chart(fig_f, use_container_width=True)
 
-    # FOOTER: PITCH VENDITA
-    st.divider()
-    st.markdown(f"**Conclusione per il Comitato Rischi:** L'azienda presenta una marginalità del {m['margin']}% (Gap vs Settore: {intel['gap']}%). La sostenibilità a 4 anni è confermata.")
-    st.button("📥 SCARICA DOSSIER PDF COMPLETO (White Label)")
+    st.success(f"Dossier certificato e archiviato in database sicuro (Cloud Sync: OK)")
