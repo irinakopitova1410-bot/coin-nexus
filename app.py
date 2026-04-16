@@ -131,7 +131,27 @@ if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
     })
     intel = get_enterprise_intelligence(m)
     res = get_credit_approval(m)
+# --- IL TOCCO DA 5 MILIONI: NEXUS STRATEGIC ADVISOR ---
+    st.divider()
+    st.subheader("🧠 Nexus AI: Piano d'Azione Strategico")
+    
+    advices = get_strategic_advice(m)
+    
+    if advices:
+        cols = st.columns(len(advices))
+        for i, a in enumerate(advices):
+            with cols[i]:
+                st.info(f"**{a['icon']} {a['label']}**\n\n{a['text']}")
+    else:
+        st.success("✅ **STATUS EXCELLENT:** La tua struttura finanziaria è ottimale. Nexus non rileva necessità di interventi correttivi.")
 
+    # --- TASTO PDF (LA CILIEGINA SULLA TORTA) ---
+    st.divider()
+    col_pdf, col_share = st.columns([1, 2])
+    with col_pdf:
+        if st.button("📄 SCARICA DOSSIER BANCARIO (PDF)", use_container_width=True):
+            st.balloons()
+            st.write("Generazione in corso... (Modulo in attivazione)")
     # --- SINCRONIZZAZIONE DATABASE SUPABASE ---
     record_audit = {
         "company_name": nome_azienda,
