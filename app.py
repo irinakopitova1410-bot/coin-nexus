@@ -3,36 +3,28 @@ import sys
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-
-# --- 1. CONFIGURAZIONE AMBIENTE (Deve essere la primissima cosa) ---
+# --- 1. CONFIGURAZIONE AMBIENTE ---
 st.set_page_config(page_title="Coin-Nexus Enterprise", layout="wide", page_icon="🏛️")
-
-# Aggiunge la cartella principale al sistema per trovare i moduli
+# Aggiunge la cartella principale al sistema
 base_path = os.path.dirname(os.path.abspath(__file__))
 if base_path not in sys.path:
     sys.path.insert(0, base_path)
-
-# --- 2. IMPORT MODULI PROTETTO ---
+# --- 2. IMPORT MODULI (Controlla bene gli spazi qui!) ---
 try:
     from engine.scoring import calculate_metrics
     from services.decision import get_credit_approval
     from utils.parser import extract_financials
 except ImportError as e:
     st.error(f"❌ Errore di configurazione moduli: {e}")
-    st.info("Verifica che le cartelle engine, services e utils abbiano i file __init__.py")
     st.stop()
-
 # --- 3. INTERFACCIA SIDEBAR ---
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/bank.png", width=80)
     st.title("Nexus Control Panel")
     st.divider()
-    
     upload_mode = st.radio("Metodo Inserimento:", ["Manuale", "Upload ERP (Excel/CSV)"])
-    
     # Valori di default
     input_data = {"revenue": 1000000, "ebitda": 200000, "debt": 400000, "short_debt": 150000}
-    
     if upload_mode == "Upload ERP (Excel/CSV)":
         file = st.file_uploader("Carica Bilancio/Export", type=["xlsx", "csv"])
         if file:
