@@ -2,68 +2,74 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import io
+from fpdf import FPDF
 
-# --- 1. CONFIGURAZIONE E SETUP ---
-st.set_page_config(page_title="Nexus Enterprise", layout="wide", page_icon="🏛️")
+# --- 1. CONFIGURAZIONE PAGINA ---
+st.set_page_config(
+    page_title="Nexus Enterprise | AI Risk Management",
+    page_icon="🏛️",
+    layout="wide"
+)
 
-# Inizializzazione Session State per evitare errori di caricamento
-if 'pdf_data' not in st.session_state:
-    st.session_state.pdf_data = None
-if 'metrics' not in st.session_state:
-    st.session_state.metrics = None
-if 'generated' not in st.session_state:
-    st.session_state.generated = False
+# Inizializzazione Session State per evitare crash al refresh
+if 'pdf_ready' not in st.session_state:
+    st.session_state.pdf_ready = None
 
-# --- 2. MOTORI DI CALCOLO (LOGICA FINANZIARIA) ---
+# --- 2. MOTORI DI CALCOLO (LOGICA SAAS) ---
 
-def calculate_metrics(d):
-    """Calcola i KPI base per l'analisi"""
-    rev = max(d.get('revenue', 1), 1)
-    ebitda = d.get('ebitda', 0)
-    debt = d.get('debt', 0)
-    # Calcolo DSCR semplificato
-    dscr = ebitda / (debt * 0.1 + 1)
+def run_financial_engine(rev, ebitda, debt):
+    """Calcola tutti i parametri finanziari in un colpo solo"""
+    # KPI Base
+    rev = max(rev, 1)
     margin = (ebitda / rev) * 100
-    return {"dscr": dscr, "margin": margin, "ebitda": ebitda, "debt": debt, "revenue": rev}
-
-def get_decision_engine(m):
-    """Motore decisionale per approvazione fido"""
-    score = 0
-    if m['dscr'] > 1.25: score += 40
-    if m['margin'] > 15: score += 30
-    if m['ebitda'] > 500000: score += 30
+    dscr = ebitda / (debt * 0.12 + 1) # Stress test al 12%
     
-    limit_credit = m['ebitda'] * 0.5 
+    # Altman Z-Score (Adattato PMI)
+    x1 = (rev * 0.1) / max(debt, 1)
+    x2 = (ebitda * 0.4) / max(debt, 1)
+    x3 = ebitda / max(debt, 1)
+    z_score = (1.2 * x1) + (1.4 * x2) + (3.3 * x3)
     
-    if score >= 70:
-        return {"status": "APPROVATO", "color": "#00CC66", "limit": limit_credit}
-    elif score >= 40:
-        return {"status": "REVISIONE UMANA", "color": "#FFA500", "limit": limit_credit * 0.3}
+    # Decision Engine
+    if z_score > 2.6 and dscr > 1.2:
+        decision = {"status": "APPROVATO", "color": "#00CC66", "risk": "Basso"}
+    elif z_score > 1.1:
+        decision = {"status": "REVISIONE", "color": "#FFA500", "risk": "Moderato"}
     else:
-        return {"status": "RESPINTO", "color": "#FF4B4B", "limit": 0}
+        decision = {"status": "RESPINTO", "color": "#FF4B4B", "risk": "Alto"}
+        
+    return {
+        "margin": margin, "dscr": dscr, "z_score": z_score,
+        "decision": decision, "credit_limit": ebitda * 0.6
+    }
 
-def get_altman_z_score(m):
-    """Previsione fallimento tramite Altman Z-Score"""
-    # Parametri pesati per aziende private
-    x1 = (m['revenue'] * 0.1) / max(m['debt'], 1) 
-    x2 = (m['ebitda'] * 0.5) / max(m['debt'], 1)
-    x3 = m['ebitda'] / max(m['debt'], 1)
-    x4 = (m['revenue'] * 0.2) / max(m['debt'], 1)
-    
-    z = (1.2 * x1) + (1.4 * x2) + (3.3 * x3) + (0.6 * x4)
-    
-    if z > 2.9:
-        return {"z": round(z, 2), "zone": "SICURA", "color": "#00CC66", "risk": "Basso"}
-    elif z > 1.23:
-        return {"z": round(z, 2), "zone": "GRIGIA", "color": "#FFA500", "risk": "Moderato"}
-    else:
-        return {"z": round(z, 2), "zone": "PERICOLO", "color": "#FF4B4B", "risk": "Alto (Default)"}
-
-# --- 3. SIDEBAR (INPUT DATI) ---
+# --- 3. SIDEBAR (INPUT) ---
 with st.sidebar:
-    st.title("🏛️ CFO Dashboard")
-    st.markdown("Inserisci i dati contabili dell'azienda target.")
+    st.image("https://cdn-icons-png.flaticon.com/512/584/584011.png", width=80)
+    st.title("Nexus Control Panel")
+    st.markdown("---")
     
-    nome_azienda = st.text_input("Ragione Sociale", "Azienda Target S.p.A.")
-    rev_in = st.number_input("Fatturato (€)", value=1000000)
-    ebit_in =
+    company_name = st.text_input("Ragione Sociale", "Azienda Esempio S.p.A.")
+    rev_in = st.number_input("Fatturato (€)", value=1200000, step=10000)
+    ebit_in = st.number_input("EBITDA (€)", value=250000, step=5000)
+    pfn_in = st.number_input("Debito Totale (€)", value=450000, step=5000)
+    
+    st.markdown("---")
+    st.caption("Nexus Enterprise v3.0 | Real-time Scoring")
+
+# --- 4. LAYOUT PRINCIPALE ---
+st.title("🏛️ Nexus Enterprise: AI Financial Intelligence")
+st.info("Strumento di analisi predittiva del rischio e automazione del credito.")
+
+# Pulsante di calcolo
+if st.button("🚀 GENERA ANALISI E REPORT", use_container_width=True):
+    results = run_financial_engine(rev_in, ebit_in, pfn_in)
+    
+    # A. SEZIONE DECISIONALE
+    st.divider()
+    col_a, col_b = st.columns([2, 1])
+    
+    with col_a:
+        st.subheader("💰 Decision Engine")
+        st.markdown(f"""
+            <div style="background-color:{
