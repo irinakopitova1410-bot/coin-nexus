@@ -18,8 +18,8 @@ if 'generated' not in st.session_state:
 @st.cache_resource
 def init_connection():
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
+        url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
+        key = st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
         return create_client(url, key)
     except:
         return None
