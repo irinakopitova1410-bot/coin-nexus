@@ -30,6 +30,39 @@ except ImportError:
     st.stop()
 
 # --- LOGICA DI SALVATAGGIO CLOUD ---
+def get_strategic_advice(m):
+    advice = []
+    # Logica di calcolo del Gap Finanziario
+    if m.get('dscr', 0) < 1.2:
+        # Calcolo di quanto manca per essere 'Safe'
+        gap_ebitda = (1.2 * m.get('debt', 0)) - m.get('ebitda', 0)
+        advice.append({
+            "icon": "⚠️", 
+            "label": "OTTIMIZZAZIONE DSCR", 
+            "text": f"Il tuo DSCR è sotto la soglia di sicurezza bancaria. Per sbloccare nuovi fidi, serve un incremento dell'EBITDA di €{max(0, gap_ebitda):,.0f}."
+        })
+    
+    if m.get('margin', 0) < 12.5:
+        advice.append({
+            "icon": "📊", 
+            "label": "PERFORMANCE DI SETTORE", 
+            "text": "Marginalità inferiore al benchmark (12.5%). Nexus suggerisce una revisione dei costi fissi del 4% per riallinearsi ai top player."
+        })
+        
+    if m.get('debt', 0) > (m.get('ebitda', 0) * 4):
+        advice.append({
+            "icon": "💸", 
+            "label": "STRUTTURA DEL DEBITO", 
+            "text": "Leva finanziaria elevata. Azione consigliata: Trasformare parte del debito a breve in medio-lungo termine per migliorare il rating."
+        })
+        
+    return advice
+
+
+
+
+
+
 def push_to_supabase(record):
     """Invia i dati alla tabella audit_reports"""
     try:
