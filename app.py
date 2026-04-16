@@ -130,6 +130,63 @@ if st.button("🚀 GENERA REPORT CERTIFICATO", use_container_width=True):
     # Generazione PDF e salvataggio in sessione
     st.session_state.pdf_data = create_pdf_bytes(nome_azienda, m)
 
+# ... (dopo i grafici della singola azienda) ...
+
+    # --- AGGIUNGI DA QUI: DASHBOARD DI MONITORAGGIO (VALORE SAAS) ---
+    st.divider()
+    st.header("🛰️ Nexus Portfolio Radar (Visione Doc Finance)")
+    
+    # Creiamo due Tab per pulizia visiva
+    tab_radar, tab_list = st.tabs(["🌍 Mappa del Rischio", "📋 Elenco Posizioni"])
+
+    with tab_radar:
+        # Simulazione dati di portafoglio (In produzione verranno da Supabase)
+        portfolio_df = pd.DataFrame({
+            'Azienda': [nome_azienda, 'Beta Manufacturing', 'Gamma Logistics', 'Delta Tech', 'Ipsilon Retail'],
+            'Z-Score': [m['z_score'], 1.45, 0.82, 2.95, 3.10],
+            'Status': [dec['status'], 'REVISIONE', 'PERICOLO', 'SICURA', 'SICURA']
+        })
+
+        # Grafico a Bolle per il Pitch
+        fig_port = go.Figure()
+        fig_port.add_trace(go.Scatter(
+            x=portfolio_df['Azienda'], 
+            y=portfolio_df['Z-Score'],
+            mode='markers+text',
+            text=portfolio_df['Status'],
+            textposition="top center",
+            marker=dict(
+                size=[40, 30, 50, 30, 35],
+                color=['#00CC66' if s == 'APPROVATO' or s == 'SICURA' else '#FF4B4B' if s == 'PERICOLO' else '#FFA500' for s in portfolio_df['Status']]
+            )
+        ))
+        fig_port.update_layout(title="Radar Multi-Azienda (Analisi di Gruppo)", height=400, template="plotly_dark")
+        st.plotly_chart(fig_port, use_container_width=True)
+
+    with tab_list:
+        st.dataframe(portfolio_df, use_container_width=True)
+        st.caption("⚠️ Gli alert vengono generati automaticamente ogni volta che un bilancio ERP viene caricato nel sistema.")
+
+    # --- FINE SEZIONE AGGIUNTA ---
+
+# --- 5. SEZIONE EXPORT (Questa deve restare in fondo) ---
+st.divider()
+# ... (codice download button)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # --- 5. SEZIONE EXPORT ---
 st.divider()
 st.subheader("📥 Export Istituzionale")
