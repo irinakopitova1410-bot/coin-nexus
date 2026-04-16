@@ -42,25 +42,38 @@ def extract_from_excel(df):
     if 'ebitda' in cols: ext['ebitda'] = df[cols['ebitda']].sum()
     if 'debiti' in cols: ext['debt'] = df[cols['debiti']].sum()
     return ext
-
 def create_pdf_bytes(nome, m):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
+    pdf.set_font("helvetica", 'B', 16) # Usa helvetica (più compatibile sui server Linux)
     pdf.cell(0, 10, "NEXUS ENTERPRISE - REPORT CERTIFICATO", ln=True, align='C')
-    pdf.set_font("Arial", '', 10)
-    pdf.cell(0, 10, "Rating Merito Creditizio conforme ISA 320", ln=True, align='C')
     pdf.ln(10)
-    pdf.set_font("Arial", 'B', 12)
+    
+    pdf.set_font("helvetica", '', 12)
     pdf.cell(0, 10, f"Azienda: {nome}", ln=True)
-    pdf.ln(5)
-    # Tabella KPI
-    pdf.set_font("Arial", '', 10)
-    pdf.cell(90, 10, "Indicatore", 1); pdf.cell(90, 10, "Valore", 1, ln=True)
-    pdf.cell(90, 10, "Fatturato", 1); pdf.cell(90, 10, f"Euro {m['revenue']:,.0f}", 1, ln=True)
-    pdf.cell(90, 10, "DSCR", 1); pdf.cell(90, 10, f"{m['dscr']:.2f}", 1, ln=True)
-    pdf.cell(90, 10, "Margine Operativo %", 1); pdf.cell(90, 10, f"{m['margin']:.2f}%", 1, ln=True)
-    return pdf.output(dest='S').encode('latin-1')
+    pdf.cell(0, 10, f"Fatturato: Euro {m['revenue']:,.2f}", ln=True)
+    pdf.cell(0, 10, f"DSCR: {m['dscr']:.2f}", ln=True)
+    
+    # Ritorna i bytes puri dell'output
+    return bytes(pdf.output())
+
+# Nel bottone di generazione:
+if st.button("🚀 GENERA REPORT CERTIFICATO"):
+    m = internal_calculate_metrics({"revenue": rev_in, "ebitda": ebit_in, "debt": pfn_in})
+    # Genera i bytes e salvali nello stato
+    st.session_state.pdf_data = create_pdf_bytes(nome_azienda, m)
+    st.session_state.generated = True
+    st.success("Report Generato con Successo!")
+
+# Nel bottone di download:
+if st.session_state.get('pdf_data'):
+    st.download_button(
+        label="📄 SCARICA DOSSIER PDF",
+        data=st.session_state.pdf_data, # Qui ora ci sono bytes puri
+        file_name="Report_Nexus.pdf",
+        mime="application/pdf"
+    )
+
 
 # --- 3. SIDEBAR (LOGICA INPUT) ---
 with st.sidebar:
