@@ -61,12 +61,13 @@ def calculate_metrics(data):
         rating = "CCC"
         decision = "NEGATO"
         risk = "HIGH"
-
-    return {
-        "dscr": round(dscr, 2),
-        "leverage": round(leverage, 2),
-        "margin": round(margin, 2),
-
+return {
+    "dscr": dscr,
+    "leverage": leverage,
+    "margin": margin,
+    "liquidity_pressure": liquidity_pressure, # <--- Verifica questo nome!
+    # ... altri dati
+}
         # 🔥 BUSINESS OUTPUT
         "score": score,
         "rating": rating,
