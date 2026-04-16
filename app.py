@@ -6,41 +6,53 @@ from supabase import create_client, Client
 import datetime
 import io
 
-# --- 1. CONFIGURAZIONE ENTERPRISE ---
-st.set_page_config(page_title="Nexus Enterprise | Risk & Compliance Hub", layout="wide", page_icon="🏛️")
+# --- 1. CONFIGURAZIONE & CONNESSIONE ---
+st.set_page_config(page_title="Nexus Enterprise | SaaS Hub", layout="wide", page_icon="🏛️")
 
-# Simulazione Auth & Audit Logs (Enterprise Ready)
-if 'user_auth' not in st.session_state:
-    st.session_state.user_auth = False
+@st.cache_resource
+def init_supabase():
+    try:
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+        return create_client(url, key)
+    except Exception as e:
+        st.error("Errore di connessione a Supabase. Controlla i Secrets.")
+        return None
 
-def audit_log(action, company):
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_entry = f"[{timestamp}] USER_01 -> {action} -> {company}"
-    if 'logs' not in st.session_state: st.session_state.logs = []
-    st.session_state.logs.append(log_entry)
+supabase = init_supabase()
 
-# --- 2. MOTORE DI RATING & CREDIT PRICING ---
+# --- 2. GESTIONE AUTENTICAZIONE (SaaS Layer) ---
+def login_user(email, password):
+    try:
+        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        return res
+    except Exception as e:
+        st.error(f"Errore Login: {e}")
+        return None
+
+def register_user(email, password):
+    try:
+        res = supabase.auth.sign_up({"email": email, "password": password})
+        st.success("Registrazione effettuata! Controlla la mail per confermare (se attivo).")
+        return res
+    except Exception as e:
+        st.error(f"Errore Registrazione: {e}")
+        return None
+
+# --- 3. MOTORE DI CALCOLO ENTERPRISE ---
 def run_enterprise_analysis(rev, ebitda, debt):
     rev = max(rev, 1)
     eb_val = max(ebitda, 1)
     db_val = max(debt, 1)
     
-    # A. Altman Z-Score (Pillar 1)
+    # Altman Z-Score & PD (Probabilità Default)
     z = (1.2 * (rev*0.1/db_val)) + (3.3 * (eb_val/db_val))
-    
-    # B. Probability of Default (PD) - Basilea III/IV Model
-    # Calcolo logistico semplificato
     pd_rate = max(0.005, min(0.99, 1 / (1 + (z**2.5)))) 
     
-    # C. Expected Loss (EL) - Perdita Attesa in Euro
-    # EAD (Esposizione) = 15% Fatturato | LGD (Severità) = 45% (Standard Bancario)
-    ead = rev * 0.15
-    lgd = 0.45
-    expected_loss = ead * pd_rate * lgd
-    
-    # D. Risk-Based Pricing (Tasso Suggerito)
-    # Costo Fondi (4%) + PD + Operating Cost (1%) + Profit Margin (2%)
-    suggested_rate = (0.04 + pd_rate + 0.01 + 0.02) * 100
+    # Expected Loss & Pricing (Basilea IV)
+    ead = rev * 0.15 # Esposizione
+    expected_loss = ead * pd_rate * 0.45 # LGD 45%
+    suggested_rate = (0.04 + pd_rate + 0.03) * 100 # Costo + Rischio + Margine
     
     status = "SOLIDO" if z > 2.6 else "VULNERABILE" if z > 1.1 else "DISTRESSED"
     color = "#00CC66" if z > 2.6 else "#FFA500" if z > 1.1 else "#FF4B4B"
@@ -51,67 +63,72 @@ def run_enterprise_analysis(rev, ebitda, debt):
         "ros": (eb_val/rev)*100, "lev": debt/eb_val, "ead": ead
     }
 
-# --- 3. SIDEBAR: CARICAMENTO ERP ---
-with st.sidebar:
-    st.title("🏛️ Nexus Enterprise")
-    if not st.session_state.user_auth:
-        st.warning("🔒 Accesso Restricted")
-        user = st.text_input("Username")
-        pwd = st.text_input("Password", type="password")
-        if st.button("Login"):
-            st.session_state.user_auth = True
-            st.rerun()
-        st.stop()
+# --- 4. SCHERMATA DI ACCESSO (LOGIN/REGISTRAZIONE) ---
+if 'user' not in st.session_state:
+    st.session_state.user = None
+
+if st.session_state.user is None:
+    st.title("🏛️ Nexus Enterprise | Login")
+    tab_log, tab_reg = st.tabs(["Accedi", "Registrati"])
     
-    st.success("👤 Authenticated: Senior Risk Officer")
+    with tab_log:
+        email = st.text_input("Email Aziendale")
+        pwd = st.text_input("Password", type="password")
+        if st.button("Entra nel Sistema"):
+            session = login_user(email, pwd)
+            if session:
+                st.session_state.user = session.user
+                st.rerun()
+                
+    with tab_reg:
+        new_email = st.text_input("Nuova Email")
+        new_pwd = st.text_input("Nuova Password", type="password")
+        if st.button("Crea Account Enterprise"):
+            register_user(new_email, new_pwd)
+    st.stop()
+
+# --- 5. DASHBOARD PRINCIPALE (SOLO PER LOGGATI) ---
+with st.sidebar:
+    st.title("🏛️ Nexus Control")
+    st.write(f"👤 Utente: {st.session_state.user.email}")
+    if st.button("Logout"):
+        st.session_state.user = None
+        st.rerun()
     st.divider()
+    
+    # INPUT DATI
     uploaded_file = st.file_uploader("📂 Import ERP (Excel/CSV)", type=["xlsx", "csv"])
     nome_az = st.text_input("Azienda Target", "Nexus Demo S.p.A.")
     rev_in = st.number_input("Fatturato (€)", value=1500000)
     ebit_in = st.number_input("EBITDA (€)", value=250000)
     pfn_in = st.number_input("Debito Totale (€)", value=500000)
 
-# --- 4. DASHBOARD PRINCIPALE ---
 st.title("🕵️ Advanced Risk & Credit Intelligence")
 
-tabs = st.tabs(["📊 Credit Report", "🎯 Pricing & Loss", "📜 Audit Logs & Compliance"])
-
-if st.button("🚀 ESEGUI ANALISI ENTERPRISE", use_container_width=True):
+if st.button("🚀 GENERA REPORT RISK-ADJUSTED", use_container_width=True):
     res = run_enterprise_analysis(rev_in, ebit_in, pfn_in)
-    audit_log("GENERATED_REPORT", nome_az)
     
-    with tabs[0]: # Report Finanziario
-        st.header(f"Rating Dossier: {nome_az}")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.markdown(f"<div style='background:{res['color']};padding:25px;border-radius:15px;text-align:center;color:white;'><h1>{res['status']}</h1></div>", unsafe_allow_html=True)
-        c2.metric("Altman Z-Score", f"{res['z']:.2f}")
-        c3.metric("Leva Finanziaria", f"{res['lev']:.2f}x")
-        
-        # Grafico Redditività
-        fig_ros = go.Figure(go.Indicator(mode="gauge+number", value=res['ros'], title={'text': "Margine ROS %"},
-            gauge={'axis': {'range': [None, 30]}, 'bar': {'color': res['color']}}))
-        st.plotly_chart(fig_ros, use_container_width=True)
+    # VISUALIZZAZIONE RISULTATI
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"<div style='background:{res['color']};padding:25px;border-radius:15px;text-align:center;color:white;'><h2>{res['status']}</h2></div>", unsafe_allow_html=True)
+    col2.metric("Altman Z-Score", f"{res['z']:.2f}")
+    col3.metric("Leva Finanziaria", f"{res['lev']:.2f}x")
 
-    with tabs[1]: # Pricing & Perdita Attesa
-        st.header("🎯 Metriche di Rischio Avanzate")
-        st.warning("⚠️ Metodologia basata su Basilea IV")
-        
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Perdita Attesa (EL)", f"€ {res['el']:,.0f}", delta="Risk Value")
-        m2.metric("Probability of Default", f"{res['pd']:.2f}%")
-        m3.metric("Tasso Risk-Adjusted", f"{res['rate']:.2f}%")
-        
-        st.info(f"**Strategia di Pricing:** Per coprire la perdita attesa di €{res['el']:,.0f} su un'esposizione di €{res['ead']:,.0f}, il tasso minimo di break-even è **{res['rate']:.2f}%**.")
+    st.divider()
+    st.subheader("🎯 Metriche di Basilea IV (Pricing & Loss)")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Perdita Attesa (EL)", f"€ {res['el']:,.0f}")
+    m2.metric("Probabilità Default", f"{res['pd']:.2f}%")
+    m3.metric("Tasso Pricing Suggerito", f"{res['rate']:.2f}%")
+    
+    st.info(f"**Strategia Operativa:** Il tasso minimo di {res['rate']:.2f}% copre il rischio di perdita attesa di €{res['el']:,.0f}.")
 
-    with tabs[2]: # Audit & Security
-        st.header("🔐 Security & Compliance Layer")
-        st.write("**Certificazione GDPR & Audit Log**")
-        for log in reversed(st.session_state.logs):
-            st.text(log)
-        st.divider()
-        st.caption("Nexus Enterprise v4.0 - Data Encrypted at Rest (AES-256)")
-
-# --- 5. EXPORT ---
-st.divider()
-st.caption("Nexus Enterprise | Sistema conforme ai criteri EBA per la valutazione del merito creditizio.")
+    # PORTFOLIO RADAR (PER DOC FINANCE)
+    st.divider()
+    st.header("🛰️ Portfolio Risk Radar")
+    portfolio_df = pd.DataFrame({
+        'Azienda': [nome_az, 'Competitor A', 'Partner B'],
+        'Score': [res['z'], 1.2, 2.9]
+    })
+    st.line_chart(portfolio_df.set_index('Azienda'))
