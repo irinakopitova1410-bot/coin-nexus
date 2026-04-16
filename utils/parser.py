@@ -1,8 +1,6 @@
+import pandas as pd
 def extract_financials(df):
-    """
-    Estrae dati finanziari con controllo qualità per credit engine
-    """
-
+    # ... incolla qui il tuo codice ...
     if "descrizione" not in df.columns or "saldo" not in df.columns:
         return default_financials()
 
