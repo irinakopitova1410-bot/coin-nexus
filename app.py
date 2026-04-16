@@ -12,8 +12,8 @@ st.set_page_config(page_title="Nexus Enterprise | SaaS Hub", layout="wide", page
 @st.cache_resource
 def init_supabase():
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
+        url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
+        key = st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
         return create_client(url, key)
     except Exception as e:
         st.error("Errore di connessione a Supabase. Controlla i Secrets.")
