@@ -2,16 +2,15 @@ import os
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from supabase import create_client, Client
-import datetime
 
-# --- CONFIGURAZIONE VARIABILI D'AMBIENTE ---
-# Qui diciamo a Python di cercare le etichette che hai creato su Render
-url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
-key = os.environ.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk")
+# CORRETTO: Cerca il nome della variabile, non il valore!
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
 
+# Protezione contro il crash
 if not url or not key:
-    # Se le variabili mancano su Render, il server lo scrive nei log invece di dare 500 generico
-    print("ERRORE CRITICO: SUPABASE_URL o SUPABASE_KEY non configurate su Render!")
+    supabase = None
+    print("ATTENZIONE: Variabili SUPABASE_URL o SUPABASE_KEY mancanti!")
 else:
     supabase: Client = create_client(url, key)
 
