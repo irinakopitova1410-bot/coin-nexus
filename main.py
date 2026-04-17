@@ -8,15 +8,12 @@ import datetime
 url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
 key = os.environ.get("nx-live-docfinance-2026")
 supabase: Client = create_client(url, key)
-
 app = FastAPI()
-
 class ScoringRequest(BaseModel):
     company_name: str
     revenue: float
     ebitda: float
     total_debt: float
-
 @app.post("/v1/scoring/analyze")
 async def analyze(data: ScoringRequest, x_api_key: str = Header(None)):
     # 1. Trova il cliente
