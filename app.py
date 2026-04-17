@@ -1,120 +1,118 @@
 import streamlit as st
+import requests
 import pandas as pd
-import plotly.graph_objects as go
-from fpdf import FPDF
 from supabase import create_client, Client
-import datetime
-import io
 
-# --- 1. CONFIGURAZIONE ---
-st.set_page_config(page_title="Nexus Enterprise | SaaS Hub", layout="wide", page_icon="🏛️")
+# --- CONFIGURAZIONE PAGINA ---
+st.set_page_config(page_title="Nexus - AI Financial Scoring", layout="wide")
 
+# --- CONNESSIONE SUPABASE ---
 @st.cache_resource
 def init_supabase():
     try:
+        # Legge dai Secrets di Streamlit (Configurali nella Dashboard di Streamlit!)
         url = st.secrets["SUPABASE_URL"]
         key = st.secrets["SUPABASE_KEY"]
         return create_client(url, key)
-    except:
+    except Exception as e:
         return None
 
-supabase = init_supabase()
+supabase_client = init_supabase()
 
-# --- 2. LOGICA DI AUTENTICAZIONE IBRIDA ---
-def login_logic(email_input, pwd_input):
-    # --- ADMIN PROVVISORIO (BACKDOOR) ---
-    # Cambia queste due stringhe con la mail e pass che vuoi usare tu per i test
-    ADMIN_MAIL = "admin@test.it" 
-    ADMIN_PASS = "nexus2026"
-
-    if email_input == ADMIN_MAIL and pwd_input == ADMIN_PASS:
-        return {"email": ADMIN_MAIL, "role": "admin"}
-    
-    # --- LOGIN STANDARD TRAMITE SUPOBASE ---
-    if supabase:
-        try:
-            res = supabase.auth.sign_in_with_password({"email": email_input, "password": pwd_input})
-            if res:
-                return {"email": res.user.email, "role": "user"}
-        except:
-            return None
-    return None
-
-# --- 3. MOTORE ANALISI ENTERPRISE ---
-def run_enterprise_analysis(rev, ebitda, debt):
-    rev = max(rev, 1)
-    eb_val = max(ebitda, 1)
-    db_val = max(debt, 1)
-    z = (1.2 * (rev*0.1/db_val)) + (3.3 * (eb_val/db_val))
-    pd_rate = max(0.005, min(0.99, 1 / (1 + (z**2.5)))) 
-    ead = rev * 0.15 
-    expected_loss = ead * pd_rate * 0.45 
-    suggested_rate = (0.04 + pd_rate + 0.03) * 100 
-    
-    status = "SOLIDO" if z > 2.6 else "VULNERABILE" if z > 1.1 else "DISTRESSED"
-    color = "#00CC66" if z > 2.6 else "#FFA500" if z > 1.1 else "#FF4B4B"
-    
-    return {
-        "z": z, "status": status, "color": color, 
-        "pd": pd_rate * 100, "el": expected_loss, "rate": suggested_rate,
-        "ros": (eb_val/rev)*100, "lev": debt/eb_val
-    }
-
-# --- 4. SCHERMATA LOGIN ---
+# --- AUTENTICAZIONE ---
 if 'auth_user' not in st.session_state:
     st.session_state.auth_user = None
 
-if st.session_state.auth_user is None:
-    st.title("🏛️ Nexus Enterprise | Login")
-    email = st.text_input("Email")
+if not st.session_state.auth_user:
+    st.title("🔐 Login Nexus")
+    user = st.text_input("Username")
     pwd = st.text_input("Password", type="password")
-    
-    if st.button("Accedi al Sistema", use_container_width=True):
-        user_data = login_logic(email, pwd)
-        if user_data:
-            st.session_state.auth_user = user_data
-            st.success(f"Benvenuto {user_data['email']}!")
+    if st.button("Accedi"):
+        if user == "admin@test.it" and pwd == "nexus2026":
+            st.session_state.auth_user = {"role": "admin", "name": "Doc Finance Admin"}
             st.rerun()
         else:
-            st.error("Credenziali non valide.")
+            st.error("Credenziali errate")
     st.stop()
 
-# --- 5. DASHBOARD POST-LOGIN ---
-with st.sidebar:
-    st.title("🏛️ Nexus System")
-    st.write(f"👤 **Sessione:** {st.session_state.auth_user['email']}")
-    
+# --- INTERFACCIA PRINCIPALE ---
+st.title("🏦 Nexus - Motore di Analisi Credito")
+st.sidebar.write(f"Connesso come: **{st.session_state.auth_user['name']}**")
+if st.sidebar.button("Logout"):
+    st.session_state.auth_user = None
+    st.rerun()
+
+# --- SEZIONE ANALISI ---
+st.subheader("🚀 Nuova Analisi Società")
+col1, col2 = st.columns(2)
+
+with col1:
+    company = st.text_input("Ragione Sociale")
+    revenue = st.number_input("Fatturato (€)", min_value=0.0)
+with col2:
+    assets = st.number_input("Totale Attivo (€)", min_value=0.0)
+    income = st.number_input("Utile Netto (€)", min_value=0.0)
+
+if st.button("Esegui Analisi API"):
+    if company and revenue > 0:
+        with st.spinner("Interrogazione motore Nexus in corso..."):
+            try:
+                # 🚨 ATTENZIONE: Controlla che questo URL sia quello corretto su Render!
+                API_URL = "https://nexus-api-m6r6.onrender.com/analyze"
+                
+                payload = {
+                    "company_name": company,
+                    "revenue": revenue,
+                    "total_assets": assets,
+                    "net_income": income
+                }
+                # Questa chiave deve essere la stessa nella tabella 'tenants' su Supabase
+                headers = {"x-api-key": "nexus_test_key_2026"}
+                
+                response = requests.post(API_URL, json=payload, headers=headers)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    st.success("Analisi Completata!")
+                    c1, c2, c3 = st.columns(3)
+                    c1.metric("Z-Score", data['z_score'])
+                    c2.metric("Rischio", data['risk_level'])
+                    c3.metric("Crediti Residui", data['remaining_credits'])
+                    st.balloons()
+                else:
+                    st.error(f"Errore API ({response.status_code}): {response.text}")
+            except Exception as e:
+                st.error(f"Impossibile connettersi al server Render: {e}")
+    else:
+        st.warning("Inserisci i dati societari per procedere.")
+
 # --- DASHBOARD PARTNER (SOLO ADMIN) ---
 if st.session_state.auth_user['role'] == "admin":
     st.divider()
     st.header("📊 Nexus Partner Dashboard")
     
-    # Controlliamo se i Secrets sono configurati su Streamlit
-    if "SUPABASE_URL" in st.secrets and "SUPABASE_KEY" in st.secrets:
+    if supabase_client:
         try:
-            # Usiamo init_supabase() che abbiamo definito sopra
-            if supabase_client:
-                # 1. Recupero Crediti Residui dal DB
-                # Nota: usa la stessa api_key che hai su Supabase
-                t_res = supabase_client.table("tenants").select("name, credit_balance").eq("api_key", "nexus_test_key_2026").execute()
-                
-                if t_res.data:
-                    info = t_res.data[0]
-                    d1, d2 = st.columns(2)
-                    d1.metric("Partner Attivo", info['name'])
-                    d2.metric("Crediti Disponibili", f"{info['credit_balance']} / 5000")
+            # 1. Recupero Crediti
+            t_res = supabase_client.table("tenants").select("name, credit_balance").eq("api_key", "nexus_test_key_2026").execute()
+            
+            if t_res.data:
+                info = t_res.data[0]
+                d1, d2 = st.columns(2)
+                d1.metric("Partner Attivo", info['name'])
+                d2.metric("Crediti Disponibili", f"{info['credit_balance']} / 5000")
 
-                # 2. Recupero Storico Analisi
-                st.subheader("📜 Ultimi Log di Integrazione")
-                l_res = supabase_client.table("analysis_logs").select("created_at, company_name, z_score, pd_rate").order("created_at", desc=True).limit(5).execute()
-                
-                if l_res.data:
-                    df_logs = pd.DataFrame(l_res.data)
-                    df_logs.columns = ['Data', 'Azienda', 'Score', 'Rischio']
-                    st.table(df_logs)
-                else:
-                    st.info("Nessun log trovato nel database.")
+            # 2. Storico Analisi
+            st.subheader("📜 Ultimi Log di Integrazione")
+            l_res = supabase_client.table("analysis_logs").select("created_at, company_name, z_score, pd_rate").order("created_at", desc=True).limit(5).execute()
+            
+            if l_res.data:
+                df_logs = pd.DataFrame(l_res.data)
+                df_logs.columns = ['Data', 'Azienda', 'Score', 'Rischio']
+                st.dataframe(df_logs, use_container_width=True)
+            else:
+                st.info("Nessuna operazione registrata nel database.")
         except Exception as e:
-            st.error(f"Errore tecnico: {e}")
+            st.error(f"Errore database: {e}")
     else:
-        st.warning("⚠️ Configurazione Supabase non trovata nei Secrets di Streamlit Cloud.")   
+        st.warning("⚠️ Configurazione Supabase non trovata nei Secrets di Streamlit.")
