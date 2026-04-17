@@ -15,7 +15,6 @@ else:
     supabase: Client = create_client(url, key)
 
 app = FastAPI()
-
 class ScoringRequest(BaseModel):
     company_name: str
     revenue: float
