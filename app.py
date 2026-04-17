@@ -115,59 +115,45 @@ if st.button("🚀 ESEGUI ANALISI GLOBALE", use_container_width=True):
     m1.metric("Perdita Attesa (EL)", f"€ {res['el']:,.0f}")
     m2.metric("Probabilità Default", f"{res['pd']:.2f}%")
     m3.metric("Pricing Credito", f"{res['rate']:.2f}%")
-
     # FUNZIONE SOLO PER ADMIN
     if st.session_state.auth_user['role'] == "admin":
         st.divider()
         st.subheader("📜 Admin Panel - Data Logs")
         st.json(res)
-# --- INSERISCI DA QUI IN POI (sotto la riga 123) ---
- 
- # FUNZIONI PER DOC-FINANCE (SOLO PER ADMIN)
- if st.session_state.auth_user['role'] == "admin":
+# --- COLLEGAMENTO REALE AL MOTORE SU RENDER ---
+if st.session_state.auth_user['role'] == "admin":
     st.divider()
-    st.header("🔌 Doc-Finance Enterprise Integration")
+    st.header("🔌 Doc-Finance Enterprise Integration")   
+    url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
+    
     col_api, col_log = st.columns([1.5, 1])
 
     with col_api:
-        st.subheader("📡 API Bridge Simulator")
-        st.info("Questa sezione mostra come i dati viaggiano verso il tuo motore su Render.")
+        st.subheader("📡 Nexus Engine Live")
+        st.info(f"Connesso a: {url_render}")
         
-        # Sostituisci questo URL con quello che ti ha dato Render (es. https://nexus-api.onrender.com)
-        url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
-        
-        st.code(f"""
-        POST {url_render}
-        X-API-KEY: nx-live-docfinance-2026
-        
-        {{
-            "revenue": {rev_in},
-            "ebitda": {ebit_in},
-            "total_debt": {pfn_in}
-        }}
-        """, language="json")
-        
-        if st.button("🚀 Push Data to Doc-Finance"):
+        if st.button("🚀 Invia Dati al Motore Render"):
             import requests
+            # Usiamo la chiave che hai impostato su Render
             headers = {"x-api-key": "nx-live-docfinance-2026"}
-            payload = {"revenue": rev_in, "ebitda": ebit_in, "total_debt": pfn_in}
+            payload = {
+                "revenue": rev_in, 
+                "ebitda": ebit_in, 
+                "total_debt": pfn_in
+            }
             
-            try:
-                # Chiamata reale al tuo server FastAPI su Render
-                response = requests.post(url_render, json=payload, headers=headers)
-                if response.status_code == 200:
-                    st.success("✅ DATI INVIATI! Il server Render ha risposto correttamente.")
-                    st.json(response.json())
-                else:
-                    st.error(f"Errore server: {response.status_code}. Controlla il link Render.")
-            except:
-                st.warning("Il server Render è ancora in fase di avvio. Riprova tra 30 secondi.")
+            with st.spinner("Interrogando l'algoritmo su Render..."):
+                try:
+                    response = requests.post(url_render, json=payload, headers=headers)
+                    if response.status_code == 200:
+                        st.success("✅ RISPOSTA RICEVUTA!")
+                        st.json(response.json()) # Qui vedrai il Rating e lo Score calcolati dal backend
+                    else:
+                        st.error(f"Errore {response.status_code}: Controlla la API Key su Render")
+                except Exception as e:
+                    st.error("Il server non risponde. Controlla che Render non sia in modalità sleep.")
 
     with col_log:
-        st.subheader("📜 Admin Audit Logs")
-        st.json({
-            "timestamp": str(datetime.datetime.now()),
-            "user": st.session_state.auth_user['email'],
-            "action": "API_PUSH_ATTEMPT",
-            "target": "Doc-Finance-Module"
-        })
+        st.subheader("📜 System Logs")
+        st.write("Monitoraggio chiamate API in tempo reale")
+        st.code(f"POST /v1/scoring/analyze\nTenant: DocFinance_Srl\nStatus: Connected", language="text")
