@@ -134,7 +134,7 @@ if st.button("🚀 ESEGUI ANALISI GLOBALE", use_container_width=True):
         st.info("Questa sezione mostra come i dati viaggiano verso il tuo motore su Render.")
         
         # Sostituisci questo URL con quello che ti ha dato Render (es. https://nexus-api.onrender.com)
-        url_render = "https://tuo-link-render.onrender.com/v1/scoring/analyze"
+        url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
         
         st.code(f"""
         POST {url_render}
