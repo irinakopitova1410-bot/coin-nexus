@@ -121,3 +121,53 @@ if st.button("🚀 ESEGUI ANALISI GLOBALE", use_container_width=True):
         st.divider()
         st.subheader("📜 Admin Panel - Data Logs")
         st.json(res)
+# --- INSERISCI DA QUI IN POI (sotto la riga 123) ---
+ 
+ # FUNZIONI PER DOC-FINANCE (SOLO PER ADMIN)
+ if st.session_state.auth_user['role'] == "admin":
+    st.divider()
+    st.header("🔌 Doc-Finance Enterprise Integration")
+    col_api, col_log = st.columns([1.5, 1])
+
+    with col_api:
+        st.subheader("📡 API Bridge Simulator")
+        st.info("Questa sezione mostra come i dati viaggiano verso il tuo motore su Render.")
+        
+        # Sostituisci questo URL con quello che ti ha dato Render (es. https://nexus-api.onrender.com)
+        url_render = "https://tuo-link-render.onrender.com/v1/scoring/analyze"
+        
+        st.code(f"""
+        POST {url_render}
+        X-API-KEY: nx-live-docfinance-2026
+        
+        {{
+            "revenue": {rev_in},
+            "ebitda": {ebit_in},
+            "total_debt": {pfn_in}
+        }}
+        """, language="json")
+        
+        if st.button("🚀 Push Data to Doc-Finance"):
+            import requests
+            headers = {"x-api-key": "nx-live-docfinance-2026"}
+            payload = {"revenue": rev_in, "ebitda": ebit_in, "total_debt": pfn_in}
+            
+            try:
+                # Chiamata reale al tuo server FastAPI su Render
+                response = requests.post(url_render, json=payload, headers=headers)
+                if response.status_code == 200:
+                    st.success("✅ DATI INVIATI! Il server Render ha risposto correttamente.")
+                    st.json(response.json())
+                else:
+                    st.error(f"Errore server: {response.status_code}. Controlla il link Render.")
+            except:
+                st.warning("Il server Render è ancora in fase di avvio. Riprova tra 30 secondi.")
+
+    with col_log:
+        st.subheader("📜 Admin Audit Logs")
+        st.json({
+            "timestamp": str(datetime.datetime.now()),
+            "user": st.session_state.auth_user['email'],
+            "action": "API_PUSH_ATTEMPT",
+            "target": "Doc-Finance-Module"
+        })
