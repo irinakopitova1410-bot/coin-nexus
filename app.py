@@ -132,8 +132,8 @@ if st.session_state.auth_user['role'] == "admin":
         import os
 
         # Recupero credenziali dalle variabili d'ambiente di Render
-        s_url = os.environ.get("SUPABASE_URL")
-        s_key = os.environ.get("SUPABASE_KEY")
+        s_url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
+        s_key = os.environ.get("sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos")
         
         if s_url and s_key:
             supabase_client = create_client(s_url, s_key)
