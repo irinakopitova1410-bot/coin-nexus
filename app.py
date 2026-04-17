@@ -122,23 +122,23 @@ if st.button("🚀 ESEGUI ANALISI GLOBALE", use_container_width=True):
         st.json(res)
 # --- COLLEGAMENTO REALE AL MOTORE SU RENDER ---
 # --- INIZIO NEXUS PARTNER DASHBOARD (Incolla in fondo al file) ---
+# --- NEXUS PARTNER DASHBOARD DEFINITIVA ---
 if st.session_state.auth_user['role'] == "admin":
     st.divider()
     st.header("📊 Nexus Partner Dashboard")
     
-    try:
-        from supabase import create_client
-        import pandas as pd
-        import os
+    # Verifichiamo se i Secrets sono presenti
+    if "SUPABASE_URL" in st.secrets and "SUPABASE_KEY" in st.secrets:
+        try:
+            from supabase import create_client
+            import pandas as pd
 
-        # Recupero credenziali dalle variabili d'ambiente di Render
-        s_url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
-        s_key = os.environ.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk")
-        
-        if s_url and s_key:
+            # Leggiamo dai Secrets (assicurati di averli salvati nella dashboard di Streamlit!)
+            s_url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
+            s_key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk"]
             supabase_client = create_client(s_url, s_key)
 
-            # 1. Recupero Crediti Residui (Basato sulla chiave del tuo screenshot)
+            # 1. Recupero Crediti Residui
             t_res = supabase_client.table("tenants").select("name, credit_balance").eq("api_key", "nexus_test_key_2026").execute()
             
             if t_res.data:
@@ -156,10 +156,10 @@ if st.session_state.auth_user['role'] == "admin":
                 df_logs.columns = ['Data/Ora', 'Azienda Analizzata', 'Z-Score']
                 st.dataframe(df_logs, use_container_width=True)
             else:
-                st.info("In attesa della prima chiamata API per popolare i log.")
-        else:
-            st.warning("⚠️ Configurazione Supabase mancante su Render (Environment Variables).")
+                st.info("In attesa della prima analisi per popolare i log.")
 
-    except Exception as e:
-        st.error(f"Errore Dashboard: {e}")
-# --- FINE ---
+        except Exception as e:
+            st.error(f"Errore di connessione a Supabase: {e}")
+    else:
+        # Questo è il messaggio che vedi ora. Sparirà appena i Secrets saranno salvati correttamente.
+        st.warning("⚠️ Configurazione Supabase non trovata nei Secrets di Streamlit.")
