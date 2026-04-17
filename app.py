@@ -121,54 +121,45 @@ if st.button("🚀 ESEGUI ANALISI GLOBALE", use_container_width=True):
         st.subheader("📜 Admin Panel - Data Logs")
         st.json(res)
 # --- COLLEGAMENTO REALE AL MOTORE SU RENDER ---
-# --- INTEGRAZIONE DOC-FINANCE (SOLO PER ADMIN) ---
+# --- INIZIO NEXUS PARTNER DASHBOARD (Incolla in fondo al file) ---
 if st.session_state.auth_user['role'] == "admin":
     st.divider()
-    st.header("🔌 Doc-Finance Enterprise Integration")
+    st.header("📊 Nexus Partner Dashboard")
     
-    # Il tuo link reale di Render
-    url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
-    
-    col_api, col_log = st.columns([1.5, 1])
+    try:
+        from supabase import create_client
+        import pandas as pd
+        import os
 
-    with col_api:
-        st.subheader("📡 Nexus Engine Live")
-        st.info(f"Connesso al backend professionale: {url_render}")
+        # Recupero credenziali dalle variabili d'ambiente di Render
+        s_url = os.environ.get("SUPABASE_URL")
+        s_key = os.environ.get("SUPABASE_KEY")
         
-        # Mostriamo cosa stiamo per inviare (molto utile per la demo)
-        st.code(f"""
-        POST /v1/scoring/analyze
-        X-API-KEY: nx-live-docfinance-2026
-        
-        {{
-            "revenue": {rev_in},
-            "ebitda": {ebit_in},
-            "total_debt": {pfn_in}
-        }}
-        """, language="json")
-        
-        if st.button("🚀 PUSH TO DOC-FINANCE (Render)"):
-            import requests
-            # Usiamo la chiave che hai impostato nelle Environment Variables di Render
-            headers = {"x-api-key": "nx-live-docfinance-2026"}
-            payload = {
-                "revenue": rev_in, 
-                "ebitda": ebit_in, 
-                "total_debt": pfn_in
-            }
+        if s_url and s_key:
+            supabase_client = create_client(s_url, s_key)
+
+            # 1. Recupero Crediti Residui (Basato sulla chiave del tuo screenshot)
+            t_res = supabase_client.table("tenants").select("name, credit_balance").eq("api_key", "nexus_test_key_2026").execute()
             
-            with st.spinner("L'algoritmo sta calcolando su Render..."):
-                try:
-                    response = requests.post(url_render, json=payload, headers=headers)
-                    if response.status_code == 200:
-                        st.success("✅ RISPOSTA RICEVUTA DAL MOTORE!")
-                        st.json(response.json()) # Qui vedrai il Rating calcolato dal backend FastAPI
-                    else:
-                        st.error(f"Errore {response.status_code}: Controlla la API Key su Render")
-                except Exception as e:
-                    st.error("Il server non risponde. Verifica che il deploy su Render sia 'Live'.")
+            if t_res.data:
+                info = t_res.data[0]
+                c1, c2 = st.columns(2)
+                c1.metric("Partner Attivo", info['name'])
+                c2.metric("Crediti Disponibili", f"{info['credit_balance']} / 5000")
 
-    with col_log:
-        st.subheader("📜 System Audit")
-        st.write("Tracciamento chiamate API")
-        st.code(f"TIMESTAMP: {datetime.datetime.now()}\nTENANT: DocFinance_Srl\nENDPOINT: /analyze\nSTATUS: ACTIVE", language="text")
+            # 2. Visualizzazione Log Ultime Analisi
+            st.subheader("📜 Registro Operazioni Integrato")
+            l_res = supabase_client.table("analysis_logs").select("created_at, company_name, z_score").order("created_at", desc=True).limit(5).execute()
+            
+            if l_res.data:
+                df_logs = pd.DataFrame(l_res.data)
+                df_logs.columns = ['Data/Ora', 'Azienda Analizzata', 'Z-Score']
+                st.dataframe(df_logs, use_container_width=True)
+            else:
+                st.info("In attesa della prima chiamata API per popolare i log.")
+        else:
+            st.warning("⚠️ Configurazione Supabase mancante su Render (Environment Variables).")
+
+    except Exception as e:
+        st.error(f"Errore Dashboard: {e}")
+# --- FINE ---
