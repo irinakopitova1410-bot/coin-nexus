@@ -133,7 +133,7 @@ if st.session_state.auth_user['role'] == "admin":
 
         # Recupero credenziali dalle variabili d'ambiente di Render
         s_url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
-        s_key = os.environ.get("sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos")
+        s_key = os.environ.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk")
         
         if s_url and s_key:
             supabase_client = create_client(s_url, s_key)
