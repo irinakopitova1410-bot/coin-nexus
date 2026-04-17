@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 
 # CORRETTO: Cerca il nome della variabile, non il valore!
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
+url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
+key = os.environ.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk")
 
 # Protezione contro il crash
 if not url or not key:
