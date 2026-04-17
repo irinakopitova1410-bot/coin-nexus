@@ -12,8 +12,8 @@ st.set_page_config(page_title="Nexus Enterprise | SaaS Hub", layout="wide", page
 @st.cache_resource
 def init_supabase():
     try:
-        url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
-        key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk"]
+     url = st.secrets["SUPABASE_URL"]
+     key = st.secrets["SUPABASE_KEY"]
         return create_client(url, key)
     except:
         return None
@@ -134,8 +134,8 @@ if st.session_state.auth_user['role'] == "admin":
             import pandas as pd
 
             # Leggiamo dai Secrets (assicurati di averli salvati nella dashboard di Streamlit!)
-            s_url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
-            s_key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk"]
+        s_url = st.secrets["SUPABASE_URL"]
+        s_key = st.secrets["SUPABASE_KEY"]
             supabase_client = create_client(s_url, s_key)
 
             # 1. Recupero Crediti Residui
