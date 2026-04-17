@@ -4,3 +4,6 @@ plotly
 supabase
 fpdf2
 openpyxl
+fastapi
+uvicorn
+pydantic
