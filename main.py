@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 
 # Inizializzazione Supabase dalle variabili d'ambiente di Render
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
+url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
+key = os.environ.get("sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos")
 supabase: Client = create_client(url, key)
 
 app = FastAPI()
