@@ -138,7 +138,7 @@ if st.session_state.auth_user['role'] == "admin":
         # Mostriamo cosa stiamo per inviare (molto utile per la demo)
         st.code(f"""
         POST /v1/scoring/analyze
-        X-API-KEY: nx-live-docfinance-2026
+        X-API-KEY: nexus_test_key_2026
         
         {{
             "revenue": {rev_in},
@@ -150,7 +150,7 @@ if st.session_state.auth_user['role'] == "admin":
         if st.button("🚀 PUSH TO DOC-FINANCE (Render)"):
             import requests
             # Usiamo la chiave che hai impostato nelle Environment Variables di Render
-            headers = {"x-api-key": "nx-live-docfinance-2026"}
+            headers = {"x-api-key": "nexus_test_key_2026"}
             payload = {
                 "revenue": rev_in, 
                 "ebitda": ebit_in, 
