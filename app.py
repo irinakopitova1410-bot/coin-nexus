@@ -1,36 +1,36 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-from fpdf import FPDF
+import requests
 from supabase import create_client, Client
 import datetime
 import io
 
-# --- 1. CONFIGURAZIONE ---
+# --- 1. CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="Nexus Enterprise | SaaS Hub", layout="wide", page_icon="🏛️")
 
+# --- 2. CONNESSIONE SUPABASE (SICURA) ---
 @st.cache_resource
 def init_supabase():
     try:
+        # Legge dai Secrets di Streamlit Cloud (da impostare nella dashboard)
         url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
         key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk"]
         return create_client(url, key)
-    except:
+    except Exception as e:
         return None
 
 supabase = init_supabase()
 
-# --- 2. LOGICA DI AUTENTICAZIONE IBRIDA ---
+# --- 3. LOGICA DI AUTENTICAZIONE ---
 def login_logic(email_input, pwd_input):
-    # --- ADMIN PROVVISORIO (BACKDOOR) ---
-    # Cambia queste due stringhe con la mail e pass che vuoi usare tu per i test
+    # BACKDOOR ADMIN
     ADMIN_MAIL = "admin@test.it" 
     ADMIN_PASS = "nexus2026"
 
     if email_input == ADMIN_MAIL and pwd_input == ADMIN_PASS:
         return {"email": ADMIN_MAIL, "role": "admin"}
     
-    # --- LOGIN STANDARD TRAMITE SUPOBASE ---
+    # LOGIN TRAMITE SUPABASE AUTH
     if supabase:
         try:
             res = supabase.auth.sign_in_with_password({"email": email_input, "password": pwd_input})
@@ -40,27 +40,7 @@ def login_logic(email_input, pwd_input):
             return None
     return None
 
-# --- 3. MOTORE ANALISI ENTERPRISE ---
-def run_enterprise_analysis(rev, ebitda, debt):
-    rev = max(rev, 1)
-    eb_val = max(ebitda, 1)
-    db_val = max(debt, 1)
-    z = (1.2 * (rev*0.1/db_val)) + (3.3 * (eb_val/db_val))
-    pd_rate = max(0.005, min(0.99, 1 / (1 + (z**2.5)))) 
-    ead = rev * 0.15 
-    expected_loss = ead * pd_rate * 0.45 
-    suggested_rate = (0.04 + pd_rate + 0.03) * 100 
-    
-    status = "SOLIDO" if z > 2.6 else "VULNERABILE" if z > 1.1 else "DISTRESSED"
-    color = "#00CC66" if z > 2.6 else "#FFA500" if z > 1.1 else "#FF4B4B"
-    
-    return {
-        "z": z, "status": status, "color": color, 
-        "pd": pd_rate * 100, "el": expected_loss, "rate": suggested_rate,
-        "ros": (eb_val/rev)*100, "lev": debt/eb_val
-    }
-
-# --- 4. SCHERMATA LOGIN ---
+# --- 4. GESTIONE SESSIONE ---
 if 'auth_user' not in st.session_state:
     st.session_state.auth_user = None
 
@@ -79,96 +59,85 @@ if st.session_state.auth_user is None:
             st.error("Credenziali non valide.")
     st.stop()
 
-# --- 5. DASHBOARD POST-LOGIN ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🏛️ Nexus System")
-    st.write(f"👤 **Sessione:** {st.session_state.auth_user['email']}")
-    
-    if st.session_state.auth_user['role'] == "admin":
-        st.success("⚡ MODO AMMINISTRATORE")
+    st.write(f"👤 **Utente:** {st.session_state.auth_user['email']}")
     
     if st.button("Logout"):
         st.session_state.auth_user = None
         st.rerun()
     
     st.divider()
-    uploaded_file = st.file_uploader("📂 Carica Bilancio ERP", type=["xlsx", "csv"])
-    nome_az = st.text_input("Azienda", "Target S.p.A.")
-    rev_in = st.number_input("Fatturato (€)", value=1500000)
-    ebit_in = st.number_input("EBITDA (€)", value=250000)
-    pfn_in = st.number_input("Debito (€)", value=500000)
+    st.subheader("Dati Analisi")
+    nome_az = st.text_input("Ragione Sociale", "Target S.p.A.")
+    rev_in = st.number_input("Fatturato (€)", value=1500000.0)
+    assets_in = st.number_input("Totale Attivo (€)", value=2000000.0)
+    income_in = st.number_input("Utile Netto (€)", value=250000.0)
 
+# --- 6. DASHBOARD PRINCIPALE ---
 st.title("🕵️ Credit Risk & Enterprise Intelligence")
 
-if st.button("🚀 ESEGUI ANALISI GLOBALE", use_container_width=True):
-    res = run_enterprise_analysis(rev_in, ebit_in, pfn_in)
-    
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f"<div style='background:{res['color']};padding:25px;border-radius:15px;text-align:center;color:white;'><h2>{res['status']}</h2></div>", unsafe_allow_html=True)
-    c2.metric("Altman Z-Score", f"{res['z']:.2f}")
-    c3.metric("Leva Finanziaria", f"{res['lev']:.2f}x")
-
-    st.divider()
-    st.subheader("🎯 Metriche Basilea IV (Credit Risk)")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Perdita Attesa (EL)", f"€ {res['el']:,.0f}")
-    m2.metric("Probabilità Default", f"{res['pd']:.2f}%")
-    m3.metric("Pricing Credito", f"{res['rate']:.2f}%")
-    # FUNZIONE SOLO PER ADMIN
-    if st.session_state.auth_user['role'] == "admin":
-        st.divider()
-        st.subheader("📜 Admin Panel - Data Logs")
-        st.json(res)
-# --- COLLEGAMENTO REALE AL MOTORE SU RENDER ---
-# --- INTEGRAZIONE DOC-FINANCE (SOLO PER ADMIN) ---
+# --- INTEGRAZIONE REALE CON RENDER ---
 if st.session_state.auth_user['role'] == "admin":
     st.divider()
     st.header("🔌 Doc-Finance Enterprise Integration")
     
-    # Il tuo link reale di Render
-    url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
+    # URL del tuo server FastAPI su Render
+    url_render = "https://nexus-api-rf76.onrender.com/analyze"
     
     col_api, col_log = st.columns([1.5, 1])
 
     with col_api:
         st.subheader("📡 Nexus Engine Live")
-        st.info(f"Connesso al backend professionale: {url_render}")
+        st.info(f"Connesso al backend: {url_render}")
         
-        # Mostriamo cosa stiamo per inviare (molto utile per la demo)
-        st.code(f"""
-        POST /v1/scoring/analyze
-        X-API-KEY: nx-live-docfinance-2026
+        # Anteprima JSON per la demo
+        payload = {
+            "company_name": nome_az,
+            "revenue": rev_in,
+            "total_assets": assets_in,
+            "net_income": income_in
+        }
         
-        {{
-            "revenue": {rev_in},
-            "ebitda": {ebit_in},
-            "total_debt": {pfn_in}
-        }}
-        """, language="json")
+        st.code(payload, language="json")
         
-        if st.button("🚀 PUSH TO DOC-FINANCE (Render)"):
-            import requests
-            # Usiamo la chiave che hai impostato nelle Environment Variables di Render
+        if st.button("🚀 PUSH TO DOC-FINANCE (Render)", use_container_width=True):
+            # API KEY che hai salvato nella tabella 'tenants' di Supabase
             headers = {"x-api-key": "nx-live-docfinance-2026"}
-            payload = {
-                "revenue": rev_in, 
-                "ebitda": ebit_in, 
-                "total_debt": pfn_in
-            }
             
             with st.spinner("L'algoritmo sta calcolando su Render..."):
                 try:
                     response = requests.post(url_render, json=payload, headers=headers)
                     if response.status_code == 200:
                         st.success("✅ RISPOSTA RICEVUTA DAL MOTORE!")
-                        st.json(response.json()) # Qui vedrai il Rating calcolato dal backend FastAPI
+                        res = response.json()
+                        
+                        # Visualizzazione Risultati Real-time
+                        c1, c2, c3 = st.columns(3)
+                        c1.metric("Z-Score", res['z_score'])
+                        c2.metric("Rischio", res['risk_level'])
+                        c3.metric("Saldo Crediti", res['remaining_credits'])
+                        st.balloons()
                     else:
-                        st.error(f"Errore {response.status_code}: Controlla la API Key su Render")
+                        st.error(f"Errore {response.status_code}: {response.text}")
                 except Exception as e:
-                    st.error("Il server non risponde. Verifica che il deploy su Render sia 'Live'.")
+                    st.error(f"Server Offline o URL errato: {e}")
 
     with col_log:
-        st.subheader("📜 System Audit")
-        st.write("Tracciamento chiamate API")
-        st.code(f"TIMESTAMP: {datetime.datetime.now()}\nTENANT: DocFinance_Srl\nENDPOINT: /analyze\nSTATUS: ACTIVE", language="text")
+        st.subheader("📊 Partner Dashboard")
+        if supabase:
+            try:
+                # Recupero crediti residui dal DB
+                t_res = supabase.table("tenants").select("credit_balance").eq("api_key", "nx-live-docfinance-2026").execute()
+                if t_res.data:
+                    saldo = t_res.data[0]['credit_balance']
+                    st.metric("Crediti Disponibili", f"{saldo} / 5000")
+                
+                # Ultime 3 analisi registrate
+                st.write("Ultime attività:")
+                l_res = supabase.table("analysis_logs").select("company_name, z_score, created_at").order("created_at", desc=True).limit(3).execute()
+                if l_res.data:
+                    st.dataframe(pd.DataFrame(l_res.data), use_container_width=True)
+            except:
+                st.write("In attesa di dati...")
