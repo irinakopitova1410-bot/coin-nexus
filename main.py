@@ -2,10 +2,11 @@ import os
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from supabase import create_client, Client
+import datetime
 
-# Queste devono essere impostate su Render nelle Environment Variables
-url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
-key = os.environ.get("sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos")
+# Prendi questi da Render -> Settings -> Environment Variables
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
 app = FastAPI()
@@ -18,26 +19,36 @@ class ScoringRequest(BaseModel):
 
 @app.post("/v1/scoring/analyze")
 async def analyze(data: ScoringRequest, x_api_key: str = Header(None)):
-    # 1. CERCA IL CLIENTE NELLA TABELLA CHE VEDO NELLA TUA FOTO
+    # 1. Trova il cliente
     res = supabase.table("tenants").select("*").eq("api_key", x_api_key).execute()
-    
     if not res.data:
         raise HTTPException(status_code=403, detail="API Key non valida")
     
     tenant = res.data[0]
 
-    # 2. CALCOLO LOGICA NEXUS
+    # 2. Calcola lo Z-Score (Logica Nexus)
+    # Esempio semplificato:
     z = (1.2 * (data.revenue * 0.1 / data.total_debt)) + (3.3 * (data.ebitda / data.total_debt))
-    
-    # 3. SALVA IL LOG (così la tabella analysis_logs si riempie!)
+    pd = 1 / (1 + (z**2.5))
+
+    # 3. SCRIVI NELLA TABELLA CHE STAI GUARDANDO (analysis_logs)
     supabase.table("analysis_logs").insert({
         "tenant_id": tenant['id'],
         "company_name": data.company_name,
-        "z_score": round(z, 2)
+        "z_score": round(z, 2),
+        "pd_rate": round(pd * 100, 2),
+        "status_code": 200
     }).execute()
+
+    # 4. SCALA IL CREDITO
+    new_balance = tenant['credit_balance'] - 1
+    supabase.table("tenants").update({"credit_balance": new_balance}).eq("id", tenant['id']).execute()
 
     return {
         "status": "success",
-        "score": round(z, 2),
-        "message": f"Analisi completata per {tenant['name']}"
+        "results": {
+            "score": round(z, 2),
+            "rating": "SOLIDO" if z > 2.6 else "VULNERABILE",
+            "credits_left": new_balance
+        }
     }
