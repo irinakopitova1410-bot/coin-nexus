@@ -13,7 +13,7 @@ st.set_page_config(page_title="Nexus Enterprise | SaaS Hub", layout="wide", page
 def init_supabase():
     try:
         url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
-        key = st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
+        key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk"]
         return create_client(url, key)
     except:
         return None
