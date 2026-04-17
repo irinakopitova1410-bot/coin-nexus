@@ -6,7 +6,7 @@ import datetime
 
 # Prendi questi da Render -> Settings -> Environment Variables
 url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
-key = os.environ.get("sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos")
+key = os.environ.get("nx-live-docfinance-2026")
 supabase: Client = create_client(url, key)
 
 app = FastAPI()
