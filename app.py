@@ -121,20 +121,35 @@ if st.button("🚀 ESEGUI ANALISI GLOBALE", use_container_width=True):
         st.subheader("📜 Admin Panel - Data Logs")
         st.json(res)
 # --- COLLEGAMENTO REALE AL MOTORE SU RENDER ---
+# --- INTEGRAZIONE DOC-FINANCE (SOLO PER ADMIN) ---
 if st.session_state.auth_user['role'] == "admin":
     st.divider()
-    st.header("🔌 Doc-Finance Enterprise Integration")   
+    st.header("🔌 Doc-Finance Enterprise Integration")
+    
+    # Il tuo link reale di Render
     url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
     
     col_api, col_log = st.columns([1.5, 1])
 
     with col_api:
         st.subheader("📡 Nexus Engine Live")
-        st.info(f"Connesso a: {url_render}")
+        st.info(f"Connesso al backend professionale: {url_render}")
         
-        if st.button("🚀 Invia Dati al Motore Render"):
+        # Mostriamo cosa stiamo per inviare (molto utile per la demo)
+        st.code(f"""
+        POST /v1/scoring/analyze
+        X-API-KEY: nx-live-docfinance-2026
+        
+        {{
+            "revenue": {rev_in},
+            "ebitda": {ebit_in},
+            "total_debt": {pfn_in}
+        }}
+        """, language="json")
+        
+        if st.button("🚀 PUSH TO DOC-FINANCE (Render)"):
             import requests
-            # Usiamo la chiave che hai impostato su Render
+            # Usiamo la chiave che hai impostato nelle Environment Variables di Render
             headers = {"x-api-key": "nx-live-docfinance-2026"}
             payload = {
                 "revenue": rev_in, 
@@ -142,18 +157,18 @@ if st.session_state.auth_user['role'] == "admin":
                 "total_debt": pfn_in
             }
             
-            with st.spinner("Interrogando l'algoritmo su Render..."):
+            with st.spinner("L'algoritmo sta calcolando su Render..."):
                 try:
                     response = requests.post(url_render, json=payload, headers=headers)
                     if response.status_code == 200:
-                        st.success("✅ RISPOSTA RICEVUTA!")
-                        st.json(response.json()) # Qui vedrai il Rating e lo Score calcolati dal backend
+                        st.success("✅ RISPOSTA RICEVUTA DAL MOTORE!")
+                        st.json(response.json()) # Qui vedrai il Rating calcolato dal backend FastAPI
                     else:
                         st.error(f"Errore {response.status_code}: Controlla la API Key su Render")
                 except Exception as e:
-                    st.error("Il server non risponde. Controlla che Render non sia in modalità sleep.")
+                    st.error("Il server non risponde. Verifica che il deploy su Render sia 'Live'.")
 
     with col_log:
-        st.subheader("📜 System Logs")
-        st.write("Monitoraggio chiamate API in tempo reale")
-        st.code(f"POST /v1/scoring/analyze\nTenant: DocFinance_Srl\nStatus: Connected", language="text")
+        st.subheader("📜 System Audit")
+        st.write("Tracciamento chiamate API")
+        st.code(f"TIMESTAMP: {datetime.datetime.now()}\nTENANT: DocFinance_Srl\nENDPOINT: /analyze\nSTATUS: ACTIVE", language="text")
