@@ -5,7 +5,7 @@ from supabase import create_client, Client
 import datetime
 
 # Prendi questi da Render -> Settings -> Environment Variables
-url = os.environ.get("SUPABASE_URL")
+url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
 key = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
