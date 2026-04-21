@@ -128,7 +128,7 @@ if st.session_state.auth_user['role'] == "admin":
     st.divider()
     st.header("🔌 Doc-Finance Enterprise Integration")
     
-DEVE finire con /v1/scoring/analyze
+# L'URL del tuo server su Render (Assicurati che sia tra virgolette!)
 url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
     
     col_api, col_log = st.columns([1.5, 1])
