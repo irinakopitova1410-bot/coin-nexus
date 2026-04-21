@@ -128,8 +128,8 @@ if st.session_state.auth_user['role'] == "admin":
     st.divider()
     st.header("🔌 Doc-Finance Enterprise Integration")
     
-   # L'URL del tuo server su Render (Assicurati che sia tra virgolette!)
-   url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
+    # URL del server su Render
+    url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
     
     col_api, col_log = st.columns([1.5, 1])
 
@@ -137,25 +137,23 @@ if st.session_state.auth_user['role'] == "admin":
         st.subheader("📡 Nexus Engine Live")
         st.info(f"Connesso al backend professionale: {url_render}")
         
-# Mostriamo cosa stiamo per inviare (molto utile per la demo)
+        # Mostriamo cosa stiamo per inviare (molto utile per la demo)
         st.code(f"""
-        POST /v1/scoring/analyze
-        X-API-KEY: nx-live-docfinance-2026
-        
-        {{
-            "company_name": "{nome_az}",
-            "revenue": {rev_in},
-            "ebitda": {ebit_in},
-            "total_debt": {pfn_in}
-        }}
+POST /v1/scoring/analyze
+X-API-KEY: nx-live-docfinance-2026
+
+{{
+    "company_name": "{nome_az}",
+    "revenue": {rev_in},
+    "ebitda": {ebit_in},
+    "total_debt": {pfn_in}
+}}
         """, language="json")
         
         if st.button("🚀 PUSH TO DOC-FINANCE (Render)"):
             import requests
-            # L'intestazione deve contenere la chiave che il server cercherà
             headers = {"x-api-key": "nx-live-docfinance-2026"}
             
-            # Il payload DEVE avere gli stessi nomi definiti in ScoringRequest su main.py
             payload = {
                 "company_name": nome_az,
                 "revenue": float(rev_in), 
@@ -165,7 +163,6 @@ if st.session_state.auth_user['role'] == "admin":
             
             with st.spinner("L'algoritmo sta calcolando su Render..."):
                 try:
-                    # Assicurati che url_render finisca con /v1/scoring/analyze
                     response = requests.post(url_render, json=payload, headers=headers)
                     
                     if response.status_code == 200:
@@ -173,10 +170,22 @@ if st.session_state.auth_user['role'] == "admin":
                         st.json(response.json()) 
                         st.balloons()
                     elif response.status_code == 500:
-                        st.error("❌ Errore 500: Il server Render ha un problema di connessione a Supabase. Controlla le Environment Variables su Render.")
+                        st.error("❌ Errore 500: Il server Render ha un problema di connessione a Supabase.")
                     elif response.status_code == 403:
-                        st.error("❌ Errore 403: API Key 'nx-live-docfinance-2026' non trovata nel database Supabase.")
+                        st.error("❌ Errore 403: API Key non valida.")
                     else:
                         st.error(f"Errore {response.status_code}: {response.text}")
                 except Exception as e:
                     st.error(f"Il server non risponde all'indirizzo: {url_render}")
+
+    with col_log:
+        st.subheader("📊 Stato Partner")
+        if supabase:
+            try:
+                res_db = supabase.table("tenants").select("credit_balance").eq("api_key", "nx-live-docfinance-2026").execute()
+                if res_db.data:
+                    saldo = res_db.data[0]['credit_balance']
+                    st.metric("Saldo Crediti", f"{saldo} / 5000")
+                    st.progress(saldo / 5000)
+            except:
+                st.warning("Dati saldo non disponibili")
