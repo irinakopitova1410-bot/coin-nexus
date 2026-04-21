@@ -12,10 +12,12 @@ st.set_page_config(page_title="Nexus Enterprise | SaaS Hub", layout="wide", page
 @st.cache_resource
 def init_supabase():
     try:
-        url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
-        key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk"]
+        # Qui usiamo i NOMI delle variabili, NON i valori reali
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
         return create_client(url, key)
-    except:
+    except Exception as e:
+        st.error(f"Errore configurazione Secrets: {e}")
         return None
 
 supabase = init_supabase()
