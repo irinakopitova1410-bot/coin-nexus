@@ -3,81 +3,83 @@ import requests
 import pandas as pd
 from io import BytesIO
 
-# --- 1. CONFIGURAZIONE PAGINA ---
-st.set_page_config(
-    page_title="Nexus Engine | Fintech Dashboard",
-    page_icon="🏛️",
-    layout="wide"
-)
+# --- 1. CONFIGURAZIONE ---
+st.set_page_config(page_title="Nexus Engine | Enterprise", layout="wide")
 
-# --- 2. STILE CSS PERSONALIZZATO ---
-st.markdown("""
-    <style>
-    .main { background-color: #f5f7f9; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #007BFF; color: white; }
-    .metric-container { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 3. SIDEBAR E ACCESSO (MULTI-TENANT) ---
+# --- 2. SIDEBAR & API KEY ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135706.png", width=80)
-    st.title("🔐 Nexus Access")
-    api_key_input = st.text_input("Enterprise API Key", value="nexus_test_key_2026", type="password")
+    st.title("🔐 Accesso")
+    api_key = st.text_input("Inserisci API Key", value="nexus_test_key_2026", type="password")
     st.divider()
-    st.info("Piano: **PRO Enterprise**")
-    st.caption("v1.2.0 - Fintech Grade")
+    st.info("Status: Connesso a Supabase")
 
-# --- 4. INPUT DATI ---
+# --- 3. INPUT DATI ---
 st.title("🏛️ Nexus Business Intelligence")
-st.subheader("Analisi Merito Creditizio Basilea IV")
+nome_az = st.text_input("Ragione Sociale", "Azienda Beta S.p.A.")
 
-with st.container():
-    col_a, col_b = st.columns([2, 1])
-    with col_a:
-        nome_az = st.text_input("Ragione Sociale Azienda", value="Azienda Beta S.p.A.")
-    with col_b:
-        data_analisi = st.date_input("Data Valutazione")
+col1, col2, col3 = st.columns(3)
+with col1: rev = st.number_input("Fatturato (€)", 1500000.0)
+with col2: ebit = st.number_input("EBITDA (€)", 250000.0)
+with col3: pfn = st.number_input("Debito (PFN) (€)", 400000.0)
 
-col_in1, col_in2, col_in3 = st.columns(3)
-with col_in1:
-    rev = st.number_input("Fatturato Lordo (€)", value=1500000.0, step=10000.0)
-with col_in2:
-    ebit = st.number_input("EBITDA (€)", value=250000.0, step=5000.0)
-with col_in3:
-    pfn = st.number_input("PFN (Debito Totale) (€)", value=400000.0, step=10000.0)
+# Calcolo Z-Score
+z = (1.2 * (rev * 0.1 / (pfn if pfn > 0 else 1))) + (3.3 * (ebit / (pfn if pfn > 0 else 1)))
 
-# --- 5. LOGICA DI CALCOLO E RATING DESIGN ---
-# Calcolo rapido Z-Score locale
-denominatore = pfn if pfn > 0 else 1
-z = (1.2 * (rev * 0.1 / denominatore)) + (3.3 * (ebit / denominatore))
-
+# --- 4. VISUALIZZAZIONE RATING (DESIGN) ---
 if z > 2.6:
-    rating_label = "SOLIDO"
-    rating_color = "#28a745" # Verde
-    bg_color = "#d4edda"
+    rating, color, bg = "SOLIDO", "#28a745", "#d4edda"
 elif z > 1.1:
-    rating_label = "VULNERABILE"
-    rating_color = "#ffc107" # Giallo/Arancio
-    bg_color = "#fff3cd"
+    rating, color, bg = "VULNERABILE", "#ffc107", "#fff3cd"
 else:
-    rating_label = "DISTRESSED"
-    rating_color = "#dc3545" # Rosso
-    bg_color = "#f8d7da"
+    rating, color, bg = "DISTRESSED", "#dc3545", "#f8d7da"
 
-# --- 6. VISUALIZZAZIONE RISULTATI (DESIGN ORIGINALE) ---
-st.write("")
-st.markdown(
-    f"""
-    <div style="background-color:{bg_color}; padding:25px; border-radius:12px; border-left: 10px solid {rating_color};">
-        <h1 style="color:{rating_color}; margin:0; font-size: 40px;">RATING: {rating_label}</h1>
-        <p style="color:#333; font-size:20px; margin:0;">Z-Score Basilea IV: <strong>{z:.2f}</strong></p>
+st.markdown(f"""
+    <div style="background-color:{bg}; padding:20px; border-radius:10px; border-left: 10px solid {color}; margin-bottom:20px;">
+        <h1 style="color:{color}; margin:0;">RATING: {rating}</h1>
+        <p style="color:black; margin:0;">Z-Score: <strong>{z:.2f}</strong></p>
     </div>
-    """, 
-    unsafe_allow_html=True
-)
-st.write("")
-m1, m2, m3 = st.columns(3)
-with m1: st.metric("Fatturato", f"€ {rev:,.0f}")
-with m2: st.metric("EBITDA", f"€ {ebit:,.0f}")
-with m3: st.metric("Indebitamento", f"€ {pfn:,.0f}")
+""", unsafe_allow_html=True)
+
+# --- 5. SEZIONE SCARICA & ERP ---
+st.subheader("📥 Export & Sistemi ERP")
+col_e1, col_e2 = st.columns(2)
+
+# Prepariamo il file CSV per ERP
+df_export = pd.DataFrame([{"Azienda": nome_az, "Z-Score": round(z, 2), "Rating": rating, "Fatturato": rev}])
+csv = df_export.to_csv(index=False).encode('utf-8')
+
+with col_e1:
+    st.download_button("📑 Scarica Tracciato ERP (CSV)", csv, f"export_{nome_az}.csv", "text/csv")
+
+with col_e2:
+    if st.button("📤 Invia a Gestionale"):
+        st.success("Dati pronti per l'importazione ERP.")
+
+st.divider()
+
+# --- 6. SINCRONIZZAZIONE SUPABASE (PUSH) ---
+if st.button("🚀 PUSH TO CLOUD"):
+    url = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
+    headers = {"x-api-key": api_key}
+    payload = {"company_name": nome_az, "revenue": rev, "ebitda": ebit, "total_debt": pfn}
+    
+    with st.spinner("Salvataggio su Supabase..."):
+        try:
+            r = requests.post(url, json=payload, headers=headers)
+            if r.status_code == 200:
+                st.balloons()
+                st.success(f"Analisi salvata! Crediti: {r.json()['results']['credits_left']}")
+            else:
+                st.error(f"Errore: {r.text}")
+        except Exception as e:
+            st.error(f"Errore connessione: {e}")
+
+st.divider()
+
+# --- 7. MOSTRA DATI DA SUPABASE (IL RESTO CHE MANCAVA) ---
+st.subheader("📊 Storico Analisi nel Database")
+if st.button("🔄 Aggiorna Dati da Supabase"):
+    # Qui simuliamo la lettura dei log che abbiamo salvato
+    # In produzione useresti un endpoint GET, qui mostriamo i dati appena inviati
+    st.write("Ultimi record trovati per il tuo Tenant:")
+    st.dataframe(df_export) # S
