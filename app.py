@@ -72,14 +72,27 @@ with col_json:
 with col_api:
     st.warning("🔗 Enterprise Integration (Render + Supabase)")
     st.write("Invia questa analisi al database centralizzato di Doc-Finance.")
-    
-    if st.button("🚀 PUSH TO DOC-FINANCE"):
-        # URL del tuo backend su Render
+if st.button("🚀 PUSH TO DOC-FINANCE"):
         url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
-        # API Key che abbiamo verificato su Supabase
         headers = {"x-api-key": "nexus_test_key_2026"}
         
         with st.spinner("Connessione al server Render in corso..."):
             try:
-                # Chiamata API al backend
-                response = requests.
+                # La riga che dava errore ora è completa:
+                response = requests.post(url_render, json=payload_demo, headers=headers)
+                
+                if response.status_code == 200:
+                    res_data = response.json()
+                    st.success("✅ Sincronizzazione Riuscita!")
+                    st.balloons()
+                    
+                    st.write(f"**Status:** {res_data['status']}")
+                    st.metric("Crediti Residui Partner", res_data['results']['credits_left'])
+                
+                elif response.status_code == 403:
+                    st.error("❌ Errore 403: API Key non valida.")
+                else:
+                    st.error(f"Errore {response.status_code}: {response.text}")
+                    
+            except Exception as e:
+                st.error(f"Impossibile raggiungere il server: {e}")
