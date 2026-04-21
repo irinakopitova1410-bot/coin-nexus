@@ -101,56 +101,11 @@ with st.sidebar:
     pfn_in = st.number_input("Debito (€)", value=500000)
 
 st.title("🕵️ Credit Risk & Enterprise Intelligence")
-
-if st.button("🚀 ESEGUI ANALISI GLOBALE", use_container_width=True):
-    res = run_enterprise_analysis(rev_in, ebit_in, pfn_in)
-    
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f"<div style='background:{res['color']};padding:25px;border-radius:15px;text-align:center;color:white;'><h2>{res['status']}</h2></div>", unsafe_allow_html=True)
-    c2.metric("Altman Z-Score", f"{res['z']:.2f}")
-    c3.metric("Leva Finanziaria", f"{res['lev']:.2f}x")
-
-    st.divider()
-    st.subheader("🎯 Metriche Basilea IV (Credit Risk)")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Perdita Attesa (EL)", f"€ {res['el']:,.0f}")
-    m2.metric("Probabilità Default", f"{res['pd']:.2f}%")
-    m3.metric("Pricing Credito", f"{res['rate']:.2f}%")
-    # FUNZIONE SOLO PER ADMIN
-    if st.session_state.auth_user['role'] == "admin":
-        st.divider()
-        st.subheader("📜 Admin Panel - Data Logs")
-        st.json(res)
-# --- COLLEGAMENTO REALE AL MOTORE SU RENDER ---
-# --- INTEGRAZIONE DOC-FINANCE (SOLO PER ADMIN) ---
-if st.session_state.auth_user['role'] == "admin":
-    st.divider()
-    st.header("🔌 Doc-Finance Enterprise Integration")
-    
-    # URL del server su Render
-    url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
-    col_api, col_log = st.columns([1.5, 1])
-    with col_api:
-        st.subheader("📡 Nexus Engine Live")
-        st.info(f"Connesso al backend professionale: {url_render}")
-        
-        # Mostriamo cosa stiamo per inviare (molto utile per la demo)
-        st.code(f"""
-POST /v1/scoring/analyze
-X-API-KEY: nx-live-docfinance-2026
-
-{{
-    "company_name": "{nome_az}",
-    "revenue": {rev_in},
-    "ebitda": {ebit_in},
-    "total_debt": {pfn_in}
-}}
-        """, language="json")
-        
-        if st.button("🚀 PUSH TO DOC-FINANCE (Render)"):
+if st.button("🚀 PUSH TO DOC-FINANCE (Render)"):
             import requests
-           headers = {"x-api-key": "nexus_test_key_2026"}
+            # Allineamento perfetto: 12 spazi dal bordo sinistro
+            url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
+            headers = {"x-api-key": "nexus_test_key_2026"}
             
             payload = {
                 "company_name": nome_az,
@@ -170,20 +125,8 @@ X-API-KEY: nx-live-docfinance-2026
                     elif response.status_code == 500:
                         st.error("❌ Errore 500: Il server Render ha un problema di connessione a Supabase.")
                     elif response.status_code == 403:
-                        st.error("❌ Errore 403: API Key non valida.")
+                        st.error("❌ Errore 403: API Key non valida nel database.")
                     else:
                         st.error(f"Errore {response.status_code}: {response.text}")
                 except Exception as e:
                     st.error(f"Il server non risponde all'indirizzo: {url_render}")
-
-    with col_log:
-        st.subheader("📊 Stato Partner")
-        if supabase:
-            try:
-                res_db = supabase.table("tenants").select("credit_balance").eq("api_key", "nx-live-docfinance-2026").execute()
-                if res_db.data:
-                    saldo = res_db.data[0]['credit_balance']
-                    st.metric("Saldo Crediti", f"{saldo} / 5000")
-                    st.progress(saldo / 5000)
-            except:
-                st.warning("Dati saldo non disponibili")
