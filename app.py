@@ -128,8 +128,8 @@ if st.session_state.auth_user['role'] == "admin":
     st.divider()
     st.header("🔌 Doc-Finance Enterprise Integration")
     
-    # Il tuo link reale di Render
-    url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
+DEVE finire con /v1/scoring/analyze
+url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
     
     col_api, col_log = st.columns([1.5, 1])
 
