@@ -150,7 +150,7 @@ X-API-KEY: nx-live-docfinance-2026
         
         if st.button("🚀 PUSH TO DOC-FINANCE (Render)"):
             import requests
-            headers = {"x-api-key": "nx-live-docfinance-2026"}
+           headers = {"x-api-key": "nexus_test_key_2026"}
             
             payload = {
                 "company_name": nome_az,
