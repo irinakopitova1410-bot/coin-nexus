@@ -8,6 +8,7 @@ from supabase import create_client, Client
 # Qui NON incollare l'URL o la Chiave. Il codice le cercherà nelle etichette di Render.
 url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
 key = os.environ.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjA5NDE3MSwiZXhwIjoyMDkxNjcwMTcxfQ.hFsH0_JtDOTgsPUm-RhvcZRztXqQmafaHgfMN6WxcKk")
+
 # Inizializzazione sicura
 if not url or not key:
     print("ERRORE: Variabili d'ambiente SUPABASE_URL o SUPABASE_KEY non trovate!")
