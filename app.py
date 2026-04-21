@@ -1,127 +1,85 @@
 import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-from fpdf import FPDF
-from supabase import create_client, Client
-import datetime
-import io
+import requests
 
-# --- 1. CONFIGURAZIONE ---
-st.set_page_config(page_title="Nexus Enterprise | SaaS Hub", layout="wide", page_icon="🏛️")
+# --- 1. CONFIGURAZIONE PAGINA ---
+st.set_page_config(page_title="Nexus Engine | Business Intelligence", layout="wide")
 
-@st.cache_resource
-def init_supabase():
-    try:
-        # Qui usiamo i NOMI delle variabili, NON i valori reali
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
-        return create_client(url, key)
-    except Exception as e:
-        st.error(f"Errore configurazione Secrets: {e}")
-        return None
+# --- 2. INIZIALIZZAZIONE VARIABILI (Evita NameError) ---
+# Definiamo i valori di default in modo che le variabili esistano sempre
+nome_az = "Azienda Demo S.r.l."
+rev_in = 1000000.0
+ebit_in = 150000.0
+pfn_in = 500000.0
 
-supabase = init_supabase()
-
-# --- 2. LOGICA DI AUTENTICAZIONE IBRIDA ---
-def login_logic(email_input, pwd_input):
-    # --- ADMIN PROVVISORIO (BACKDOOR) ---
-    # Cambia queste due stringhe con la mail e pass che vuoi usare tu per i test
-    ADMIN_MAIL = "admin@test.it" 
-    ADMIN_PASS = "nexus2026"
-
-    if email_input == ADMIN_MAIL and pwd_input == ADMIN_PASS:
-        return {"email": ADMIN_MAIL, "role": "admin"}
-    
-    # --- LOGIN STANDARD TRAMITE SUPOBASE ---
-    if supabase:
-        try:
-            res = supabase.auth.sign_in_with_password({"email": email_input, "password": pwd_input})
-            if res:
-                return {"email": res.user.email, "role": "user"}
-        except:
-            return None
-    return None
-
-# --- 3. MOTORE ANALISI ENTERPRISE ---
-def run_enterprise_analysis(rev, ebitda, debt):
-    rev = max(rev, 1)
-    eb_val = max(ebitda, 1)
-    db_val = max(debt, 1)
-    z = (1.2 * (rev*0.1/db_val)) + (3.3 * (eb_val/db_val))
-    pd_rate = max(0.005, min(0.99, 1 / (1 + (z**2.5)))) 
-    ead = rev * 0.15 
-    expected_loss = ead * pd_rate * 0.45 
-    suggested_rate = (0.04 + pd_rate + 0.03) * 100 
-    
-    status = "SOLIDO" if z > 2.6 else "VULNERABILE" if z > 1.1 else "DISTRESSED"
-    color = "#00CC66" if z > 2.6 else "#FFA500" if z > 1.1 else "#FF4B4B"
-    
-    return {
-        "z": z, "status": status, "color": color, 
-        "pd": pd_rate * 100, "el": expected_loss, "rate": suggested_rate,
-        "ros": (eb_val/rev)*100, "lev": debt/eb_val
-    }
-
-# --- 4. SCHERMATA LOGIN ---
-if 'auth_user' not in st.session_state:
-    st.session_state.auth_user = None
-
-if st.session_state.auth_user is None:
-    st.title("🏛️ Nexus Enterprise | Login")
-    email = st.text_input("Email")
-    pwd = st.text_input("Password", type="password")
-    
-    if st.button("Accedi al Sistema", use_container_width=True):
-        user_data = login_logic(email, pwd)
-        if user_data:
-            st.session_state.auth_user = user_data
-            st.success(f"Benvenuto {user_data['email']}!")
-            st.rerun()
-        else:
-            st.error("Credenziali non valide.")
-    st.stop()
-
-# --- 5. DASHBOARD POST-LOGIN ---
+# --- 3. SIDEBAR - INPUT DATI ---
 with st.sidebar:
-    st.title("🏛️ Nexus System")
-    st.write("### 📜 Admin Panel - Data Logs")
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135706.png", width=80)
+    st.header("📝 Input Dati Finanziari")
     
-    # Prepariamo i dati per l'integrazione
-    payload_demo = {
-        "company_name": nome_az,
-        "revenue": rev_in,
-        "ebitda": ebit_in,
-        "total_debt": pfn_in,
-        "z_score": round(z, 2),
-        "rating": "VULNERABILE" if z > 1.1 else "DISTRESSED" # Semplificato per brevità
-    }
+    nome_az = st.text_input("Ragione Sociale", value=nome_az)
+    rev_in = st.number_input("Fatturato (€)", value=rev_in, step=10000.0)
+    ebit_in = st.number_input("EBITDA (€)", value=ebit_in, step=5000.0)
+    pfn_in = st.number_input("Debito Totale (PFN) (€)", value=pfn_in, step=10000.0)
+    
+    st.divider()
+    st.caption("Nexus Engine v1.0.1 - Powered by Doc-Finance")
 
-    col_json, col_api = st.columns([1, 1.2])
+# --- 4. LOGICA DI CALCOLO LOCALE (Basilea IV) ---
+# Calcolo rapido dello Z-Score locale
+debt_safe = pfn_in if pfn_in > 0 else 1
+z_score_local = (1.2 * (rev_in * 0.1 / debt_safe)) + (3.3 * (ebit_in / debt_safe))
 
-    with col_json:
-        st.info("Dati pronti per API Export:")
-        st.json(payload_demo)
+if z_score_local > 2.6:
+    rating_local = "SOLIDO"
+    color = "green"
+elif z_score_local > 1.1:
+    rating_local = "VULNERABILE"
+    color = "orange"
+else:
+    rating_local = "DISTRESSED"
+    color = "red"
 
-    with col_api:
-        st.subheader("🚀 Enterprise Integration")
-        st.write("Invia i dati al motore esterno su Render:")
+# --- 5. DASHBOARD PRINCIPALE ---
+st.title("🏛️ Nexus Engine Dashboard")
+st.write(f"Analisi finanziaria per: **{nome_az}**")
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Fatturato", f"€ {rev_in:,.0f}")
+col2.metric("EBITDA", f"€ {ebit_in:,.0f}")
+col3.metric("Z-Score", f"{z_score_local:.2f}", delta=rating_local, delta_color="normal")
+
+st.divider()
+
+# --- 6. ADMIN PANEL & ENTERPRISE SYNC ---
+st.subheader("📜 Admin Panel - Data Logs & API")
+
+# Creiamo il pacchetto dati (Payload) completo come richiesto
+payload_demo = {
+    "company_name": nome_az,
+    "revenue": rev_in,
+    "ebitda": ebit_in,
+    "total_debt": pfn_in,
+    "z_score_local": round(z_score_local, 2),
+    "rating_local": rating_local
+}
+
+col_json, col_api = st.columns([1, 1])
+
+with col_json:
+    st.info("📦 JSON Payload pronto per l'export:")
+    st.json(payload_demo)
+
+with col_api:
+    st.warning("🔗 Enterprise Integration (Render + Supabase)")
+    st.write("Invia questa analisi al database centralizzato di Doc-Finance.")
+    
+    if st.button("🚀 PUSH TO DOC-FINANCE"):
+        # URL del tuo backend su Render
+        url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
+        # API Key che abbiamo verificato su Supabase
+        headers = {"x-api-key": "nexus_test_key_2026"}
         
-        if st.button("🔗 PUSH TO DOC-FINANCE"):
-            import requests
-            url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
-            headers = {"x-api-key": "nexus_test_key_2026"}
-            
-            with st.spinner("Sincronizzazione in corso..."):
-                try:
-                    # Inviamo esattamente i dati che mancano nel tuo screenshot
-                    response = requests.post(url_render, json=payload_demo, headers=headers)
-                    if response.status_code == 200:
-                        st.success("Sincronizzazione Completata!")
-                        st.balloons()
-                        data_back = response.json()
-                        st.metric("Crediti Residui", data_back['results']['credits_left'])
-                    else:
-                        st.error(f"Errore {response.status_code}: {response.text}")
-                except Exception as e:
-                    st.error(f"Errore di connessione: {e}")
-                 
+        with st.spinner("Connessione al server Render in corso..."):
+            try:
+                # Chiamata API al backend
+                response = requests.
