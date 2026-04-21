@@ -15,8 +15,8 @@ st.set_page_config(
 @st.cache_resource
 def init_supabase():
     return create_client(
-        st.secrets["SUPABASE_URL"],
-        st.secrets["SUPABASE_ANON_KEY"]
+        st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"],
+        st.secrets["sb_publishable_HasWDK8G-d09qqpGEA-syw_sCPBhpos"]
     )
 
 supabase = init_supabase()
@@ -75,7 +75,7 @@ st.title("🕵️ Credit Risk & Enterprise Intelligence")
 
 # --- API CONFIG ---
 API_URL = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
-API_KEY = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQxNzEsImV4cCI6MjA5MTY3MDE3MX0.HRFDqEKVCygVSKByVupgK3XGIkkpxxCyO7PH4LucPZg"]
+API_KEY = st.secrets["nx-live-docfinance-2026"]
 
 payload = {
     "company_name": nome_az,
