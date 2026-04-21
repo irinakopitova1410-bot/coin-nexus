@@ -20,7 +20,9 @@ except Exception as e:
     supabase = None
 
 app = FastAPI()
-
+@app.get("/")
+def read_root():
+    return {"status": "Nexus Engine Online", "message": "Benvenuto nel motore di calcolo"}
 # --- 2. CORS (Per permettere a Streamlit di parlare con Render) ---
 app.add_middleware(
     CORSMiddleware,
