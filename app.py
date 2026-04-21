@@ -1,98 +1,70 @@
 import streamlit as st
 import requests
+import pandas as pd
+from io import BytesIO
 
-# --- 1. CONFIGURAZIONE PAGINA ---
-st.set_page_config(page_title="Nexus Engine | Business Intelligence", layout="wide")
+# --- CONFIGURAZIONE ---
+st.set_page_config(page_title="Nexus Fintech Platform", layout="wide")
 
-# --- 2. INIZIALIZZAZIONE VARIABILI (Evita NameError) ---
-# Definiamo i valori di default in modo che le variabili esistano sempre
-nome_az = "Azienda Demo S.r.l."
-rev_in = 1000000.0
-ebit_in = 150000.0
-pfn_in = 500000.0
-
-# --- 3. SIDEBAR - INPUT DATI ---
+# --- SIMULAZIONE MULTI-TENANT (LOGIN) ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135706.png", width=80)
-    st.header("📝 Input Dati Finanziari")
-    
-    nome_az = st.text_input("Ragione Sociale", value=nome_az)
-    rev_in = st.number_input("Fatturato (€)", value=rev_in, step=10000.0)
-    ebit_in = st.number_input("EBITDA (€)", value=ebit_in, step=5000.0)
-    pfn_in = st.number_input("Debito Totale (PFN) (€)", value=pfn_in, step=10000.0)
-    
+    st.title("🔐 Accesso Partner")
+    api_key_input = st.text_input("Inserisci la tua API Key Enterprise", value="nexus_test_key_2026", type="password")
     st.divider()
-    st.caption("Nexus Engine v1.0.1 - Powered by Doc-Finance")
 
-# --- 4. LOGICA DI CALCOLO LOCALE (Basilea IV) ---
-# Calcolo rapido dello Z-Score locale
-debt_safe = pfn_in if pfn_in > 0 else 1
-z_score_local = (1.2 * (rev_in * 0.1 / debt_safe)) + (3.3 * (ebit_in / debt_safe))
+# --- INPUT DATI ---
+st.title("🏛️ Nexus Engine | Fintech Dashboard")
+nome_az = st.text_input("Ragione Sociale Cliente", "Azienda Beta S.p.A.")
 
-if z_score_local > 2.6:
-    rating_local = "SOLIDO"
-    color = "green"
-elif z_score_local > 1.1:
-    rating_local = "VULNERABILE"
-    color = "orange"
-else:
-    rating_local = "DISTRESSED"
-    color = "red"
+col_in1, col_in2, col_in3 = st.columns(3)
+with col_in1: rev = st.number_input("Fatturato (€)", 1500000.0)
+with col_in2: ebit = st.number_input("EBITDA (€)", 250000.0)
+with col_in3: pfn = st.number_input("PFN (Debito) (€)", 400000.0)
 
-# --- 5. DASHBOARD PRINCIPALE ---
-st.title("🏛️ Nexus Engine Dashboard")
-st.write(f"Analisi finanziaria per: **{nome_az}**")
+# Calcolo locale rapido
+z = (1.2 * (rev * 0.1 / (pfn if pfn > 0 else 1))) + (3.3 * (ebit / (pfn if pfn > 0 else 1)))
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Fatturato", f"€ {rev_in:,.0f}")
-col2.metric("EBITDA", f"€ {ebit_in:,.0f}")
-col3.metric("Z-Score", f"{z_score_local:.2f}", delta=rating_local, delta_color="normal")
+# --- EXPORT ERP & SCARICA DATI ---
+st.subheader("📥 Export ERP & Reporting")
+col_down1, col_down2, col_down3 = st.columns(3)
 
+# Prepariamo i dati per l'export
+df_erp = pd.DataFrame([{
+    "ID_CLIENTE": nome_az,
+    "FATTURATO": rev,
+    "EBITDA": ebit,
+    "PFN": pfn,
+    "Z_SCORE": round(z, 2),
+    "DATA": "2026-04-21"
+}])
+
+with col_down1:
+    csv = df_erp.to_csv(index=False).encode('utf-8')
+    st.download_button("📑 Scarica Tracciato ERP (CSV)", csv, f"erp_export_{nome_az}.csv", "text/csv")
+
+with col_down2:
+    # Simulazione integrazione SAP/Doc-Finance
+    if st.button("📤 Invia a Gestionale (ERP)"):
+        st.success(f"Dati di {nome_az} inviati al webservice ERP con successo!")
+
+with col_down3:
+    st.info("💎 Piano: PRO (Illimitato)")
+
+# --- INTEGRAZIONE RENDER (IL CUORE DEL SISTEMA) ---
 st.divider()
-
-# --- 6. ADMIN PANEL & ENTERPRISE SYNC ---
-st.subheader("📜 Admin Panel - Data Logs & API")
-
-# Creiamo il pacchetto dati (Payload) completo come richiesto
-payload_demo = {
-    "company_name": nome_az,
-    "revenue": rev_in,
-    "ebitda": ebit_in,
-    "total_debt": pfn_in,
-    "z_score_local": round(z_score_local, 2),
-    "rating_local": rating_local
-}
-
-col_json, col_api = st.columns([1, 1])
-
-with col_json:
-    st.info("📦 JSON Payload pronto per l'export:")
-    st.json(payload_demo)
-
-with col_api:
-    st.warning("🔗 Enterprise Integration (Render + Supabase)")
-    st.write("Invia questa analisi al database centralizzato di Doc-Finance.")
-if st.button("🚀 PUSH TO DOC-FINANCE"):
-        url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
-        headers = {"x-api-key": "nexus_test_key_2026"}
-        
-        with st.spinner("Connessione al server Render in corso..."):
-            try:
-                # La riga che dava errore ora è completa:
-                response = requests.post(url_render, json=payload_demo, headers=headers)
-                
-                if response.status_code == 200:
-                    res_data = response.json()
-                    st.success("✅ Sincronizzazione Riuscita!")
-                    st.balloons()
-                    
-                    st.write(f"**Status:** {res_data['status']}")
-                    st.metric("Crediti Residui Partner", res_data['results']['credits_left'])
-                
-                elif response.status_code == 403:
-                    st.error("❌ Errore 403: API Key non valida.")
-                else:
-                    st.error(f"Errore {response.status_code}: {response.text}")
-                    
-            except Exception as e:
-                st.error(f"Impossibile raggiungere il server: {e}")
+if st.button("🚀 PUSH TO CLOUD & SYNC DB"):
+    url = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
+    headers = {"x-api-key": api_key_input}
+    payload = {"company_name": nome_az, "revenue": rev, "ebitda": ebit, "total_debt": pfn}
+    
+    with st.spinner("Sincronizzazione crittografata in corso..."):
+        try:
+            r = requests.post(url, json=payload, headers=headers)
+            if r.status_code == 200:
+                res = r.json()
+                st.balloons()
+                st.success(f"Analisi salvata! Crediti residui: {res['results']['credits_left']}")
+            else:
+                st.error(f"Errore: {r.text}")
+        except Exception as e:
+            st.error(f"Connessione fallita: {e}")
