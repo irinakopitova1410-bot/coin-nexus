@@ -12,8 +12,8 @@ st.set_page_config(page_title="Nexus Enterprise | SaaS Hub", layout="wide", page
 def init_supabase():
     try:
         # Legge dai Secrets di Streamlit Cloud (Configurali nelle impostazioni di Streamlit!)
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
+        url = st.secrets["https://ipmttldwfsxuubugiyir.supabase.co"]
+        key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQxNzEsImV4cCI6MjA5MTY3MDE3MX0.HRFDqEKVCygVSKByVupgK3XGIkkpxxCyO7PH4LucPZg"]
         return create_client(url, key)
     except Exception as e:
         return None
