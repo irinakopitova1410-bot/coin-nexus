@@ -77,9 +77,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 st.write("")
-
-# Metriche Dashboard
 m1, m2, m3 = st.columns(3)
 with m1: st.metric("Fatturato", f"€ {rev:,.0f}")
 with m2: st.metric("EBITDA", f"€ {ebit:,.0f}")
-with m3: st.
+with m3: st.metric("Indebitamento", f"€ {pfn:,.0f}")
