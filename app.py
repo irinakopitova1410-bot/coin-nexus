@@ -84,49 +84,44 @@ if st.session_state.auth_user is None:
 # --- 5. DASHBOARD POST-LOGIN ---
 with st.sidebar:
     st.title("🏛️ Nexus System")
-    st.write(f"👤 **Sessione:** {st.session_state.auth_user['email']}")
+    st.write("### 📜 Admin Panel - Data Logs")
     
-    if st.session_state.auth_user['role'] == "admin":
-        st.success("⚡ MODO AMMINISTRATORE")
-    
-    if st.button("Logout"):
-        st.session_state.auth_user = None
-        st.rerun()
-    
-    st.divider()
-    uploaded_file = st.file_uploader("📂 Carica Bilancio ERP", type=["xlsx", "csv"])
-    nome_az = st.text_input("Azienda", "Target S.p.A.")
-    rev_in = st.number_input("Fatturato (€)", value=1500000)
-    ebit_in = st.number_input("EBITDA (€)", value=250000)
-    pfn_in = st.number_input("Debito (€)", value=500000)
+    # Prepariamo i dati per l'integrazione
+    payload_demo = {
+        "company_name": nome_az,
+        "revenue": rev_in,
+        "ebitda": ebit_in,
+        "total_debt": pfn_in,
+        "z_score": round(z, 2),
+        "rating": "VULNERABILE" if z > 1.1 else "DISTRESSED" # Semplificato per brevità
+    }
 
-st.title("🕵️ Credit Risk & Enterprise Intelligence")
-if st.button("🚀 PUSH TO DOC-FINANCE (Render)"):
+    col_json, col_api = st.columns([1, 1.2])
+
+    with col_json:
+        st.info("Dati pronti per API Export:")
+        st.json(payload_demo)
+
+    with col_api:
+        st.subheader("🚀 Enterprise Integration")
+        st.write("Invia i dati al motore esterno su Render:")
+        
+        if st.button("🔗 PUSH TO DOC-FINANCE"):
             import requests
-            # Allineamento perfetto: 12 spazi dal bordo sinistro
             url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
             headers = {"x-api-key": "nexus_test_key_2026"}
             
-            payload = {
-                "company_name": nome_az,
-                "revenue": float(rev_in), 
-                "ebitda": float(ebit_in), 
-                "total_debt": float(pfn_in)
-            }
-            
-            with st.spinner("L'algoritmo sta calcolando su Render..."):
+            with st.spinner("Sincronizzazione in corso..."):
                 try:
-                    response = requests.post(url_render, json=payload, headers=headers)
-                    
+                    # Inviamo esattamente i dati che mancano nel tuo screenshot
+                    response = requests.post(url_render, json=payload_demo, headers=headers)
                     if response.status_code == 200:
-                        st.success("✅ RISPOSTA RICEVUTA DAL MOTORE!")
-                        st.json(response.json()) 
+                        st.success("Sincronizzazione Completata!")
                         st.balloons()
-                    elif response.status_code == 500:
-                        st.error("❌ Errore 500: Il server Render ha un problema di connessione a Supabase.")
-                    elif response.status_code == 403:
-                        st.error("❌ Errore 403: API Key non valida nel database.")
+                        data_back = response.json()
+                        st.metric("Crediti Residui", data_back['results']['credits_left'])
                     else:
                         st.error(f"Errore {response.status_code}: {response.text}")
                 except Exception as e:
-                    st.error(f"Il server non risponde all'indirizzo: {url_render}")
+                    st.error(f"Errore di connessione: {e}")
+                 
