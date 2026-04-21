@@ -3,68 +3,83 @@ import requests
 import pandas as pd
 from io import BytesIO
 
-# --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Nexus Fintech Platform", layout="wide")
+# --- 1. CONFIGURAZIONE PAGINA ---
+st.set_page_config(
+    page_title="Nexus Engine | Fintech Dashboard",
+    page_icon="🏛️",
+    layout="wide"
+)
 
-# --- SIMULAZIONE MULTI-TENANT (LOGIN) ---
+# --- 2. STILE CSS PERSONALIZZATO ---
+st.markdown("""
+    <style>
+    .main { background-color: #f5f7f9; }
+    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #007BFF; color: white; }
+    .metric-container { background-color: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 3. SIDEBAR E ACCESSO (MULTI-TENANT) ---
 with st.sidebar:
-    st.title("🔐 Accesso Partner")
-    api_key_input = st.text_input("Inserisci la tua API Key Enterprise", value="nexus_test_key_2026", type="password")
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135706.png", width=80)
+    st.title("🔐 Nexus Access")
+    api_key_input = st.text_input("Enterprise API Key", value="nexus_test_key_2026", type="password")
     st.divider()
+    st.info("Piano: **PRO Enterprise**")
+    st.caption("v1.2.0 - Fintech Grade")
 
-# --- INPUT DATI ---
-st.title("🏛️ Nexus Engine | Fintech Dashboard")
-nome_az = st.text_input("Ragione Sociale Cliente", "Azienda Beta S.p.A.")
+# --- 4. INPUT DATI ---
+st.title("🏛️ Nexus Business Intelligence")
+st.subheader("Analisi Merito Creditizio Basilea IV")
+
+with st.container():
+    col_a, col_b = st.columns([2, 1])
+    with col_a:
+        nome_az = st.text_input("Ragione Sociale Azienda", value="Azienda Beta S.p.A.")
+    with col_b:
+        data_analisi = st.date_input("Data Valutazione")
 
 col_in1, col_in2, col_in3 = st.columns(3)
-with col_in1: rev = st.number_input("Fatturato (€)", 1500000.0)
-with col_in2: ebit = st.number_input("EBITDA (€)", 250000.0)
-with col_in3: pfn = st.number_input("PFN (Debito) (€)", 400000.0)
+with col_in1:
+    rev = st.number_input("Fatturato Lordo (€)", value=1500000.0, step=10000.0)
+with col_in2:
+    ebit = st.number_input("EBITDA (€)", value=250000.0, step=5000.0)
+with col_in3:
+    pfn = st.number_input("PFN (Debito Totale) (€)", value=400000.0, step=10000.0)
 
-# Calcolo locale rapido
-z = (1.2 * (rev * 0.1 / (pfn if pfn > 0 else 1))) + (3.3 * (ebit / (pfn if pfn > 0 else 1)))
+# --- 5. LOGICA DI CALCOLO E RATING DESIGN ---
+# Calcolo rapido Z-Score locale
+denominatore = pfn if pfn > 0 else 1
+z = (1.2 * (rev * 0.1 / denominatore)) + (3.3 * (ebit / denominatore))
 
-# --- EXPORT ERP & SCARICA DATI ---
-st.subheader("📥 Export ERP & Reporting")
-col_down1, col_down2, col_down3 = st.columns(3)
+if z > 2.6:
+    rating_label = "SOLIDO"
+    rating_color = "#28a745" # Verde
+    bg_color = "#d4edda"
+elif z > 1.1:
+    rating_label = "VULNERABILE"
+    rating_color = "#ffc107" # Giallo/Arancio
+    bg_color = "#fff3cd"
+else:
+    rating_label = "DISTRESSED"
+    rating_color = "#dc3545" # Rosso
+    bg_color = "#f8d7da"
 
-# Prepariamo i dati per l'export
-df_erp = pd.DataFrame([{
-    "ID_CLIENTE": nome_az,
-    "FATTURATO": rev,
-    "EBITDA": ebit,
-    "PFN": pfn,
-    "Z_SCORE": round(z, 2),
-    "DATA": "2026-04-21"
-}])
+# --- 6. VISUALIZZAZIONE RISULTATI (DESIGN ORIGINALE) ---
+st.write("")
+st.markdown(
+    f"""
+    <div style="background-color:{bg_color}; padding:25px; border-radius:12px; border-left: 10px solid {rating_color};">
+        <h1 style="color:{rating_color}; margin:0; font-size: 40px;">RATING: {rating_label}</h1>
+        <p style="color:#333; font-size:20px; margin:0;">Z-Score Basilea IV: <strong>{z:.2f}</strong></p>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
+st.write("")
 
-with col_down1:
-    csv = df_erp.to_csv(index=False).encode('utf-8')
-    st.download_button("📑 Scarica Tracciato ERP (CSV)", csv, f"erp_export_{nome_az}.csv", "text/csv")
-
-with col_down2:
-    # Simulazione integrazione SAP/Doc-Finance
-    if st.button("📤 Invia a Gestionale (ERP)"):
-        st.success(f"Dati di {nome_az} inviati al webservice ERP con successo!")
-
-with col_down3:
-    st.info("💎 Piano: PRO (Illimitato)")
-
-# --- INTEGRAZIONE RENDER (IL CUORE DEL SISTEMA) ---
-st.divider()
-if st.button("🚀 PUSH TO CLOUD & SYNC DB"):
-    url = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
-    headers = {"x-api-key": api_key_input}
-    payload = {"company_name": nome_az, "revenue": rev, "ebitda": ebit, "total_debt": pfn}
-    
-    with st.spinner("Sincronizzazione crittografata in corso..."):
-        try:
-            r = requests.post(url, json=payload, headers=headers)
-            if r.status_code == 200:
-                res = r.json()
-                st.balloons()
-                st.success(f"Analisi salvata! Crediti residui: {res['results']['credits_left']}")
-            else:
-                st.error(f"Errore: {r.text}")
-        except Exception as e:
-            st.error(f"Connessione fallita: {e}")
+# Metriche Dashboard
+m1, m2, m3 = st.columns(3)
+with m1: st.metric("Fatturato", f"€ {rev:,.0f}")
+with m2: st.metric("EBITDA", f"€ {ebit:,.0f}")
+with m3: st.
