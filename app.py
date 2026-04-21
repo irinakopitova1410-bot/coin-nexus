@@ -130,9 +130,7 @@ if st.session_state.auth_user['role'] == "admin":
     
     # URL del server su Render
     url_render = "https://nexus-api-rf76.onrender.com/v1/scoring/analyze"
-    
     col_api, col_log = st.columns([1.5, 1])
-
     with col_api:
         st.subheader("📡 Nexus Engine Live")
         st.info(f"Connesso al backend professionale: {url_render}")
