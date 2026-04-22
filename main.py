@@ -32,7 +32,7 @@ async def verify_access(x_api_key: str = Header(...)):
     return tenant.data
 
 # --- ENDPOINT CORE: ANALISI & ERP ---
-@app.post("/v1/analyze")
+@app.post("/analyze-finance")
 async def analyze_and_sync(request: AnalysisRequest, tenant: dict = Depends(verify_access)):
     # 1. Algoritmo Protetto (Basilea IV)
     denominatore = request.total_debt if request.total_debt > 0 else 1
