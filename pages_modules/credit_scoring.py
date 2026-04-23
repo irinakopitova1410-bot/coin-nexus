@@ -1,6 +1,7 @@
 import streamlit as st
 from engine.calculations import calculate_credit_score
 from utils.charts import radar_chart, bar_chart
+from utils.file_parser import parse_credit_file, get_credit_template_bytes
 from services.db import save_credit_report
 
 def show_credit_scoring():
@@ -11,29 +12,74 @@ def show_credit_scoring():
     </div>
     """, unsafe_allow_html=True)
 
-    company_name = st.text_input("Nome Azienda / Debitore", placeholder="Es: Mario Bianchi S.p.A.")
+    # ─── Upload File ──────────────────────────────────────────────────────────
+    st.subheader("📂 Carica Dati da File")
+    col_up, col_tmpl = st.columns([3, 1])
+    with col_up:
+        uploaded = st.file_uploader(
+            "Carica CSV o Excel con i dati finanziari",
+            type=["csv", "xlsx", "xls"],
+            help="Usa il template scaricabile per il formato corretto"
+        )
+    with col_tmpl:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.download_button(
+            "📥 Scarica Template CSV",
+            data=get_credit_template_bytes(),
+            file_name="template_credit_scoring.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
 
+    # Valori di default (modificati se arriva file)
+    defaults = {
+        "nome_azienda": "",
+        "ebit": 120000.0,
+        "depreciation": 30000.0,
+        "interest_expense": 20000.0,
+        "debt_repayment": 50000.0,
+        "total_debt": 400000.0,
+        "total_equity": 300000.0,
+        "ebitda": 150000.0,
+        "net_revenue": 900000.0,
+        "current_assets": 350000.0,
+        "current_liabilities": 200000.0,
+    }
+
+    if uploaded:
+        parsed = parse_credit_file(uploaded)
+        if parsed["success"]:
+            defaults.update(parsed)
+            st.success(f"✅ File caricato correttamente! Dati importati per: **{parsed.get('nome_azienda', 'Azienda')}**")
+        else:
+            st.error(f"❌ Errore nel file: {parsed['error']}. Verifica il formato con il template.")
+
+    st.markdown("---")
+
+    # ─── Inserimento Manuale ──────────────────────────────────────────────────
     st.subheader("📊 Dati Finanziari")
+    company_name = st.text_input("Nome Azienda / Debitore", value=defaults["nome_azienda"], placeholder="Es: Mario Bianchi S.p.A.")
+
     col1, col2, col3 = st.columns(3)
 
     with col1:
         st.markdown("**🔵 Reddito & Debito**")
-        ebit = st.number_input("EBIT (€)", value=120000.0, step=5000.0, format="%.0f")
-        depreciation = st.number_input("Ammortamenti (€)", min_value=0.0, value=30000.0, step=1000.0, format="%.0f")
-        interest_expense = st.number_input("Interessi passivi (€)", min_value=0.0, value=20000.0, step=1000.0, format="%.0f")
-        debt_repayment = st.number_input("Rimborso debito annuo (€)", min_value=0.0, value=50000.0, step=5000.0, format="%.0f")
+        ebit = st.number_input("EBIT (€)", value=float(defaults["ebit"]), step=5000.0, format="%.0f")
+        depreciation = st.number_input("Ammortamenti (€)", min_value=0.0, value=float(defaults["depreciation"]), step=1000.0, format="%.0f")
+        interest_expense = st.number_input("Interessi passivi (€)", min_value=0.0, value=float(defaults["interest_expense"]), step=1000.0, format="%.0f")
+        debt_repayment = st.number_input("Rimborso debito annuo (€)", min_value=0.0, value=float(defaults["debt_repayment"]), step=5000.0, format="%.0f")
 
     with col2:
         st.markdown("**🟡 Struttura Patrimoniale**")
-        total_debt = st.number_input("Debiti Finanziari Totali (€)", min_value=0.0, value=400000.0, step=10000.0, format="%.0f")
-        total_equity = st.number_input("Patrimonio Netto (€)", min_value=1.0, value=300000.0, step=10000.0, format="%.0f")
-        ebitda = st.number_input("EBITDA (€)", value=150000.0, step=5000.0, format="%.0f")
-        net_revenue = st.number_input("Ricavi Netti (€)", min_value=1.0, value=900000.0, step=10000.0, format="%.0f")
+        total_debt = st.number_input("Debiti Finanziari Totali (€)", min_value=0.0, value=float(defaults["total_debt"]), step=10000.0, format="%.0f")
+        total_equity = st.number_input("Patrimonio Netto (€)", min_value=1.0, value=float(defaults["total_equity"]), step=10000.0, format="%.0f")
+        ebitda = st.number_input("EBITDA (€)", value=float(defaults["ebitda"]), step=5000.0, format="%.0f")
+        net_revenue = st.number_input("Ricavi Netti (€)", min_value=1.0, value=float(defaults["net_revenue"]), step=10000.0, format="%.0f")
 
     with col3:
         st.markdown("**🟢 Liquidità**")
-        current_assets = st.number_input("Attivo Corrente (€)", min_value=0.0, value=350000.0, step=10000.0, format="%.0f")
-        current_liabilities = st.number_input("Passivo Corrente (€)", min_value=1.0, value=200000.0, step=10000.0, format="%.0f")
+        current_assets = st.number_input("Attivo Corrente (€)", min_value=0.0, value=float(defaults["current_assets"]), step=10000.0, format="%.0f")
+        current_liabilities = st.number_input("Passivo Corrente (€)", min_value=1.0, value=float(defaults["current_liabilities"]), step=10000.0, format="%.0f")
 
     st.markdown("---")
 
@@ -89,15 +135,15 @@ def show_credit_scoring():
         st.subheader("📏 Indicatori Chiave")
         m1, m2, m3, m4 = st.columns(4)
         dscr_c = "#4ADE80" if result.dscr >= 1.5 else "#FCD34D" if result.dscr >= 1.0 else "#F87171"
-        lev_c = "#4ADE80" if result.leverage <= 2 else "#FCD34D" if result.leverage <= 4 else "#F87171"
-        eb_c = "#4ADE80" if result.ebitda_margin >= 15 else "#FCD34D" if result.ebitda_margin >= 8 else "#F87171"
-        cr_c = "#4ADE80" if result.current_ratio >= 1.5 else "#FCD34D" if result.current_ratio >= 1.0 else "#F87171"
+        lev_c  = "#4ADE80" if result.leverage <= 2 else "#FCD34D" if result.leverage <= 4 else "#F87171"
+        eb_c   = "#4ADE80" if result.ebitda_margin >= 15 else "#FCD34D" if result.ebitda_margin >= 8 else "#F87171"
+        cr_c   = "#4ADE80" if result.current_ratio >= 1.5 else "#FCD34D" if result.current_ratio >= 1.0 else "#F87171"
 
         for col, label, val, color, suffix, desc in [
-            (m1, "DSCR", result.dscr, dscr_c, "x", "Soglia: ≥1.25"),
-            (m2, "Leverage D/E", result.leverage, lev_c, "x", "Soglia: ≤3.0"),
-            (m3, "EBITDA Margin", result.ebitda_margin, eb_c, "%", "Soglia: ≥10%"),
-            (m4, "Current Ratio", result.current_ratio, cr_c, "x", "Soglia: ≥1.2"),
+            (m1, "DSCR",          result.dscr,           dscr_c, "x", "Soglia: ≥1.25"),
+            (m2, "Leverage D/E",  result.leverage,        lev_c,  "x", "Soglia: ≤3.0"),
+            (m3, "EBITDA Margin", result.ebitda_margin,   eb_c,   "%", "Soglia: ≥10%"),
+            (m4, "Current Ratio", result.current_ratio,   cr_c,   "x", "Soglia: ≥1.2"),
         ]:
             with col:
                 st.markdown(f"""

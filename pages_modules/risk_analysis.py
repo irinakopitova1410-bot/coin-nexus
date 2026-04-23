@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from engine.calculations import altman_z_original, altman_z_prime, altman_z_doubleprime
 from utils.charts import gauge_chart, projection_chart
+from utils.file_parser import parse_zscore_file, get_zscore_template_bytes
 from services.db import save_risk_analysis
 
 def show_risk_analysis():
@@ -22,25 +23,68 @@ def show_risk_analysis():
 
     st.markdown("---")
 
+    # ─── Upload File ──────────────────────────────────────────────────────────
+    st.subheader("📂 Carica Dati da File")
+    col_up, col_tmpl = st.columns([3, 1])
+    with col_up:
+        uploaded = st.file_uploader(
+            "Carica CSV o Excel con i dati del bilancio",
+            type=["csv", "xlsx", "xls"],
+            help="Usa il template scaricabile per il formato corretto",
+            key="zscore_upload"
+        )
+    with col_tmpl:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.download_button(
+            "📥 Scarica Template CSV",
+            data=get_zscore_template_bytes(),
+            file_name="template_zscore.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+    # Valori di default
+    defaults = {
+        "nome_azienda": "",
+        "total_assets": 1000000.0,
+        "retained_earnings": 100000.0,
+        "ebit": 80000.0,
+        "working_capital": 150000.0,
+        "total_liabilities": 500000.0,
+        "equity_input": 500000.0,
+        "revenue": 800000.0,
+    }
+
+    if uploaded:
+        parsed = parse_zscore_file(uploaded)
+        if parsed["success"]:
+            defaults.update(parsed)
+            st.success(f"✅ File caricato! Dati importati per: **{parsed.get('nome_azienda', 'Azienda')}**")
+        else:
+            st.error(f"❌ Errore nel file: {parsed['error']}. Usa il template CSV.")
+
+    st.markdown("---")
+
+    # ─── Inserimento Dati ─────────────────────────────────────────────────────
     col1, col2 = st.columns([2, 1])
 
     with col1:
         st.subheader("📝 Dati Aziendali")
-        company_name = st.text_input("Nome Azienda", placeholder="Es: Rossi S.r.l.")
+        company_name = st.text_input("Nome Azienda", value=defaults["nome_azienda"], placeholder="Es: Rossi S.r.l.")
 
         colA, colB = st.columns(2)
         with colA:
-            total_assets = st.number_input("Totale Attivo (€)", min_value=0.0, value=1000000.0, step=10000.0, format="%.0f")
-            retained_earnings = st.number_input("Utili non distribuiti / Riserve (€)", value=100000.0, step=10000.0, format="%.0f")
-            ebit = st.number_input("EBIT — Reddito Operativo (€)", value=80000.0, step=5000.0, format="%.0f")
-            working_capital = st.number_input("Capitale Circolante Netto (€)", value=150000.0, step=10000.0, format="%.0f")
+            total_assets      = st.number_input("Totale Attivo (€)",                  min_value=0.0, value=float(defaults["total_assets"]),      step=10000.0, format="%.0f")
+            retained_earnings = st.number_input("Utili non distribuiti / Riserve (€)",               value=float(defaults["retained_earnings"]),   step=10000.0, format="%.0f")
+            ebit              = st.number_input("EBIT — Reddito Operativo (€)",                       value=float(defaults["ebit"]),                step=5000.0,  format="%.0f")
+            working_capital   = st.number_input("Capitale Circolante Netto (€)",                      value=float(defaults["working_capital"]),      step=10000.0, format="%.0f")
         with colB:
-            total_liabilities = st.number_input("Totale Passività (€)", min_value=1.0, value=500000.0, step=10000.0, format="%.0f")
+            total_liabilities = st.number_input("Totale Passività (€)",               min_value=1.0, value=float(defaults["total_liabilities"]),  step=10000.0, format="%.0f")
             if "Quotate" in model_choice:
-                equity_input = st.number_input("Market Cap (€)", value=600000.0, step=10000.0, format="%.0f")
+                equity_input  = st.number_input("Market Cap (€)",                                     value=float(defaults["equity_input"]),         step=10000.0, format="%.0f")
             else:
-                equity_input = st.number_input("Patrimonio Netto Contabile (€)", value=500000.0, step=10000.0, format="%.0f")
-            revenue = st.number_input("Ricavi Netti (€)", min_value=0.0, value=800000.0, step=10000.0, format="%.0f")
+                equity_input  = st.number_input("Patrimonio Netto Contabile (€)",                     value=float(defaults["equity_input"]),         step=10000.0, format="%.0f")
+            revenue           = st.number_input("Ricavi Netti (€)",                   min_value=0.0, value=float(defaults["revenue"]),             step=10000.0, format="%.0f")
 
     with col2:
         st.subheader("ℹ️ Come interpretare")
@@ -65,7 +109,7 @@ def show_risk_analysis():
                 result = altman_z_doubleprime(working_capital, total_assets, retained_earnings,
                                                ebit, equity_input, total_liabilities)
 
-            zone_bg = {"safe": "#14532D", "grey": "#422006", "distress": "#450A0A"}[result.zone]
+            zone_bg  = {"safe": "#14532D", "grey": "#422006", "distress": "#450A0A"}[result.zone]
             zone_txt = {"safe": "#4ADE80", "grey": "#FCD34D", "distress": "#F87171"}[result.zone]
 
             st.markdown(f"""
@@ -80,10 +124,7 @@ def show_risk_analysis():
 
             col1, col2 = st.columns(2)
             with col1:
-                st.plotly_chart(
-                    gauge_chart(result.z_score, "Z-Score", 0, 5, result.thresholds),
-                    use_container_width=True
-                )
+                st.plotly_chart(gauge_chart(result.z_score, "Z-Score", 0, 5, result.thresholds), use_container_width=True)
             with col2:
                 st.markdown(f"""
                 <div style="background:#1E293B;border-radius:12px;padding:20px;">
