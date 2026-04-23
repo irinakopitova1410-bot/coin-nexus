@@ -1,54 +1,46 @@
 import os
 from fastapi import FastAPI, BackgroundTasks, Header, HTTPException
 from supabase import create_client, Client
-from analytics import NexusAI  # Assicurati che il tuo file analytics.py sia presente
+from analytics import NexusAI
 
 app = FastAPI()
 ai_engine = NexusAI()
 
-# Configurazione Supabase
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-supabase: Client = create_client(url, key)
+# Connessione Supabase tramite ENV
+supabase: Client = create_client(
+    os.getenv("SUPABASE_URL"), 
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+)
+
+@app.get("/")
+def home():
+    return {"status": "Nexus AI Engine Online"}
 
 @app.post("/v1/analyze")
 async def start_analysis(data: dict, background_tasks: BackgroundTasks, x_api_key: str = Header(None)):
-    # Controllo Chiave di Sicurezza
     if x_api_key != "nx-live-docfinance-2026":
-        raise HTTPException(status_code=403, detail="Chiave non autorizzata")
+        raise HTTPException(status_code=403, detail="Chiave API Errata")
 
-    # 1. Registra l'inizio dell'analisi su Supabase
+    # 1. Creazione record "In Lavorazione"
     res = supabase.table("analisi_rischio").insert({
-        "nome_azienda": data.get("azienda", "Sconosciuta"),
-        "stato_rischio": "In elaborazione..."
+        "nome_azienda": data.get("azienda"),
+        "stato_rischio": "Analisi in corso...",
+        "completato": False
     }).execute()
     
     analysis_id = res.data[0]['id']
+    
+    # 2. Avvio calcolo pesante in background
+    background_tasks.add_task(process_data, analysis_id, data['records'])
 
-    # 2. Avvia il calcolo AI in background (senza bloccare il sito)
-    background_tasks.add_task(run_ai_logic, analysis_id, data['records'])
+    return {"id": analysis_id, "message": "Analisi avviata correttamente"}
 
-    return {
-        "status": "success", 
-        "id": analysis_id, 
-        "message": "Analisi avviata correttamente"
-    }
-
-def run_ai_logic(analysis_id: str, records: list):
-    try:
-        # Esegue i calcoli pesanti (Z-Score, TensorFlow, ecc.)
-        results = ai_engine.calculate_risk(records)
-        
-        # 3. Aggiorna Supabase con i risultati finali
-        supabase.table("analisi_rischio").update({
-            "z_score": results.get('z_score'),
-            "stato_rischio": results.get('status'),
-            "completato": True
-        }).eq("id", analysis_id).execute()
-        
-    except Exception as e:
-        # In caso di errore, lo logghiamo su Supabase
-        supabase.table("analisi_rischio").update({
-            "stato_rischio": f"Errore: {str(e)}",
-            "completato": False
-        }).eq("id", analysis_id).execute()
+def process_data(analysis_id: str, records: list):
+    results = ai_engine.calculate_risk(records)
+    supabase.table("analisi_rischio").update({
+        "z_score": results.get('z_score'),
+        "ebitda": results.get('ebitda'),
+        "stato_rischio": results.get('status'),
+        "proiezioni": results.get('proiezioni'),
+        "completato": True
+    }).eq("id", analysis_id).execute()
