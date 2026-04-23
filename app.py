@@ -17,21 +17,30 @@ if uploaded_file and api_key:
     st.write(df.head())
 
     col1, col2 = st.columns(2)
-
-    with col1:
+with col1:
         if st.button("🚀 Analisi Score"):
             res = requests.post(
                 f"{BACKEND_URL}/analyze-finance",
                 json={"data": df.to_dict(orient='records')},
                 headers={"x-api-key": api_key}
             )
-            st.write(res.json())
-
-    with col2:
+            # CONTROLLO SICUREZZA
+            if res.status_code == 200:
+                st.success("Analisi completata!")
+                st.json(res.json())
+            else:
+                st.error(f"Errore dal Server ({res.status_code}): {res.text}")
+with col2:
         if st.button("☁️ Push to Cloud"):
             res = requests.post(
                 f"{BACKEND_URL}/save-to-supabase",
                 json={"data": df.to_dict(orient='records')},
                 headers={"x-api-key": api_key}
             )
-            st.write(res.json())
+            # CONTROLLO SICUREZZA
+            if res.status_code == 200:
+                st.balloons()
+                st.success("Dati inviati!")
+                st.json(res.json())
+            else:
+                st.error(f"Errore dal Server ({res.status_code}): {res.text}")
