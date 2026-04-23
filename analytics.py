@@ -1,61 +1,35 @@
-import pandas as pd
-import numpy as np
+import os
+from fastapi import FastAPI, BackgroundTasks, Header, HTTPException
+from supabase import create_client, Client
+from analytics import NexusAI
 
-class NexusAI:
-    def __init__(self):
-        # Qui potresti caricare un modello TensorFlow o Scikit-learn salvato
-        # self.model = joblib.load('model_v1.pkl')
-        pass
+app = FastAPI()
+ai_engine = NexusAI()
 
-    def calculate_risk(self, records: list):
-        """
-        Riceve una lista di dizionari (dati Excel), esegue i calcoli
-        e restituisce Z-Score e stato del rischio.
-        """
-        try:
-            # 1. Conversione in DataFrame per manipolazione veloce
-            df = pd.DataFrame(records)
+supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
 
-            # --- ESEMPIO LOGICA Z-SCORE DI ALTMAN (Versione semplificata) ---
-            # Nota: Assicurati che le colonne nel tuo Excel abbiano questi nomi
-            # o mappa i nomi delle colonne qui sotto.
-            
-            # Calcolo dei parametri (Esempio)
-            # A = Capitale Circolante / Totale Attività
-            # B = Utili Trattenuti / Totale Attività
-            # C = EBIT / Totale Attività ... e così via.
-            
-            # Simuliamo un calcolo basato sulla media dei valori per l'esempio
-            valore_medio = df.select_dtypes(include=[np.number]).mean().mean()
-            
-            # Formula dummy per lo Z-Score (Sostituisci con la tua formula reale)
-            z_score = round(float(valore_medio * 1.2), 2)
+@app.post("/v1/analyze")
+async def start_analysis(data: dict, background_tasks: BackgroundTasks, x_api_key: str = Header(None)):
+    if x_api_key != "nx-live-docfinance-2026":
+        raise HTTPException(status_code=403, detail="Unauthorized")
 
-            # 2. Determinazione dello stato
-            if z_score > 2.99:
-                status = "Safe (Sicuro)"
-            elif 1.81 <= z_score <= 2.99:
-                status = "Grey Zone (Attenzione)"
-            else:
-                status = "Distress (Pericolo Insolvenza)"
+    # Registrazione iniziale su Supabase
+    res = supabase.table("analisi_rischio").insert({
+        "nome_azienda": data.get("azienda"),
+        "stato_rischio": "Elaborazione dati finanziari..."
+    }).execute()
+    
+    analysis_id = res.data[0]['id']
+    background_tasks.add_task(run_ai_logic, analysis_id, data['records'])
 
-            return {
-                "z_score": z_score,
-                "status": status,
-                "error": None
-            }
+    return {"status": "success", "id": analysis_id}
 
-        except Exception as e:
-            print(f"Errore durante l'analisi AI: {e}")
-            return {
-                "z_score": 0,
-                "status": "Errore di Calcolo",
-                "error": str(e)
-            }
-
-    def predict_trend(self, records: list):
-        """
-        Esempio di funzione aggiuntiva per previsioni future (TensorFlow)
-        """
-        # Logica per modelli predittivi
-        pass
+def run_ai_logic(analysis_id: str, records: list):
+    results = ai_engine.calculate_risk(records)
+    supabase.table("analisi_rischio").update({
+        "z_score": results.get('z_score'),
+        "ebitda": results.get('ebitda'),
+        "stato_rischio": results.get('status'),
+        "proiezioni": results.get('proiezioni'),
+        "completato": True
+    }).eq("id", analysis_id).execute()
