@@ -6,43 +6,35 @@ from supabase import create_client, Client
 
 app = FastAPI()
 
-# Configurazione Supabase
+# Inizializzazione Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") # Deve chiamarsi così su Render!
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-class AnalysisRequest(BaseModel):
+class DataRequest(BaseModel):
     data: List[dict]
 
 @app.get("/")
-async def root():
-    return {"status": "online", "message": "Nexus Backend is running"}
+async def health_check():
+    return {"status": "online", "message": "Nexus Backend Pronto"}
 
-# --- ENDPOINT ANALISI ---
+# --- QUESTI NOMI DEVONO ESSERE IDENTICI IN STREAMLIT ---
 @app.post("/analyze-finance")
-async def analyze_finance(request: AnalysisRequest, x_api_key: str = Header(None)):
+async def analyze(request: DataRequest, x_api_key: str = Header(None)):
     if x_api_key != "nx-live-docfinance-2026":
-        raise HTTPException(status_code=403, detail="API Key non valida")
-    
-    # Logica di esempio Z-Score
+        raise HTTPException(status_code=403, detail="Key Errata")
     return {"status": "success", "rating": "Solido", "score": 2.85}
 
-# --- ENDPOINT SALVATAGGIO ---
 @app.post("/save-to-supabase")
-async def save_to_supabase(request: AnalysisRequest, x_api_key: str = Header(None)):
+async def save(request: DataRequest, x_api_key: str = Header(None)):
     if x_api_key != "nx-live-docfinance-2026":
-        raise HTTPException(status_code=403, detail="API Key non valida")
-    
+        raise HTTPException(status_code=403, detail="Key Errata")
     try:
-        # Recupera ID del tenant
+        # Recupero ID Tenant
         res = supabase.table("tenants").select("id").eq("api_key", x_api_key).execute()
-        if not res.data:
-            raise HTTPException(status_code=404, detail="Tenant non trovato")
-        
         tenant_id = res.data[0]["id"]
         for row in request.data:
             row["tenant_id"] = tenant_id
-            
         supabase.table("financial_data").insert(request.data).execute()
         return {"status": "success", "message": "Dati salvati"}
     except Exception as e:
