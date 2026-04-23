@@ -7,131 +7,172 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ─── CSS GLOBALE ────────────────────────────────────────────────
 st.markdown("""
 <style>
-[data-testid="stAppViewContainer"] { background: #0F172A; }
-[data-testid="stSidebar"] { background: linear-gradient(180deg,#0F172A 0%,#1E293B 100%) !important; border-right: 1px solid #334155; }
-[data-testid="stHeader"] { background: transparent; }
-.stButton > button { border-radius: 8px; font-weight: 600; transition: all 0.2s; }
-.stButton > button[kind="primary"] { background: linear-gradient(135deg,#1E40AF,#7C3AED) !important; border: none; color: white !important; }
-.stTextInput > div > div > input { background: #1E293B; border: 1px solid #334155; color: #F1F5F9; border-radius: 8px; }
-.stNumberInput > div > div > input { background: #1E293B; border: 1px solid #334155; color: #F1F5F9; }
-.stSelectbox > div > div { background: #1E293B; border-color: #334155; color: #F1F5F9; }
-.stTabs [data-baseweb="tab"] { background: #1E293B; color: #94A3B8; border-radius: 8px 8px 0 0; }
-.stTabs [aria-selected="true"] { background: #3B82F6; color: white; }
-div[data-testid="metric-container"] { background: #1E293B; border: 1px solid #334155; border-radius: 12px; padding: 15px; }
-div[data-testid="metric-container"] label { color: #94A3B8 !important; }
-div[data-testid="metric-container"] div[data-testid="metric-value"] { color: #3B82F6 !important; }
-.stDataFrame { background: #1E293B; }
-h1,h2,h3,h4 { color: #F1F5F9 !important; }
-p, label, .stMarkdown { color: #CBD5E1; }
-.stSlider > div { color: #F1F5F9; }
-hr { border-color: #334155; }
+    [data-testid="stAppViewContainer"] { background: #0a0e1a; }
+    [data-testid="stSidebar"] { background: #0d1220; border-right: 1px solid #1e2d4a; }
+    .main .block-container { padding: 2rem; max-width: 1400px; }
+    h1, h2, h3 { color: #e2e8f0 !important; }
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white; border: none; border-radius: 8px;
+        font-weight: 600; transition: all 0.3s;
+    }
+    .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(102,126,234,0.4); }
+    .metric-card {
+        background: linear-gradient(135deg, #1a2340 0%, #0d1220 100%);
+        border: 1px solid #1e2d4a; border-radius: 12px;
+        padding: 20px; text-align: center; margin: 8px 0;
+    }
+    /* Login form */
+    .login-container {
+        max-width: 420px; margin: 80px auto;
+        background: linear-gradient(135deg, #1a2340 0%, #0d1220 100%);
+        border: 1px solid #1e2d4a; border-radius: 16px; padding: 40px;
+    }
+    div[data-testid="stTextInput"] input {
+        background: #0a0e1a !important; color: #e2e8f0 !important;
+        border: 1px solid #1e2d4a !important; border-radius: 8px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
+# ─── FUNZIONI AUTH ────────────────────────────────────────────
+from services.auth import login, logout, get_user_profile, is_admin, is_authenticated
 
-def login_page():
+def show_login_page():
+    """Pagina di login elegante."""
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.markdown("""
-        <div style="text-align:center;padding:50px 0 30px 0;">
-            <div style="font-size:4rem;">💎</div>
-            <h1 style="color:#3B82F6;font-size:2.5rem;margin:0;">NEXUS Finance Pro</h1>
-            <p style="color:#64748B;font-size:1.1rem;margin-top:8px;">Piattaforma Enterprise di Analisi Finanziaria</p>
-            <div style="display:flex;justify-content:center;gap:8px;margin:15px 0;flex-wrap:wrap;">
-                <span style="background:#1E3A8A;color:#93C5FD;padding:4px 12px;border-radius:20px;font-size:0.8rem;">⚠️ Z-Score Altman</span>
-                <span style="background:#164E63;color:#7DD3FC;padding:4px 12px;border-radius:20px;font-size:0.8rem;">💳 Credit Scoring Basel IV</span>
-                <span style="background:#2E1065;color:#C4B5FD;padding:4px 12px;border-radius:20px;font-size:0.8rem;">📊 Audit ISA 320</span>
-            </div>
+        <div style="text-align:center; padding: 40px 0 20px;">
+            <div style="font-size:4rem">💎</div>
+            <h1 style="color:#667eea; font-size:2.2rem; margin:0;">NEXUS Finance Pro</h1>
+            <p style="color:#64748b; font-size:1rem; margin-top:8px;">
+                Piattaforma Avanzata di Analisi Finanziaria
+            </p>
         </div>
         """, unsafe_allow_html=True)
 
-        with st.form("login"):
-            api_key = st.text_input("🔑 API Key", type="password", placeholder="Inserisci la tua API Key aziendale")
-            login_btn = st.form_submit_button("🚀 Accedi alla Piattaforma", use_container_width=True, type="primary")
-            if login_btn:
-                if api_key:
-                    from services.db import verify_api_key
-                    tenant = verify_api_key(api_key)
-                    if tenant:
-                        st.session_state.authenticated = True
-                        st.session_state.tenant = tenant
+        st.markdown("---")
+
+        with st.form("login_form"):
+            st.markdown("### 🔐 Accedi")
+            email = st.text_input("📧 Email", placeholder="la-tua-email@azienda.com")
+            password = st.text_input("🔑 Password", type="password", placeholder="••••••••")
+            st.markdown("<br>", unsafe_allow_html=True)
+            submitted = st.form_submit_button("➡️ Entra", use_container_width=True)
+
+            if submitted:
+                if not email or not password:
+                    st.error("Inserisci email e password")
+                else:
+                    with st.spinner("Accesso in corso..."):
+                        result = login(email, password)
+                    if result["success"]:
+                        user = result["user"]
+                        profile = get_user_profile(user.id)
+                        st.session_state["user"] = user.id
+                        st.session_state["user_email"] = user.email
+                        st.session_state["role"] = profile["role"] if profile else "client"
+                        st.session_state["user_name"] = profile.get("full_name", email) if profile else email
+                        st.session_state["company"] = profile.get("company_name", "") if profile else ""
+                        st.success("✅ Accesso effettuato!")
                         st.rerun()
                     else:
-                        st.error("❌ API Key non valida.")
-                else:
-                    st.warning("Inserisci la tua API Key.")
+                        err = result["error"]
+                        if "Invalid login" in err or "invalid_credentials" in err:
+                            st.error("❌ Email o password non corretti")
+                        else:
+                            st.error(f"❌ Errore: {err}")
 
         st.markdown("""
-        <div style="text-align:center;margin-top:30px;color:#334155;font-size:0.8rem;">
-            <p>🔒 SSL • GDPR Compliant • Powered by Supabase</p>
-            <p>© 2025 NEXUS Finance Pro</p>
-        </div>
+        <p style="text-align:center; color:#475569; font-size:0.8rem; margin-top:24px;">
+            © 2026 NEXUS Finance Pro · Tutti i diritti riservati
+        </p>
         """, unsafe_allow_html=True)
 
-
-def sidebar_nav():
-    tenant = st.session_state.get("tenant", {})
+# ─── SIDEBAR ─────────────────────────────────────────────────
+def show_sidebar():
     with st.sidebar:
-        st.markdown(f"""
-        <div style="padding:15px 0;border-bottom:1px solid #334155;margin-bottom:15px;">
-            <div style="text-align:center;">
-                <div style="font-size:2rem;">💎</div>
-                <div style="color:#3B82F6;font-weight:700;font-size:1.1rem;">NEXUS Finance Pro</div>
-                <div style="color:#64748B;font-size:0.75rem;">Enterprise Edition v2.0</div>
-            </div>
-            <div style="background:#0F172A;border-radius:8px;padding:10px;margin-top:15px;">
-                <div style="color:#CBD5E1;font-size:0.85rem;">👤 {tenant.get('name','Utente')}</div>
-                <div style="color:#64748B;font-size:0.75rem;margin-top:4px;">
-                    💳 Crediti: <span style="color:#4ADE80;">{tenant.get('credit_balance',0)}</span>
-                </div>
-            </div>
+        st.markdown("""
+        <div style="text-align:center; padding:16px 0;">
+            <div style="font-size:2.5rem">💎</div>
+            <div style="color:#667eea; font-weight:700; font-size:1.3rem;">NEXUS Finance Pro</div>
         </div>
         """, unsafe_allow_html=True)
 
-        page = st.radio(
-            "nav",
-            ["🏠 Dashboard", "⚠️ Analisi Rischio", "💳 Credit Scoring", "📊 Audit Report", "📋 Storico"],
-            label_visibility="hidden"
-        )
+        # Info utente
+        role = st.session_state.get("role", "client")
+        name = st.session_state.get("user_name", "Utente")
+        company = st.session_state.get("company", "")
+        badge = "👑 Amministratore" if role == "admin" else "🏢 Cliente"
 
-        st.markdown("<div style='height:20px;'></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="background:#1a2340; border-radius:10px; padding:12px; margin-bottom:16px; border:1px solid #1e2d4a;">
+            <div style="color:#94a3b8; font-size:0.75rem">{badge}</div>
+            <div style="color:#e2e8f0; font-weight:600;">{name}</div>
+            <div style="color:#64748b; font-size:0.8rem">{company}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("### Navigazione")
+
+        pages = [
+            ("🏠", "Dashboard", "dashboard"),
+            ("⚠️", "Analisi Rischio", "risk"),
+            ("💳", "Credit Scoring", "credit"),
+            ("📋", "Audit Report", "audit"),
+            ("📜", "Storico", "history"),
+        ]
+        if role == "admin":
+            pages.append(("👑", "Pannello Admin", "admin"))
+
+        if "page" not in st.session_state:
+            st.session_state["page"] = "dashboard"
+
+        for icon, label, key in pages:
+            active = "background:#1e2d4a; border-left:3px solid #667eea;" if st.session_state["page"] == key else ""
+            if st.button(f"{icon}  {label}", key=f"nav_{key}", use_container_width=True):
+                st.session_state["page"] = key
+                st.rerun()
+
+        st.markdown("---")
         if st.button("🚪 Logout", use_container_width=True):
-            st.session_state.clear()
+            logout()
             st.rerun()
 
-        st.markdown("""
-        <div style="position:fixed;bottom:20px;left:0;width:280px;text-align:center;color:#334155;font-size:0.7rem;">
-            NEXUS Finance Pro v2.0<br>Supabase + Streamlit
-        </div>
-        """, unsafe_allow_html=True)
-    return page
-
-
+# ─── MAIN ─────────────────────────────────────────────────────
 def main():
-    if not st.session_state.get("authenticated", False):
-        login_page()
+    if not is_authenticated():
+        show_login_page()
         return
 
-    page = sidebar_nav()
+    show_sidebar()
 
-    if page == "🏠 Dashboard":
+    page = st.session_state.get("page", "dashboard")
+
+    if page == "dashboard":
         from pages_modules.dashboard import show_dashboard
         show_dashboard()
-    elif page == "⚠️ Analisi Rischio":
+    elif page == "risk":
         from pages_modules.risk_analysis import show_risk_analysis
         show_risk_analysis()
-    elif page == "💳 Credit Scoring":
+    elif page == "credit":
         from pages_modules.credit_scoring import show_credit_scoring
         show_credit_scoring()
-    elif page == "📊 Audit Report":
+    elif page == "audit":
         from pages_modules.audit_report import show_audit_report
         show_audit_report()
-    elif page == "📋 Storico":
+    elif page == "history":
         from pages_modules.history import show_history
         show_history()
-
+    elif page == "admin" and is_admin():
+        from pages_modules.admin_panel import show_admin_panel
+        show_admin_panel()
+    else:
+        st.error("Pagina non trovata")
 
 if __name__ == "__main__":
     main()
