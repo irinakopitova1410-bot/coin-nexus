@@ -1,3 +1,7 @@
-==> Build failed 😞
-Menu
-==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+fastapi
+uvicorn
+pandas
+numpy
+supabase
+openpyxl
+python-multipart
