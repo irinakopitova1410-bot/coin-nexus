@@ -16,10 +16,10 @@ try:
 except Exception as e:
     st.error("Configura i Secrets (SUPABASE_URL e SUPABASE_KEY) su Streamlit Cloud!")
 
-# URL del tuo Backend su Render
-API_URL = "https://nexus-api-rf76.onrender.com/v1/analyze"
+# URL del tuo NUOVO Backend su Render
+# Nota: aggiungiamo /v1/analyze alla fine dell'URL che hai postato
+API_URL = "https://finance-analyzer-q9m8.onrender.com/v1/analyze"
 API_KEY = "nx-live-docfinance-2026"
-
 st.title("🏛️ Nexus Finance AI - Analisi Rischio Pro")
 st.markdown("Carica il bilancio aziendale in formato Excel per calcolare lo Z-Score e l'affidabilità con AI.")
 
