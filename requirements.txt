@@ -1,8 +1,3 @@
-streamlit
-pandas
-numpy
-requests
-fastapi
-uvicorn
-supabase
-openpyxl
+==> Build failed 😞
+Menu
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
