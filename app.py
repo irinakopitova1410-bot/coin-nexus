@@ -101,8 +101,15 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    st.markdown("**⚡ STRUMENTO PRINCIPALE**")
+    st.markdown("""
+    <div style='background:rgba(255,255,255,0.12); border-radius:8px; padding:0.4rem 0.6rem; margin-bottom:0.5rem; border:1px solid rgba(255,255,255,0.2);'>
+        <div style='color:#fbbf24; font-size:0.75rem; font-weight:700;'>🔥 NUOVO</div>
+    </div>
+    """, unsafe_allow_html=True)
     st.markdown("**📂 ANALISI**")
     pages = {
+        "⚡ Credit Readiness": "credit_readiness",
         "🏠 Dashboard": "dashboard",
         "🔌 Import da ERP": "erp_import",
         "📊 Ratio Analysis": "ratio_analysis",
@@ -147,7 +154,11 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
 # ── Routing pagine ────────────────────────────────────────────────────────────
-if page_id == "dashboard":
+if page_id == "credit_readiness":
+    from pages_modules.credit_readiness import render_credit_readiness
+    render_credit_readiness()
+
+elif page_id == "dashboard":
     from pages_modules.dashboard import render_dashboard
     render_dashboard(user)
 
