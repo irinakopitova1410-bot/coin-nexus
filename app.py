@@ -1,178 +1,184 @@
+"""
+NEXUS Finance Pro — Main Application
+Piattaforma professionale di analisi finanziaria aziendale.
+Superiore a DocFinance: Z-Score, 35+ ratios, cash flow, ERP integration, PDF export.
+"""
 import streamlit as st
+from services.auth import login_page, get_current_user, logout
 
+# ── Configurazione pagina ──────────────────────────────────────────────────────
 st.set_page_config(
     page_title="NEXUS Finance Pro",
-    page_icon="💎",
+    page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        "About": "NEXUS Finance Pro — Analisi finanziaria professionale",
+    }
 )
 
-# ─── CSS GLOBALE ────────────────────────────────────────────────
+# ── CSS Custom ─────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    [data-testid="stAppViewContainer"] { background: #0a0e1a; }
-    [data-testid="stSidebar"] { background: #0d1220; border-right: 1px solid #1e2d4a; }
-    .main .block-container { padding: 2rem; max-width: 1400px; }
-    h1, h2, h3 { color: #e2e8f0 !important; }
-    .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white; border: none; border-radius: 8px;
-        font-weight: 600; transition: all 0.3s;
-    }
-    .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(102,126,234,0.4); }
-    .metric-card {
-        background: linear-gradient(135deg, #1a2340 0%, #0d1220 100%);
-        border: 1px solid #1e2d4a; border-radius: 12px;
-        padding: 20px; text-align: center; margin: 8px 0;
-    }
-    /* Login form */
-    .login-container {
-        max-width: 420px; margin: 80px auto;
-        background: linear-gradient(135deg, #1a2340 0%, #0d1220 100%);
-        border: 1px solid #1e2d4a; border-radius: 16px; padding: 40px;
-    }
-    div[data-testid="stTextInput"] input {
-        background: #0a0e1a !important; color: #e2e8f0 !important;
-        border: 1px solid #1e2d4a !important; border-radius: 8px !important;
-    }
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0D47A1 0%, #1565C0 50%, #0D47A1 100%);
+}
+[data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] label,
+[data-testid="stSidebar"] .stRadio label, [data-testid="stSidebar"] p {
+    color: white !important;
+}
+[data-testid="stSidebar"] .stRadio > label {
+    color: rgba(255,255,255,0.8) !important;
+    font-size: 0.85em;
+}
+/* Header */
+.nexus-header {
+    background: linear-gradient(90deg, #0D47A1, #00897B);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    color: white;
+}
+/* Metric cards */
+[data-testid="metric-container"] {
+    background: #F8FAFF;
+    border: 1px solid #E3E8F0;
+    border-radius: 8px;
+    padding: 0.5rem;
+}
+/* Buttons */
+.stButton > button[kind="primary"] {
+    background: #0D47A1;
+    border: none;
+    font-weight: 600;
+}
+.stButton > button[kind="primary"]:hover {
+    background: #1565C0;
+}
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {
+    background: #F0F4FF;
+    border-radius: 8px;
+}
+/* Expander */
+.streamlit-expanderHeader {
+    background: #F0F4FF;
+    font-weight: 600;
+}
+/* Hide footer */
+footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# ─── FUNZIONI AUTH ────────────────────────────────────────────
-from services.auth import login, logout, get_user_profile, is_admin, is_authenticated
 
-def show_login_page():
-    """Pagina di login elegante."""
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("""
-        <div style="text-align:center; padding: 40px 0 20px;">
-            <div style="font-size:4rem">💎</div>
-            <h1 style="color:#667eea; font-size:2.2rem; margin:0;">NEXUS Finance Pro</h1>
-            <p style="color:#64748b; font-size:1rem; margin-top:8px;">
-                Piattaforma Avanzata di Analisi Finanziaria
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+# ── Auth ──────────────────────────────────────────────────────────────────────
+user = get_current_user()
 
-        st.markdown("---")
+if not user:
+    login_page()
+    st.stop()
 
-        with st.form("login_form"):
-            st.markdown("### 🔐 Accedi")
-            email = st.text_input("📧 Email", placeholder="la-tua-email@azienda.com")
-            password = st.text_input("🔑 Password", type="password", placeholder="••••••••")
-            st.markdown("<br>", unsafe_allow_html=True)
-            submitted = st.form_submit_button("➡️ Entra", use_container_width=True)
+# ── Sidebar navigazione ───────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style='text-align:center; padding: 1rem 0 0.5rem;'>
+        <div style='font-size:2.5rem;'>📊</div>
+        <div style='font-size:1.3rem; font-weight:700; color:white;'>NEXUS Finance Pro</div>
+        <div style='font-size:0.8rem; color:rgba(255,255,255,0.7);'>Analisi Finanziaria Professionale</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-            if submitted:
-                if not email or not password:
-                    st.error("Inserisci email e password")
-                else:
-                    with st.spinner("Accesso in corso..."):
-                        result = login(email, password)
-                    if result["success"]:
-                        user = result["user"]
-                        profile = get_user_profile(user.id)
-                        st.session_state["user"] = user.id
-                        st.session_state["user_email"] = user.email
-                        st.session_state["role"] = profile["role"] if profile else "client"
-                        st.session_state["user_name"] = profile.get("full_name", email) if profile else email
-                        st.session_state["company"] = profile.get("company_name", "") if profile else ""
-                        st.success("✅ Accesso effettuato!")
-                        st.rerun()
-                    else:
-                        err = result["error"]
-                        if "Invalid login" in err or "invalid_credentials" in err:
-                            st.error("❌ Email o password non corretti")
-                        else:
-                            st.error(f"❌ Errore: {err}")
+    st.divider()
 
-        st.markdown("""
-        <p style="text-align:center; color:#475569; font-size:0.8rem; margin-top:24px;">
-            © 2026 NEXUS Finance Pro · Tutti i diritti riservati
-        </p>
-        """, unsafe_allow_html=True)
+    # Info utente
+    role = user.get("role", "client")
+    role_badge = "👑 Admin" if role == "admin" else "👤 Cliente"
+    st.markdown(f"""
+    <div style='background:rgba(255,255,255,0.15); border-radius:8px; padding:0.6rem; margin-bottom:0.5rem;'>
+        <div style='color:white; font-size:0.85rem;'>{role_badge}</div>
+        <div style='color:rgba(255,255,255,0.85); font-size:0.75rem;'>{user.get("email","")}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# ─── SIDEBAR ─────────────────────────────────────────────────
-def show_sidebar():
-    with st.sidebar:
-        st.markdown("""
-        <div style="text-align:center; padding:16px 0;">
-            <div style="font-size:2.5rem">💎</div>
-            <div style="color:#667eea; font-weight:700; font-size:1.3rem;">NEXUS Finance Pro</div>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("**📂 ANALISI**")
+    pages = {
+        "🏠 Dashboard": "dashboard",
+        "🔌 Import da ERP": "erp_import",
+        "📊 Ratio Analysis": "ratio_analysis",
+        "💰 Cash Flow": "cashflow",
+        "🎯 Z-Score Altman": "risk_analysis",
+        "🏅 Credit Scoring": "credit_scoring",
+        "📄 Audit Report": "audit_report",
+        "📁 Storico Analisi": "history",
+    }
 
-        # Info utente
-        role = st.session_state.get("role", "client")
-        name = st.session_state.get("user_name", "Utente")
-        company = st.session_state.get("company", "")
-        badge = "👑 Amministratore" if role == "admin" else "🏢 Cliente"
+    if role == "admin":
+        pages["⚙️ Pannello Admin"] = "admin"
 
+    page = st.radio(
+        "Naviga",
+        list(pages.keys()),
+        label_visibility="collapsed",
+        key="nav_page",
+    )
+    page_id = pages[page]
+
+    st.divider()
+
+    # ERP data indicator
+    if st.session_state.get("erp_data"):
+        company = st.session_state.get("erp_company", "Azienda")
         st.markdown(f"""
-        <div style="background:#1a2340; border-radius:10px; padding:12px; margin-bottom:16px; border:1px solid #1e2d4a;">
-            <div style="color:#94a3b8; font-size:0.75rem">{badge}</div>
-            <div style="color:#e2e8f0; font-weight:600;">{name}</div>
-            <div style="color:#64748b; font-size:0.8rem">{company}</div>
+        <div style='background:rgba(0,200,83,0.25); border-radius:6px; padding:0.5rem; margin-bottom:0.5rem;'>
+            <div style='color:white; font-size:0.8rem;'>✅ Dati ERP caricati</div>
+            <div style='color:rgba(255,255,255,0.8); font-size:0.75rem;'>{company}</div>
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("### Navigazione")
+    if st.button("🚪 Logout", use_container_width=True):
+        logout()
+        st.rerun()
 
-        pages = [
-            ("🏠", "Dashboard", "dashboard"),
-            ("⚠️", "Analisi Rischio", "risk"),
-            ("💳", "Credit Scoring", "credit"),
-            ("📋", "Audit Report", "audit"),
-            ("📜", "Storico", "history"),
-        ]
-        if role == "admin":
-            pages.append(("👑", "Pannello Admin", "admin"))
+    st.markdown("""
+    <div style='text-align:center; color:rgba(255,255,255,0.4); font-size:0.65rem; margin-top:1rem;'>
+    NEXUS Finance Pro v3.0<br>© 2025 Irina Kopitova
+    </div>
+    """, unsafe_allow_html=True)
 
-        if "page" not in st.session_state:
-            st.session_state["page"] = "dashboard"
+# ── Routing pagine ────────────────────────────────────────────────────────────
+if page_id == "dashboard":
+    from pages_modules.dashboard import render_dashboard
+    render_dashboard(user)
 
-        for icon, label, key in pages:
-            active = "background:#1e2d4a; border-left:3px solid #667eea;" if st.session_state["page"] == key else ""
-            if st.button(f"{icon}  {label}", key=f"nav_{key}", use_container_width=True):
-                st.session_state["page"] = key
-                st.rerun()
+elif page_id == "erp_import":
+    from pages_modules.erp_import import render_erp_import
+    render_erp_import()
 
-        st.markdown("---")
-        if st.button("🚪 Logout", use_container_width=True):
-            logout()
-            st.rerun()
+elif page_id == "ratio_analysis":
+    from pages_modules.financial_ratios import render_financial_ratios
+    render_financial_ratios()
 
-# ─── MAIN ─────────────────────────────────────────────────────
-def main():
-    if not is_authenticated():
-        show_login_page()
-        return
+elif page_id == "cashflow":
+    from pages_modules.cashflow_analysis import render_cashflow_analysis
+    render_cashflow_analysis()
 
-    show_sidebar()
+elif page_id == "risk_analysis":
+    from pages_modules.risk_analysis import render_risk_analysis
+    render_risk_analysis()
 
-    page = st.session_state.get("page", "dashboard")
+elif page_id == "credit_scoring":
+    from pages_modules.credit_scoring import render_credit_scoring
+    render_credit_scoring()
 
-    if page == "dashboard":
-        from pages_modules.dashboard import show_dashboard
-        show_dashboard()
-    elif page == "risk":
-        from pages_modules.risk_analysis import show_risk_analysis
-        show_risk_analysis()
-    elif page == "credit":
-        from pages_modules.credit_scoring import show_credit_scoring
-        show_credit_scoring()
-    elif page == "audit":
-        from pages_modules.audit_report import show_audit_report
-        show_audit_report()
-    elif page == "history":
-        from pages_modules.history import show_history
-        show_history()
-    elif page == "admin" and is_admin():
-        from pages_modules.admin_panel import show_admin_panel
-        show_admin_panel()
-    else:
-        st.error("Pagina non trovata")
+elif page_id == "audit_report":
+    from pages_modules.audit_report import render_audit_report
+    render_audit_report()
 
-if __name__ == "__main__":
-    main()
+elif page_id == "history":
+    from pages_modules.history import render_history
+    render_history()
+
+elif page_id == "admin" and role == "admin":
+    from pages_modules.admin_panel import render_admin_panel
+    render_admin_panel()

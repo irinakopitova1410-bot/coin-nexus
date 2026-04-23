@@ -1,185 +1,275 @@
+"""
+NEXUS Finance Pro — Altman Z-Score Analysis
+3 modelli (1968/1983/1995), probabilità fallimento, proiezioni, PDF export.
+"""
 import streamlit as st
+import plotly.graph_objects as go
 import pandas as pd
+import io
 from engine.calculations import altman_z_original, altman_z_prime, altman_z_doubleprime
-from utils.charts import gauge_chart, projection_chart
-from utils.file_parser import parse_zscore_file, get_zscore_template_bytes
+from engine.financial_ratios import calculate_all_ratios
 from services.db import save_risk_analysis
+from utils.file_parser import generate_template_csv
+from services.erp_connectors import parse_erp_file
 
-def show_risk_analysis():
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#7C2D12,#C2410C);padding:25px;border-radius:12px;margin-bottom:25px;">
-        <h1 style="color:white;margin:0;font-size:1.8rem;">⚠️ Analisi del Rischio — Altman Z-Score</h1>
-        <p style="color:#FED7AA;margin:5px 0 0 0;">Previsione fallimento con 3 modelli scientifici validati</p>
-    </div>
-    """, unsafe_allow_html=True)
 
-    model_choice = st.radio(
-        "Seleziona Modello",
-        ["Z-Score (1968) — Quotate manifatturiere",
-         "Z'-Score (1983) — Aziende private (PMI) ⭐",
-         "Z''-Score (1995) — Servizi/Non manifatturiere"],
-        index=1
-    )
+def _render_gauge(z_score: float, safe: float, grey: float) -> go.Figure:
+    color = "#00C853" if z_score >= safe else ("#FFD600" if z_score >= grey else "#D50000")
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number+delta",
+        value=z_score,
+        title={"text": "Z-Score", "font": {"size": 16}},
+        gauge={
+            "axis": {"range": [0, max(safe * 1.5, z_score * 1.2)], "tickwidth": 1},
+            "bar": {"color": color, "thickness": 0.25},
+            "steps": [
+                {"range": [0, grey], "color": "#FFEBEE"},
+                {"range": [grey, safe], "color": "#FFF9C4"},
+                {"range": [safe, max(safe * 1.5, z_score * 1.2)], "color": "#E8F5E9"},
+            ],
+            "threshold": {"line": {"color": "darkblue", "width": 3}, "value": safe},
+        },
+        number={"font": {"size": 36, "color": color}},
+    ))
+    fig.update_layout(height=280, margin=dict(l=20, r=20, t=60, b=20))
+    return fig
 
-    st.markdown("---")
 
-    # ─── Upload File ──────────────────────────────────────────────────────────
-    st.subheader("📂 Carica Dati da File")
-    col_up, col_tmpl = st.columns([3, 1])
-    with col_up:
-        uploaded = st.file_uploader(
-            "Carica CSV o Excel con i dati del bilancio",
-            type=["csv", "xlsx", "xls"],
-            help="Usa il template scaricabile per il formato corretto",
-            key="zscore_upload"
-        )
-    with col_tmpl:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button(
-            "📥 Scarica Template CSV",
-            data=get_zscore_template_bytes(),
-            file_name="template_zscore.csv",
-            mime="text/csv",
+def render_risk_analysis():
+    st.title("🎯 Altman Z-Score — Probabilità di Fallimento")
+    st.markdown("Tre modelli ufficiali di Altman per aziende quotate, private e di servizi.")
+
+    erp_data = st.session_state.get("erp_data", {})
+
+    # ── Selezione modello ───────────────────────────────────────────────────────
+    col_model, col_info = st.columns([2, 1])
+    with col_model:
+        model = st.selectbox("Seleziona il modello Z-Score:", [
+            "Z'-Score (1983) — Aziende Private [CONSIGLIATO]",
+            "Z-Score (1968) — Aziende Quotate Manifatturiere",
+            "Z''-Score (1995) — Servizi / Non Manifatturiere",
+        ])
+    with col_info:
+        st.info("""
+        📌 **Guida modelli:**
+        - **Z'** → SRL, SPA non quotate
+        - **Z** → SPA quotate in borsa
+        - **Z''** → Servizi, retail, tech
+        """)
+
+    # ── Upload file ─────────────────────────────────────────────────────────────
+    with st.expander("📤 Import da file CSV/Excel o ERP", expanded=False):
+        c1, c2 = st.columns(2)
+        with c1:
+            tpl = generate_template_csv()
+            st.download_button("⬇️ Template CSV", data=tpl,
+                               file_name="template_zscore.csv", mime="text/csv")
+        with c2:
+            up = st.file_uploader("Carica CSV/Excel", type=["csv", "xlsx", "xls"],
+                                   key="zscore_upload")
+            if up:
+                result = parse_erp_file(up.read(), up.name)
+                if result.success and result.data:
+                    st.session_state["erp_data"] = result.data
+                    erp_data = result.data
+                    st.success(f"✅ Caricati {len(result.data)} campi da {result.erp_type}")
+                    st.rerun()
+
+    # ── Dati di input ──────────────────────────────────────────────────────────
+    with st.form("zscore_form"):
+        st.subheader("📋 Dati di Bilancio")
+        if erp_data:
+            st.success("✅ Dati precaricati da ERP Import — verifica e modifica se necessario")
+
+        company_name = st.text_input("Nome Azienda",
+                                      value=st.session_state.get("erp_company", ""))
+        industry = st.selectbox("Settore (per benchmark)", 
+                                ["Manifatturiero", "Commercio", "Servizi", "Costruzioni", "Tecnologia"])
+
+        col1, col2, col3 = st.columns(3)
+
+        def ei(label, key, help_txt=""):
+            return col1.number_input(label, value=float(erp_data.get(key, 0)),
+                                     format="%.2f", help=help_txt, key=f"zs_{key}")
+        def ei2(label, key, help_txt=""):
+            return col2.number_input(label, value=float(erp_data.get(key, 0)),
+                                     format="%.2f", help=help_txt, key=f"zs_{key}")
+        def ei3(label, key, help_txt=""):
+            return col3.number_input(label, value=float(erp_data.get(key, 0)),
+                                     format="%.2f", help=help_txt, key=f"zs_{key}")
+
+        with col1:
+            st.markdown("**📊 Stato Patrimoniale**")
+            total_assets = st.number_input("Totale Attivo (€)", value=float(erp_data.get("total_assets", 0)), format="%.2f", key="zs_ta")
+            total_liabilities = st.number_input("Totale Passivo (€)", value=float(erp_data.get("total_liabilities", 0)), format="%.2f", key="zs_tl")
+            equity = st.number_input("Patrimonio Netto (€)", value=float(erp_data.get("equity", 0)), format="%.2f", key="zs_eq")
+            current_assets = st.number_input("Attivo Corrente (€)", value=float(erp_data.get("current_assets", 0)), format="%.2f", key="zs_ca")
+            current_liabilities = st.number_input("Passivo Corrente (€)", value=float(erp_data.get("current_liabilities", 0)), format="%.2f", key="zs_cl")
+
+        with col2:
+            st.markdown("**📈 Conto Economico**")
+            revenue = st.number_input("Ricavi (€)", value=float(erp_data.get("revenue", 0)), format="%.2f", key="zs_rev")
+            ebit = st.number_input("EBIT (€)", value=float(erp_data.get("ebit", 0)), format="%.2f", key="zs_ebit")
+            net_income = st.number_input("Utile Netto (€)", value=float(erp_data.get("net_income", 0)), format="%.2f", key="zs_ni")
+            depreciation = st.number_input("Ammortamenti (€)", value=float(erp_data.get("depreciation", 0)), format="%.2f", key="zs_dep")
+            interest_expense = st.number_input("Oneri Finanziari (€)", value=float(erp_data.get("interest_expense", 0)), format="%.2f", key="zs_int")
+
+        with col3:
+            st.markdown("**🏦 Altri Dati**")
+            retained_earnings = st.number_input("Riserve / Utili portati (€)", value=float(erp_data.get("retained_earnings", 0)), format="%.2f", key="zs_re")
+            market_cap = st.number_input("Capitalizzazione di Borsa (€)\n[solo per modello 1968]", value=float(erp_data.get("market_cap", equity)), format="%.2f", key="zs_mc")
+            inventory = st.number_input("Magazzino (€)", value=float(erp_data.get("inventory", 0)), format="%.2f", key="zs_inv")
+            accounts_receivable = st.number_input("Crediti Commerciali (€)", value=float(erp_data.get("accounts_receivable", 0)), format="%.2f", key="zs_ar")
+            accounts_payable = st.number_input("Debiti Commerciali (€)", value=float(erp_data.get("accounts_payable", 0)), format="%.2f", key="zs_ap")
+
+        submitted = st.form_submit_button("🚀 CALCOLA Z-SCORE", type="primary", use_container_width=True)
+
+    if not submitted:
+        return
+
+    if total_assets == 0:
+        st.error("❌ Inserisci almeno il Totale Attivo")
+        return
+
+    # ── Calcolo ───────────────────────────────────────────────────────────────
+    working_capital = current_assets - current_liabilities
+
+    if "1968" in model:
+        result = altman_z_original(working_capital, total_assets, retained_earnings,
+                                    ebit, market_cap, total_liabilities, revenue)
+    elif "1995" in model:
+        result = altman_z_doubleprime(working_capital, total_assets, retained_earnings,
+                                       ebit, equity, total_liabilities)
+    else:
+        result = altman_z_prime(working_capital, total_assets, retained_earnings,
+                                 ebit, equity, total_liabilities, revenue)
+
+    # ── Risultati ─────────────────────────────────────────────────────────────
+    st.divider()
+
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        # Gauge
+        st.plotly_chart(
+            _render_gauge(result.z_score, result.thresholds["safe"], result.thresholds["grey_low"]),
             use_container_width=True
         )
 
-    # Valori di default
-    defaults = {
-        "nome_azienda": "",
-        "total_assets": 1000000.0,
-        "retained_earnings": 100000.0,
-        "ebit": 80000.0,
-        "working_capital": 150000.0,
-        "total_liabilities": 500000.0,
-        "equity_input": 500000.0,
-        "revenue": 800000.0,
-    }
-
-    if uploaded:
-        parsed = parse_zscore_file(uploaded)
-        if parsed["success"]:
-            defaults.update(parsed)
-            st.success(f"✅ File caricato! Dati importati per: **{parsed.get('nome_azienda', 'Azienda')}**")
-        else:
-            st.error(f"❌ Errore nel file: {parsed['error']}. Usa il template CSV.")
-
-    st.markdown("---")
-
-    # ─── Inserimento Dati ─────────────────────────────────────────────────────
-    col1, col2 = st.columns([2, 1])
-
-    with col1:
-        st.subheader("📝 Dati Aziendali")
-        company_name = st.text_input("Nome Azienda", value=defaults["nome_azienda"], placeholder="Es: Rossi S.r.l.")
-
-        colA, colB = st.columns(2)
-        with colA:
-            total_assets      = st.number_input("Totale Attivo (€)",                  min_value=0.0, value=float(defaults["total_assets"]),      step=10000.0, format="%.0f")
-            retained_earnings = st.number_input("Utili non distribuiti / Riserve (€)",               value=float(defaults["retained_earnings"]),   step=10000.0, format="%.0f")
-            ebit              = st.number_input("EBIT — Reddito Operativo (€)",                       value=float(defaults["ebit"]),                step=5000.0,  format="%.0f")
-            working_capital   = st.number_input("Capitale Circolante Netto (€)",                      value=float(defaults["working_capital"]),      step=10000.0, format="%.0f")
-        with colB:
-            total_liabilities = st.number_input("Totale Passività (€)",               min_value=1.0, value=float(defaults["total_liabilities"]),  step=10000.0, format="%.0f")
-            if "Quotate" in model_choice:
-                equity_input  = st.number_input("Market Cap (€)",                                     value=float(defaults["equity_input"]),         step=10000.0, format="%.0f")
-            else:
-                equity_input  = st.number_input("Patrimonio Netto Contabile (€)",                     value=float(defaults["equity_input"]),         step=10000.0, format="%.0f")
-            revenue           = st.number_input("Ricavi Netti (€)",                   min_value=0.0, value=float(defaults["revenue"]),             step=10000.0, format="%.0f")
-
     with col2:
-        st.subheader("ℹ️ Come interpretare")
-        if "Z'-Score (1983)" in model_choice:
-            st.info("**Modello Z' (1983)**\nIdeal per PMI italiane\n\n🟢 Z > 2.9 → Sicuro\n🟡 1.23–2.9 → Grigio\n🔴 Z < 1.23 → Pericolo")
-        elif "Quotate" in model_choice:
-            st.info("**Modello Z (1968)**\nAziende quotate in borsa\n\n🟢 Z > 2.99 → Sicuro\n🟡 1.81–2.99 → Grigio\n🔴 Z < 1.81 → Pericolo")
-        else:
-            st.info("**Modello Z'' (1995)**\nServizi e non manifatturiere\n\n🟢 Z > 2.6 → Sicuro\n🟡 1.1–2.6 → Grigio\n🔴 Z < 1.1 → Pericolo")
+        # Metriche principali
+        zone_colors = {"safe": "normal", "grey": "off", "distress": "inverse"}
+        st.metric("📍 Zona", result.zone_label)
+        st.metric("📊 Z-Score", result.z_score)
+        prob = result.bankruptcy_probability
+        prob_delta = "BASSO" if prob < 20 else ("MEDIO" if prob < 50 else "ELEVATO")
+        st.metric("💀 Probabilità Fallimento", f"{prob:.1f}%", prob_delta)
+        st.metric("🏷️ Rating Equivalente", result.rating)
 
-    st.markdown("---")
+    # Alert zona
+    if result.zone == "distress":
+        st.error(f"🔴 **ZONA DI PERICOLO** — {result.recommendation}")
+    elif result.zone == "grey":
+        st.warning(f"🟡 **ZONA GRIGIA** — {result.recommendation}")
+    else:
+        st.success(f"🟢 **ZONA SICURA** — {result.recommendation}")
 
-    if st.button("🔍 CALCOLA Z-SCORE", type="primary", use_container_width=True):
-        try:
-            if "Z'-Score (1983)" in model_choice:
-                result = altman_z_prime(working_capital, total_assets, retained_earnings,
-                                         ebit, equity_input, total_liabilities, revenue)
-            elif "Quotate" in model_choice:
-                result = altman_z_original(working_capital, total_assets, retained_earnings,
-                                            ebit, equity_input, total_liabilities, revenue)
-            else:
-                result = altman_z_doubleprime(working_capital, total_assets, retained_earnings,
-                                               ebit, equity_input, total_liabilities)
+    # ── Variabili ──────────────────────────────────────────────────────────────
+    st.subheader("📐 Variabili del Modello")
+    df_vars = pd.DataFrame(list(result.variables.items()), columns=["Variabile", "Valore"])
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.dataframe(df_vars, use_container_width=True, hide_index=True)
+    with col2:
+        fig_bar = go.Figure(go.Bar(
+            x=list(result.variables.values()),
+            y=list(result.variables.keys()),
+            orientation="h",
+            marker_color=["#00C853" if v > 0 else "#D50000"
+                          for v in result.variables.values()],
+        ))
+        fig_bar.update_layout(height=250, margin=dict(l=10, r=10, t=10, b=10),
+                               showlegend=False)
+        st.plotly_chart(fig_bar, use_container_width=True)
 
-            zone_bg  = {"safe": "#14532D", "grey": "#422006", "distress": "#450A0A"}[result.zone]
-            zone_txt = {"safe": "#4ADE80", "grey": "#FCD34D", "distress": "#F87171"}[result.zone]
+    # ── Proiezioni ────────────────────────────────────────────────────────────
+    st.subheader("📈 Proiezioni Z-Score (4 anni)")
+    df_proj = pd.DataFrame(result.projections)
+    st.dataframe(df_proj, use_container_width=True, hide_index=True)
 
-            st.markdown(f"""
-            <div style="background:{zone_bg};border:2px solid {zone_txt};border-radius:12px;padding:20px;margin:15px 0;">
-                <div style="text-align:center;">
-                    <div style="font-size:3rem;font-weight:800;color:{zone_txt};">{result.z_score}</div>
-                    <div style="color:{zone_txt};font-size:1.2rem;font-weight:700;">{result.zone_label}</div>
-                    <div style="color:#CBD5E1;font-size:0.9rem;margin-top:5px;">{result.model}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+    fig_proj = go.Figure()
+    fig_proj.add_trace(go.Scatter(x=df_proj["Anno"], y=df_proj["Scenario Base"],
+                                   name="Scenario Base", mode="lines+markers",
+                                   line=dict(color="#0D47A1", width=2)))
+    fig_proj.add_trace(go.Scatter(x=df_proj["Anno"], y=df_proj["Scenario Stress"],
+                                   name="Scenario Stress", mode="lines+markers",
+                                   line=dict(color="#D50000", width=2, dash="dash")))
+    fig_proj.add_hline(y=result.thresholds["safe"], line_color="green",
+                        line_dash="dot", annotation_text="Soglia Sicura")
+    fig_proj.add_hline(y=result.thresholds["grey_low"], line_color="orange",
+                        line_dash="dot", annotation_text="Soglia Grigia")
+    fig_proj.update_layout(height=320, title="Evoluzione Z-Score — Scenari")
+    st.plotly_chart(fig_proj, use_container_width=True)
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.plotly_chart(gauge_chart(result.z_score, "Z-Score", 0, 5, result.thresholds), use_container_width=True)
-            with col2:
-                st.markdown(f"""
-                <div style="background:#1E293B;border-radius:12px;padding:20px;">
-                    <h3 style="color:#F1F5F9;margin-top:0;">📊 Indicatori Chiave</h3>
-                    <div style="margin:10px 0;padding:10px;background:#0F172A;border-radius:8px;">
-                        <div style="color:#94A3B8;font-size:0.8rem;">PROBABILITÀ DI DEFAULT</div>
-                        <div style="color:{zone_txt};font-size:1.8rem;font-weight:700;">{result.bankruptcy_probability:.1f}%</div>
-                    </div>
-                    <div style="margin:10px 0;padding:10px;background:#0F172A;border-radius:8px;">
-                        <div style="color:#94A3B8;font-size:0.8rem;">RATING IMPLICITO</div>
-                        <div style="color:#3B82F6;font-size:1.8rem;font-weight:700;">{result.rating}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+    # ── Ratio Analysis integrata ──────────────────────────────────────────────
+    data_for_ratios = dict(
+        total_assets=total_assets, total_liabilities=total_liabilities, revenue=revenue,
+        ebit=ebit, ebitda=ebit + depreciation, net_income=net_income, equity=equity,
+        current_assets=current_assets, current_liabilities=current_liabilities,
+        inventory=inventory, accounts_receivable=accounts_receivable,
+        accounts_payable=accounts_payable, interest_expense=interest_expense,
+        retained_earnings=retained_earnings,
+    )
+    ratio_result = calculate_all_ratios(data_for_ratios, industry)
 
-            st.subheader("🧮 Scomposizione Variabili")
-            var_cols = st.columns(len(result.variables))
-            for i, (k, v) in enumerate(result.variables.items()):
-                with var_cols[i]:
-                    color = "#4ADE80" if v > 0 else "#F87171"
-                    st.markdown(f"""
-                    <div style="background:#1E293B;border-radius:8px;padding:12px;text-align:center;">
-                        <div style="color:#94A3B8;font-size:0.75rem;">{k}</div>
-                        <div style="color:{color};font-size:1.3rem;font-weight:700;">{v:.4f}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+    st.subheader(f"📊 Health Score Finanziario: {ratio_result.overall_score:.0f}/100 — {ratio_result.health_label}")
+    cols = st.columns(len(ratio_result.categories))
+    for i, cat in enumerate(ratio_result.categories):
+        cols[i].metric(f"{cat.icon} {cat.name.split()[0]}", f"{cat.score:.0f}/100")
 
-            st.markdown(f"""
-            <div style="background:#1E293B;border-left:4px solid {zone_txt};border-radius:8px;padding:15px;margin:15px 0;">
-                <strong style="color:#F1F5F9;">📋 Raccomandazione</strong><br>
-                <span style="color:#CBD5E1;">{result.recommendation}</span>
-            </div>
-            """, unsafe_allow_html=True)
+    # ── Salva su Supabase ─────────────────────────────────────────────────────
+    save_risk_analysis({
+        "company_name": company_name,
+        "model": result.model,
+        "z_score": result.z_score,
+        "zone": result.zone,
+        "bankruptcy_probability": result.bankruptcy_probability,
+        "rating": result.rating,
+        "total_assets": total_assets,
+        "revenue": revenue,
+        "ebit": ebit,
+    })
 
-            st.plotly_chart(projection_chart(result.projections), use_container_width=True)
-
-            df_proj = pd.DataFrame(result.projections)
-            st.dataframe(df_proj.set_index("Anno"), use_container_width=True)
-
-            st.markdown("---")
-            if st.button("💾 Salva Analisi su Supabase"):
-                saved = save_risk_analysis({
-                    "company_name": company_name or "N/A",
-                    "model": result.model,
-                    "z_score": result.z_score,
-                    "zone": result.zone,
-                    "bankruptcy_probability": result.bankruptcy_probability,
-                    "rating": result.rating,
-                    "total_assets": total_assets,
-                    "total_liabilities": total_liabilities,
-                    "ebit": ebit,
-                    "revenue": revenue,
-                })
-                if saved:
-                    st.success("✅ Analisi salvata con successo!")
-
-        except Exception as e:
-            st.error(f"❌ Errore nel calcolo: {e}. Verifica che i valori inseriti siano corretti.")
+    # ── Export PDF ────────────────────────────────────────────────────────────
+    st.divider()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📄 Genera Report PDF Completo", type="primary", use_container_width=True):
+            with st.spinner("Generazione PDF..."):
+                try:
+                    from utils.pdf_export import generate_full_report
+                    from engine.cashflow import calculate_cashflow
+                    cf = calculate_cashflow(data_for_ratios)
+                    pdf_bytes = generate_full_report(
+                        company_name=company_name or "Azienda",
+                        altman_result=result,
+                        ratio_result=ratio_result,
+                        cashflow_result=cf,
+                        raw_data=data_for_ratios,
+                    )
+                    st.download_button("⬇️ Scarica PDF", data=pdf_bytes,
+                                       file_name=f"nexus_zscore_{company_name or 'report'}.pdf",
+                                       mime="application/pdf", use_container_width=True)
+                    st.success("✅ Report PDF completo generato!")
+                except Exception as e:
+                    st.error(f"Errore PDF: {e}")
+    with col2:
+        csv_rows = [("Z-Score", result.z_score), ("Zona", result.zone_label),
+                    ("Prob. Fallimento", f"{result.bankruptcy_probability}%"),
+                    ("Rating", result.rating)] + list(result.variables.items())
+        df_csv = pd.DataFrame(csv_rows, columns=["Indicatore", "Valore"])
+        buf = io.StringIO()
+        df_csv.to_csv(buf, index=False)
+        st.download_button("📊 Esporta CSV", data=buf.getvalue().encode(),
+                           file_name="zscore_export.csv", mime="text/csv",
+                           use_container_width=True)
