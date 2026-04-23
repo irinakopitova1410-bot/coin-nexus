@@ -1,7 +1,5 @@
-fastapi
-uvicorn[standard]
-supabase
-python-dotenv
+streamlit
+requests
 pandas
-scikit-learn
-tensorflow-cpu
+openpyxl
+supabase
