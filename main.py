@@ -1,26 +1,18 @@
-import os
 from fastapi import FastAPI, BackgroundTasks, Header, HTTPException
-from supabase import create_client, Client
-from analytics import NexusAI  # Importa il motore professionale che abbiamo creato
+import os
+from analytics import NexusAI 
 
 app = FastAPI()
 ai_engine = NexusAI()
 
-# Inizializzazione Supabase tramite Variabili d'Ambiente su Render
-try:
-    supabase: Client = create_client(
-        os.getenv("SUPABASE_URL"), 
-        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    )
-except Exception as e:
-    print(f"Errore configurazione Supabase: {e}")
-
 @app.get("/")
-def health():
-    return {"status": "Nexus AI Engine Online", "version": "Audace 2.0"}
+def home():
+    return {"status": "Nexus AI Engine Online"}
 
-@app.post("/v1/analyze")
+@app.post("/v1/analyze") # <--- Questa riga è CRITICA
 async def start_analysis(data: dict, background_tasks: BackgroundTasks, x_api_key: str = Header(None)):
+    # ... resto del codice ...
+    
     # 1. Verifica di Sicurezza
     if x_api_key != "nx-live-docfinance-2026":
         raise HTTPException(status_code=403, detail="Chiave API non valida")
