@@ -178,6 +178,15 @@ def show_credit_scoring():
     if file_data:
         defaults.update(file_data)
 
+    # Helper: per campi che devono essere >= 0, prende il valore assoluto
+    # (es. interessi passivi possono essere negativi nel bilancio ma sono sempre costi positivi)
+    def pos(key):
+        return abs(float(defaults.get(key, 0) or 0))
+
+    # Helper: per campi che possono essere negativi (EBIT, EBITDA, PN)
+    def val(key, fallback=0.0):
+        return float(defaults.get(key, fallback) or fallback)
+
     company_name = st.text_input("Nome Azienda / Debitore",
         value=str(defaults.get("nome_azienda", "")),
         placeholder="Es: Mario Bianchi S.p.A.")
@@ -185,20 +194,20 @@ def show_credit_scoring():
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown("**🔵 Reddito & Debito**")
-        ebit = st.number_input("EBIT (€)", value=float(defaults["ebit"]), step=5000.0, format="%.0f")
-        depreciation = st.number_input("Ammortamenti (€)", min_value=0.0, value=float(defaults["depreciation"]), step=1000.0, format="%.0f")
-        interest_expense = st.number_input("Interessi passivi (€)", min_value=0.0, value=float(defaults["interest_expense"]), step=1000.0, format="%.0f")
-        debt_repayment = st.number_input("Rimborso debito annuo (€)", min_value=0.0, value=float(defaults["debt_repayment"]), step=5000.0, format="%.0f")
+        ebit = st.number_input("EBIT (€)", value=val("ebit", 120000.0), step=5000.0, format="%.0f")
+        depreciation = st.number_input("Ammortamenti (€)", min_value=0.0, value=pos("depreciation"), step=1000.0, format="%.0f")
+        interest_expense = st.number_input("Interessi passivi (€)", min_value=0.0, value=pos("interest_expense"), step=1000.0, format="%.0f")
+        debt_repayment = st.number_input("Rimborso debito annuo (€)", min_value=0.0, value=pos("debt_repayment"), step=5000.0, format="%.0f")
     with col2:
         st.markdown("**🟡 Struttura Patrimoniale**")
-        total_debt = st.number_input("Debiti Finanziari Totali (€)", min_value=0.0, value=float(defaults["total_debt"]), step=10000.0, format="%.0f")
-        total_equity = st.number_input("Patrimonio Netto (€)", value=float(defaults["total_equity"]), step=10000.0, format="%.0f")
-        ebitda = st.number_input("EBITDA (€)", value=float(defaults["ebitda"]), step=5000.0, format="%.0f")
-        net_revenue = st.number_input("Ricavi Netti (€)", value=float(defaults["net_revenue"]), step=10000.0, format="%.0f")
+        total_debt = st.number_input("Debiti Finanziari Totali (€)", min_value=0.0, value=pos("total_debt"), step=10000.0, format="%.0f")
+        total_equity = st.number_input("Patrimonio Netto (€)", value=val("total_equity", 300000.0), step=10000.0, format="%.0f")
+        ebitda = st.number_input("EBITDA (€)", value=val("ebitda", 150000.0), step=5000.0, format="%.0f")
+        net_revenue = st.number_input("Ricavi Netti (€)", value=val("net_revenue", 900000.0), step=10000.0, format="%.0f")
     with col3:
         st.markdown("**🟢 Liquidità**")
-        current_assets = st.number_input("Attivo Corrente (€)", min_value=0.0, value=float(defaults["current_assets"]), step=10000.0, format="%.0f")
-        current_liabilities = st.number_input("Passivo Corrente (€)", min_value=0.0, value=float(defaults["current_liabilities"]), step=10000.0, format="%.0f")
+        current_assets = st.number_input("Attivo Corrente (€)", min_value=0.0, value=pos("current_assets"), step=10000.0, format="%.0f")
+        current_liabilities = st.number_input("Passivo Corrente (€)", min_value=0.0, value=pos("current_liabilities"), step=10000.0, format="%.0f")
 
     st.markdown("---")
     if st.button("💳 CALCOLA CREDIT SCORE", type="primary", use_container_width=True):
