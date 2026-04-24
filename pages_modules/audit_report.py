@@ -65,7 +65,12 @@ def _parse_audit_file(uploaded_file) -> dict | None:
     try:
         name = uploaded_file.name.lower()
         if name.endswith(".csv"):
-            df = pd.read_csv(uploaded_file)
+            raw = uploaded_file.read()
+            uploaded_file.seek(0)
+            text = raw.decode("utf-8", errors="replace")
+            # Filtra righe commento (#) e righe vuote PRIMA di passare a pandas
+            lines = [l for l in text.splitlines() if l.strip() and not l.strip().startswith("#")]
+            df = pd.read_csv(io.StringIO("\n".join(lines)))
         else:
             df = pd.read_excel(uploaded_file)
 
