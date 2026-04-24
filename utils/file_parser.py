@@ -340,3 +340,129 @@ def get_credit_template_bytes():
 
 def get_zscore_template_bytes():
     return ZSCORE_TEMPLATE.encode("utf-8")
+
+
+def get_credit_template_excel():
+    """Genera un file Excel del template Credit Scoring (bytes)."""
+    try:
+        import io as _io
+        lines = [l for l in CREDIT_TEMPLATE.strip().splitlines() if l.strip() and not l.startswith("#")]
+        df = pd.read_csv(_io.StringIO("\n".join(lines)))
+        buf = _io.BytesIO()
+        df.to_excel(buf, index=False, engine="openpyxl")
+        return buf.getvalue()
+    except Exception:
+        # Fallback: restituisci il CSV come bytes
+        return CREDIT_TEMPLATE.encode("utf-8")
+
+
+def get_zscore_template_excel():
+    """Genera un file Excel del template Z-Score (bytes)."""
+    try:
+        import io as _io
+        lines = [l for l in ZSCORE_TEMPLATE.strip().splitlines() if l.strip() and not l.startswith("#")]
+        df = pd.read_csv(_io.StringIO("\n".join(lines)))
+        buf = _io.BytesIO()
+        df.to_excel(buf, index=False, engine="openpyxl")
+        return buf.getvalue()
+    except Exception:
+        return ZSCORE_TEMPLATE.encode("utf-8")
+
+
+def get_ratios_template_bytes():
+    """Restituisce il template Financial Ratios come CSV bytes."""
+    template = """campo,valore,descrizione
+nome_azienda,,Ragione sociale
+totale_attivo,,Totale Attivo (€)
+patrimonio_netto,,Patrimonio Netto (€)
+totale_debiti,,Totale Debiti (€)
+totale_attivo_circolante,,Attivo Corrente (€)
+passivo_corrente,,Passivo Corrente (€)
+rimanenze,,Rimanenze/Scorte (€)
+disponibilita_liquide,,Liquidità disponibile (€)
+ricavi_netti,,Ricavi Netti (€)
+ebit,,EBIT - Reddito Operativo (€)
+ebitda,,EBITDA (€)
+utile_netto,,Utile (Perdita) Netto (€)
+interessi_passivi,,Interessi Passivi (€)
+ammortamenti,,Ammortamenti (€)
+"""
+    return template.encode("utf-8")
+
+
+def get_ratios_template_excel():
+    """Genera un file Excel del template Financial Ratios (bytes)."""
+    try:
+        import io as _io
+        template = get_ratios_template_bytes().decode("utf-8")
+        lines = [l for l in template.strip().splitlines() if l.strip() and not l.startswith("#")]
+        df = pd.read_csv(_io.StringIO("\n".join(lines)))
+        buf = _io.BytesIO()
+        df.to_excel(buf, index=False, engine="openpyxl")
+        return buf.getvalue()
+    except Exception:
+        return get_ratios_template_bytes()
+
+
+def parse_financial_file(uploaded_file):
+    """Parsa file CSV/Excel per Cash Flow Analysis. Alias di parse_cashflow_file."""
+    try:
+        if uploaded_file.name.lower().endswith(".csv"):
+            data = _parse_csv_universal(uploaded_file)
+            if "_parse_error" in data:
+                return {"success": False, "error": data["_parse_error"]}
+        else:
+            df = pd.read_excel(uploaded_file)
+            if "campo" in df.columns and "valore" in df.columns:
+                data = dict(zip(df["campo"].astype(str).str.strip().str.lower(), df["valore"]))
+            else:
+                data = {col.strip().lower(): df[col].iloc[0] for col in df.columns}
+
+        nome = _str(data, "nome_azienda", "azienda", default="Azienda")
+        ebit = _num(data, "ebit", default=0.0)
+        ammort = _num(data, "ammortamenti", default=0.0)
+        ebitda = _num(data, "ebitda", default=ebit + ammort)
+
+        # Cash Flow Operativo
+        ocf = _num(data, "cash_flow_operativo", "ocf", default=None)
+        if ocf is None:
+            utile_netto = _num(data, "utile_netto", default=0.0)
+            var_ccn = _num(data, "variazione_ccn", "variazione_capitale_circolante", default=0.0)
+            ocf = utile_netto + ammort - var_ccn
+
+        # Investimenti e Finanziamenti
+        capex = _num(data, "capex", "investimenti", default=ammort * 1.1)
+        fcf = ocf - capex
+
+        return {
+            "success": True,
+            "nome_azienda": nome,
+            "ebit": ebit,
+            "ebitda": ebitda,
+            "ammortamenti": ammort,
+            "utile_netto": _num(data, "utile_netto", default=0.0),
+            "variazione_ccn": _num(data, "variazione_ccn", "variazione_capitale_circolante", default=0.0),
+            "capex": capex,
+            "cash_flow_operativo": ocf,
+            "free_cash_flow": fcf,
+            "ricavi_netti": _num(data, "ricavi_netti", "ricavi_vendite", "fatturato", default=0.0),
+            "debiti_finanziari": _num(data, "debiti_banche", "totale_debiti", "debiti_finanziari_totali", default=0.0),
+            "disponibilita_liquide": _num(data, "disponibilita_liquide", default=0.0),
+            "interessi_passivi": _num(data, "interessi_passivi", "oneri_finanziari", default=0.0),
+            "rimborso_debito": _num(data, "rimborso_debito", default=0.0),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def get_bilancio_template_excel():
+    """Genera un file Excel del template Bilancio Completo (bytes)."""
+    try:
+        import io as _io
+        lines = [l for l in BILANCIO_COMPLETO_TEMPLATE.strip().splitlines() if l.strip() and not l.startswith("#")]
+        df = pd.read_csv(_io.StringIO("\n".join(lines)))
+        buf = _io.BytesIO()
+        df.to_excel(buf, index=False, engine="openpyxl")
+        return buf.getvalue()
+    except Exception:
+        return BILANCIO_COMPLETO_TEMPLATE.encode("utf-8")
