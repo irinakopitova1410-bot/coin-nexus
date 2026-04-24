@@ -1,226 +1,204 @@
+"""
+NEXUS Finance Pro — Entry Point
+Analisi finanziaria professionale per PMI italiane.
+"""
 import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from fpdf import FPDF
-from datetime import datetime
-from supabase import create_client, Client
+import os
 
-# --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Coin-Nexus | Enterprise Audit", layout="wide", page_icon="🏛️")
+# ── Configurazione pagina ──────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="NEXUS Finance Pro",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-# --- CONNESSIONE SUPABASE (Dalle Secrets) ---
-@st.cache_resource
-def init_supabase():
+# ── Secrets: supporta sia Streamlit Cloud che variabili d'ambiente ─────────────
+def get_secret(key: str, fallback: str = "") -> str:
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
-        return create_client(url, key)
-    except:
-        return None
+        return st.secrets[key]
+    except Exception:
+        return os.environ.get(key, fallback)
 
-supabase = init_supabase()
+# Rendi i secrets disponibili come env vars per i moduli services/
+if not os.environ.get("SUPABASE_URL"):
+    url = get_secret("SUPABASE_URL")
+    key = get_secret("SUPABASE_KEY")
+    if url:
+        os.environ["SUPABASE_URL"] = url
+    if key:
+        os.environ["SUPABASE_KEY"] = key
 
-# --- CLASSE PDF AVANZATA (LAYOUT BANCARIO) ---
-class EnterpriseReport(FPDF):
-    def header(self):
-        self.set_fill_color(0, 40, 85)
-        self.rect(0, 0, 210, 45, 'F')
-        self.set_text_color(255, 255, 255)
-        self.set_font('Arial', 'B', 18)
-        self.cell(0, 20, 'EXECUTIVE AUDIT & STRATEGIC DOSSIER', 0, 1, 'C')
-        self.set_font('Arial', 'I', 9)
-        self.cell(0, -5, 'Certified ISA 320 Compliance | Basel IV Rating System', 0, 1, 'C')
-        self.ln(25)
+# ── CSS globale ────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0D47A1 0%, #1565C0 60%, #0097A7 100%);
+    color: white;
+}
+[data-testid="stSidebar"] * { color: white !important; }
+[data-testid="stSidebar"] .stButton > button {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white !important;
+    border-radius: 8px;
+    width: 100%;
+    text-align: left;
+    margin-bottom: 2px;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(255,255,255,0.25);
+}
+/* Metric cards */
+[data-testid="metric-container"] {
+    background: #f8faff;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #e3eafc;
+    box-shadow: 0 2px 8px rgba(13,71,161,0.06);
+}
+/* Headers */
+h1, h2, h3 { color: #0D47A1; }
+/* Hide Streamlit default menu */
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
+</style>
+""", unsafe_allow_html=True)
 
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.set_text_color(150, 150, 150)
-        self.cell(0, 10, f'VALIDATED BY COIN-NEXUS AI | ID: {datetime.now().strftime("%Y%m%d")}-ST', 0, 0, 'C')
+# ── Autenticazione ─────────────────────────────────────────────────────────────
+from services.auth import login_page, get_current_user, logout
 
-# --- AUTENTICAZIONE IBRIDA ---
-if 'auth' not in st.session_state:
-    st.session_state['auth'] = False
+user = get_current_user()
 
-if not st.session_state['auth']:
-    st.title("🏛️ Coin-Nexus | Gate di Accesso")
-    tab1, tab2 = st.tabs(["🔑 Master Admin", "👤 Registrazione Cloud"])
-    with tab1:
-        u = st.text_input("Admin Email")
-        p = st.text_input("Quantum Key", type="password")
-        if st.button("ACCEDI"):
-            if u == "admin@coin-nexus.com" and p == "quantum2026":
-                st.session_state.update({"auth": True, "user": u, "role": "admin"})
-                st.rerun()
-    with tab2:
-        st.info("Area per utenti esterni gestita via Supabase Auth.")
+if not user:
+    login_page()
     st.stop()
 
-# --- DASHBOARD ---
-st.title(f"🚀 Terminale Audit Strategico | {st.session_state['user']}")
-st.sidebar.success(f"Connessione DB: {'Attiva' if supabase else 'Locale'}")
+# ── Sidebar navigazione ────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style='text-align:center; padding:16px 0 8px 0;'>
+        <div style='font-size:32px;'>📊</div>
+        <div style='font-size:18px; font-weight:800; letter-spacing:1px;'>NEXUS Finance</div>
+        <div style='font-size:11px; opacity:0.8;'>Pro Analytics Platform</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-up = st.file_uploader("Carica Flusso ERP (CSV/XLSX)", type=['xlsx', 'csv'])
+    st.markdown("---")
 
-if up:
-    # 1. MOTORE DI CALCOLO (Simulazione su dati reali)
-    fatturato_2026 = 5450000.0
-    utile_lordo = 950000.0
-    isa_320_threshold = utile_lordo * 0.05  # € 47,500
-    bep = 2847619.0
-    safety_margin = 82.6
+    # Info utente
+    role_label = "👑 Admin" if user.get("role") == "admin" else "👤 Cliente"
+    company = user.get("company_name") or user.get("email", "")
+    st.markdown(f"""
+    <div style='background:rgba(255,255,255,0.12); border-radius:8px; padding:10px 12px; margin-bottom:12px;'>
+        <div style='font-size:13px; font-weight:700;'>{role_label}</div>
+        <div style='font-size:11px; opacity:0.85; word-break:break-all;'>{company}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # 2. PROIEZIONI 4 ANNI
-    anni = ['2026', '2027', '2028', '2029']
-    rev_proj = [5.45, 7.20, 9.80, 13.5]
-    
-    # KPI FRONTEND
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Rating Basilea IV", "AAA")
-    c2.metric("Soglia ISA 320", f"€{isa_320_threshold:,.0f}")
-    c3.metric("Break-Even Point", f"€{bep:,.0f}")
-    c4.metric("Market Val.", "€ 25.0M")
+    # ── Navigazione principale ─────────────────────────────────────────────────
+    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin-bottom:6px;'>⚡ STRUMENTO PRINCIPALE</div>", unsafe_allow_html=True)
 
-    st.divider()
+    PAGES = {
+        "credit_readiness": ("⚡", "Credit Readiness"),
+        "dashboard":        ("🏠", "Dashboard"),
+        "erp_import":       ("🔌", "Import da ERP"),
+        "ratio_analysis":   ("📊", "Ratio Analysis"),
+        "cashflow":         ("💰", "Cash Flow"),
+        "risk_analysis":    ("🎯", "Z-Score Altman"),
+        "credit_scoring":   ("🏅", "Credit Scoring"),
+        "audit_report":     ("📄", "Audit Report"),
+        "history":          ("📁", "Storico Analisi"),
+    }
 
-    # 3. GRAFICI
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("📊 Analisi del Punto di Pareggio")
-        fig_bep = go.Figure()
-        x_val = np.linspace(0, 6000000, 20)
-        fig_bep.add_trace(go.Scatter(x=x_val, y=x_val, name='Ricavi', line=dict(color='cyan', width=3)))
-        fig_bep.add_trace(go.Scatter(x=x_val, y=1200000 + 0.5*x_val, name='Costi', line=dict(color='red')))
-        fig_bep.update_layout(template="plotly_dark", height=350)
-        st.plotly_chart(fig_bep, use_container_width=True)
+    if user.get("role") == "admin":
+        PAGES["admin_panel"] = ("⚙️", "Admin Panel")
 
-    with col2:
-        st.subheader("📈 Proiezione Crescita 2029")
-        fig_pro = px.area(x=anni, y=rev_proj, title="Fatturato Target (M€)")
-        fig_pro.update_layout(template="plotly_dark", height=350)
-        st.plotly_chart(fig_pro, use_container_width=True)
+    if "current_page" not in st.session_state:
+        st.session_state["current_page"] = "credit_readiness"
 
-# --- NUOVA SEZIONE: POSIZIONAMENTO E KPI RADAR ---
-    st.divider()
-    st.subheader("🎯 Posizionamento Strategico (KPI Radar)")
-    
-    col_radar, col_info = st.columns([2, 1])
-    
-    with col_radar:
-        categories = ['Solvibilità', 'Redditività', 'Liquidità', 'Efficienza', 'Resilienza']
-        fig_radar = go.Figure()
-        fig_radar.add_trace(go.Scatterpolar(
-              r=[95, 88, 92, 85, 98], # Asset Coin-Nexus
-              theta=categories, fill='toself', name='Coin-Nexus', line_color='cyan'
-        ))
-        fig_radar.add_trace(go.Scatterpolar(
-              r=[65, 60, 70, 55, 50], # Media Settore
-              theta=categories, fill='toself', name='Media Mercato', line_color='red'
-        ))
-        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), 
-                              template="plotly_dark", height=400)
-        st.plotly_chart(fig_radar, use_container_width=True)
+    def nav_button(page_id, icon, label):
+        is_active = st.session_state.get("current_page") == page_id
+        btn_style = "background:rgba(255,255,255,0.3) !important;" if is_active else ""
+        # Usa un marker visivo
+        prefix = "▶ " if is_active else "   "
+        if st.button(f"{prefix}{icon} {label}", key=f"nav_{page_id}"):
+            st.session_state["current_page"] = page_id
+            st.rerun()
 
-    with col_info:
-        st.write("### 🤖 Analisi Predictiva AI")
-        st.info(f"""
-        **Esito:** L'asset performa il **35% sopra la media** di settore. 
-        Il 'Telepass Bancario' è validato con rating AAA. 
-        Probabilità di Default stimata: **< 0.05%**.
-        """)
-        
-    # --- SEZIONE STRESS TEST ---
-    with st.expander("🛡️ Esegui Stress Test (Simulazione Crisi)"):
-        st.write("Analisi di resilienza in scenario di contrazione del mercato (-20%)")
-        st.success("RISULTATO: L'azienda mantiene un Margine di Sicurezza del 62% e piena solvibilità.")
+    for pid, (icon, label) in PAGES.items():
+        nav_button(pid, icon, label)
 
+    st.markdown("---")
+    if st.button("🚪 Esci", key="logout_btn"):
+        logout()
 
+    st.markdown("""
+    <div style='text-align:center; font-size:10px; opacity:0.6; margin-top:16px;'>
+        NEXUS Finance Pro v4.0<br>© 2025 Irina Kopitova
+    </div>
+    """, unsafe_allow_html=True)
 
+# ── Routing pagine ─────────────────────────────────────────────────────────────
+page_id = st.session_state.get("current_page", "credit_readiness")
 
+try:
+    if page_id == "credit_readiness":
+        from pages_modules.credit_readiness import render_credit_readiness
+        render_credit_readiness()
 
+    elif page_id == "dashboard":
+        from pages_modules.dashboard import render_dashboard
+        render_dashboard(user)
 
+    elif page_id == "erp_import":
+        from pages_modules.erp_import import render_erp_import
+        render_erp_import()
 
-    
+    elif page_id == "ratio_analysis":
+        from pages_modules.financial_ratios import render_financial_ratios
+        render_financial_ratios()
 
-    # 4. TABELLA BENCHMARK
-    st.subheader("🏁 Benchmark Comparativo di Settore")
-    bench_data = pd.DataFrame({
-        "KPI": ["EBITDA Margin", "Current Ratio", "Growth YoY"],
-        "Coin-Nexus": ["17.4%", "1.85", "25.2%"],
-        "Media Mercato": ["11.2%", "1.40", "12.5%"]
-    })
-    st.table(bench_data)
+    elif page_id == "cashflow":
+        from pages_modules.cashflow_analysis import render_cashflow_analysis
+        render_cashflow_analysis()
 
-   # --- GENERAZIONE REPORT PDF POTENZIATO ---
-    if st.button("🏆 EMETTI DOSSIER EXECUTIVO CERTIFICATO"):
-        pdf = EnterpriseReport()
-        pdf.add_page()
-        
-        # 1. ESITO FORMALE DI REVISIONE (ISA 320)
-        pdf.set_font('Arial', 'B', 12)
-        pdf.set_fill_color(230, 240, 255)
-        pdf.cell(0, 10, " 1. ESITO FORMALE DI REVISIONE (PROTOCOLLO ISA 320)", 0, 1, 'L', True)
-        pdf.ln(2)
-        pdf.set_font('Arial', '', 10)
-        
-        esito_testo = (
-            f"Sulla base dei dati analizzati per il file {up.name}, la Soglia di Materialita e stata fissata a "
-            f"Euro {isa_320_threshold:,.0f}. L'analisi non ha rilevato scostamenti significativi. "
-            "ESITO: I flussi finanziari sono certificati conformi agli standard di revisione internazionale. "
-            "La precisione del dato permette una validazione senza riserve per l'accesso a linee di credito Tier-1."
-        )
-        pdf.multi_cell(0, 8, esito_testo)
-        
-        # 2. ANALISI TECNICA BREAK-EVEN & RESILIENZA
-        pdf.ln(5)
-        pdf.set_font('Arial', 'B', 12)
-        pdf.set_fill_color(240, 240, 240)
-        pdf.cell(0, 10, " 2. ANALISI DI RESILIENZA E STRUTTURA COSTI", 0, 1, 'L', True)
-        pdf.ln(2)
-        pdf.set_font('Arial', '', 10)
-        
-        analisi_bep = (
-            f"L'azienda raggiunge il punto di pareggio (BEP) a Euro {bep:,.0f}. "
-            f"Con un Margine di Sicurezza dell' {safety_margin}%, la struttura aziendale mostra una "
-            "resilienza eccezionale a shock di mercato esterni. Anche in caso di una contrazione "
-            "del fatturato superiore al 50%, la capacita di rimborso del debito (DSCR) rimane solida."
-        )
-        pdf.multi_cell(0, 8, analisi_bep)
+    elif page_id == "risk_analysis":
+        from pages_modules.risk_analysis import render_risk_analysis
+        render_risk_analysis()
 
-        # 3. PROIEZIONI STRATEGICHE 2026-2029
-        pdf.ln(5)
-        pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, " 3. PROIEZIONI E TARGET DI VALUTAZIONE 2029", 0, 1, 'L', True)
-        pdf.set_font('Arial', '', 10)
-        pdf.ln(2)
-        for i in range(len(anni)):
-            pdf.cell(0, 8, f"- Proiezione Anno {anni[i]}: Target Fatturato Euro {rev_proj[i]}M", ln=True)
-        
-        pdf.ln(3)
-        pdf.set_font('Arial', 'I', 9)
-        pdf.multi_cell(0, 7, "Nota: Le proiezioni sono basate su algoritmi di crescita predittiva e tengono conto del posizionamento AAA nel mercato Fintech.")
+    elif page_id == "credit_scoring":
+        from pages_modules.credit_scoring import render_credit_scoring
+        render_credit_scoring()
 
-        # 4. RACCOMANDAZIONI PER DOCFINANCE
-        pdf.ln(5)
-        pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, " 4. RACCOMANDAZIONI PER LA BANCA / INVESTITORE", 0, 1, 'L', True)
-        pdf.set_font('Arial', '', 9)
-        pdf.ln(2)
-        raccomandazioni = (
-            "- Sincronizzare immediatamente i flussi con DocFinance per monitoraggio real-time.\n"
-            "- Sfruttare l'alto rating per rinegoziare tassi d'interesse (Euribor + spread minimo).\n"
-            "- Procedere con l'istruttoria per finanziamenti agevolati basati su asset intangibili (software)."
-        )
-        pdf.multi_cell(0, 7, raccomandazioni)
+    elif page_id == "audit_report":
+        from pages_modules.audit_report import render_audit_report
+        render_audit_report()
 
-        # GENERAZIONE FINALE
-        pdf_bytes = pdf.output(dest='S').encode('latin-1')
-        st.download_button(
-            label="📥 SCARICA REPORT INTEGRALE (ANALISI + ESITO)",
-            data=pdf_bytes,
-            file_name=f"CoinNexus_Executive_Dossier.pdf",
-            mime="application/pdf"
-        )
-        st.balloons()
+    elif page_id == "history":
+        from pages_modules.history import render_history
+        render_history(user)
+
+    elif page_id == "admin_panel":
+        if user.get("role") == "admin":
+            from pages_modules.admin_panel import render_admin_panel
+            render_admin_panel()
+        else:
+            st.error("Accesso non autorizzato.")
+
+    else:
+        st.info("Seleziona una sezione dalla barra laterale.")
+
+except ImportError as e:
+    st.error(f"❌ Errore modulo: {e}")
+    st.info("Controlla che tutti i file siano correttamente caricati su GitHub.")
+    with st.expander("Dettagli errore"):
+        import traceback
+        st.code(traceback.format_exc())
+
+except Exception as e:
+    st.error(f"❌ Errore: {e}")
+    with st.expander("Dettagli errore"):
+        import traceback
+        st.code(traceback.format_exc())
