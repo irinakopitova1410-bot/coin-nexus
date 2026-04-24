@@ -9,7 +9,7 @@ import io
 from engine.calculations import altman_z_original, altman_z_prime, altman_z_doubleprime
 from engine.financial_ratios import calculate_all_ratios
 from services.db import save_risk_analysis
-from utils.file_parser import generate_template_csv
+from utils.file_parser import get_zscore_template_bytes
 from services.erp_connectors import parse_erp_file
 
 
@@ -61,7 +61,7 @@ def render_risk_analysis():
     with st.expander("📤 Import da file CSV/Excel o ERP", expanded=False):
         c1, c2 = st.columns(2)
         with c1:
-            tpl = generate_template_csv()
+            tpl = get_zscore_template_bytes()
             st.download_button("⬇️ Template CSV", data=tpl,
                                file_name="template_zscore.csv", mime="text/csv")
         with c2:
@@ -90,27 +90,27 @@ def render_risk_analysis():
 
         with col1:
             st.markdown("**📊 Stato Patrimoniale**")
-            total_assets = st.number_input("Totale Attivo (€)", value=float(erp_data.get("total_assets", 0)), format="%.2f", key="zs_ta")
-            total_liabilities = st.number_input("Totale Passivo (€)", value=float(erp_data.get("total_liabilities", 0)), format="%.2f", key="zs_tl")
-            equity = st.number_input("Patrimonio Netto (€)", value=float(erp_data.get("equity", 0)), format="%.2f", key="zs_eq")
-            current_assets = st.number_input("Attivo Corrente (€)", value=float(erp_data.get("current_assets", 0)), format="%.2f", key="zs_ca")
-            current_liabilities = st.number_input("Passivo Corrente (€)", value=float(erp_data.get("current_liabilities", 0)), format="%.2f", key="zs_cl")
+            total_assets = st.number_input("Totale Attivo (EUR)", value=float(erp_data.get("total_assets", 0)), format="%.2f", key="zs_ta")
+            total_liabilities = st.number_input("Totale Passivo (EUR)", value=float(erp_data.get("total_liabilities", 0)), format="%.2f", key="zs_tl")
+            equity = st.number_input("Patrimonio Netto (EUR)", value=float(erp_data.get("equity", 0)), format="%.2f", key="zs_eq")
+            current_assets = st.number_input("Attivo Corrente (EUR)", value=float(erp_data.get("current_assets", 0)), format="%.2f", key="zs_ca")
+            current_liabilities = st.number_input("Passivo Corrente (EUR)", value=float(erp_data.get("current_liabilities", 0)), format="%.2f", key="zs_cl")
 
         with col2:
             st.markdown("**📈 Conto Economico**")
-            revenue = st.number_input("Ricavi (€)", value=float(erp_data.get("revenue", 0)), format="%.2f", key="zs_rev")
-            ebit = st.number_input("EBIT (€)", value=float(erp_data.get("ebit", 0)), format="%.2f", key="zs_ebit")
-            net_income = st.number_input("Utile Netto (€)", value=float(erp_data.get("net_income", 0)), format="%.2f", key="zs_ni")
-            depreciation = st.number_input("Ammortamenti (€)", value=float(erp_data.get("depreciation", 0)), format="%.2f", key="zs_dep")
-            interest_expense = st.number_input("Oneri Finanziari (€)", value=float(erp_data.get("interest_expense", 0)), format="%.2f", key="zs_int")
+            revenue = st.number_input("Ricavi (EUR)", value=float(erp_data.get("revenue", 0)), format="%.2f", key="zs_rev")
+            ebit = st.number_input("EBIT (EUR)", value=float(erp_data.get("ebit", 0)), format="%.2f", key="zs_ebit")
+            net_income = st.number_input("Utile Netto (EUR)", value=float(erp_data.get("net_income", 0)), format="%.2f", key="zs_ni")
+            depreciation = st.number_input("Ammortamenti (EUR)", value=float(erp_data.get("depreciation", 0)), format="%.2f", key="zs_dep")
+            interest_expense = st.number_input("Oneri Finanziari (EUR)", value=float(erp_data.get("interest_expense", 0)), format="%.2f", key="zs_int")
 
         with col3:
             st.markdown("**🏦 Altri Dati**")
-            retained_earnings = st.number_input("Riserve / Utili portati (€)", value=float(erp_data.get("retained_earnings", 0)), format="%.2f", key="zs_re")
-            market_cap = st.number_input("Capitalizzazione di Borsa (€)\n[solo per modello 1968]", value=float(erp_data.get("market_cap", equity)), format="%.2f", key="zs_mc")
-            inventory = st.number_input("Magazzino (€)", value=float(erp_data.get("inventory", 0)), format="%.2f", key="zs_inv")
-            accounts_receivable = st.number_input("Crediti Commerciali (€)", value=float(erp_data.get("accounts_receivable", 0)), format="%.2f", key="zs_ar")
-            accounts_payable = st.number_input("Debiti Commerciali (€)", value=float(erp_data.get("accounts_payable", 0)), format="%.2f", key="zs_ap")
+            retained_earnings = st.number_input("Riserve / Utili portati (EUR)", value=float(erp_data.get("retained_earnings", 0)), format="%.2f", key="zs_re")
+            market_cap = st.number_input("Capitalizzazione di Borsa (EUR)\n[solo per modello 1968]", value=float(erp_data.get("market_cap", equity)), format="%.2f", key="zs_mc")
+            inventory = st.number_input("Magazzino (EUR)", value=float(erp_data.get("inventory", 0)), format="%.2f", key="zs_inv")
+            accounts_receivable = st.number_input("Crediti Commerciali (EUR)", value=float(erp_data.get("accounts_receivable", 0)), format="%.2f", key="zs_ar")
+            accounts_payable = st.number_input("Debiti Commerciali (EUR)", value=float(erp_data.get("accounts_payable", 0)), format="%.2f", key="zs_ap")
 
         submitted = st.form_submit_button("🚀 CALCOLA Z-SCORE", type="primary", use_container_width=True)
 
@@ -140,14 +140,12 @@ def render_risk_analysis():
     col1, col2 = st.columns([1, 1])
 
     with col1:
-        # Gauge
         st.plotly_chart(
             _render_gauge(result.z_score, result.thresholds["safe"], result.thresholds["grey_low"]),
             use_container_width=True
         )
 
     with col2:
-        # Metriche principali
         st.metric("📍 Zona", result.zone_label)
         st.metric("📊 Z-Score", result.z_score)
         prob = result.bankruptcy_probability
@@ -197,7 +195,7 @@ def render_risk_analysis():
                         line_dash="dot", annotation_text="Soglia Sicura")
     fig_proj.add_hline(y=result.thresholds["grey_low"], line_color="orange",
                         line_dash="dot", annotation_text="Soglia Grigia")
-    fig_proj.update_layout(height=320, title="Evoluzione Z-Score — Scenari")
+    fig_proj.update_layout(height=320, title="Evoluzione Z-Score - Scenari")
     st.plotly_chart(fig_proj, use_container_width=True)
 
     # ── Ratio Analysis integrata ──────────────────────────────────────────────
@@ -211,7 +209,7 @@ def render_risk_analysis():
     )
     ratio_result = calculate_all_ratios(data_for_ratios, industry)
 
-    st.subheader(f"📊 Health Score Finanziario: {ratio_result.overall_score:.0f}/100 — {ratio_result.health_label}")
+    st.subheader(f"📊 Health Score Finanziario: {ratio_result.overall_score:.0f}/100 - {ratio_result.health_label}")
     cols = st.columns(len(ratio_result.categories))
     for i, cat in enumerate(ratio_result.categories):
         cols[i].metric(f"{cat.icon} {cat.name.split()[0]}", f"{cat.score:.0f}/100")
@@ -230,7 +228,7 @@ def render_risk_analysis():
         "ebit": ebit,
     }, access_token=access_token)
     if saved:
-        st.toast("✅ Analisi salvata nello storico Supabase", icon="💾")
+        st.toast("Analisi salvata nello storico Supabase", icon="💾")
 
     # ── Export PDF ────────────────────────────────────────────────────────────
     st.divider()
