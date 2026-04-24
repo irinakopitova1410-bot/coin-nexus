@@ -34,13 +34,20 @@ def logout():
         st.session_state.pop(key, None)
 
 
-def get_user_profile(user_id: str):
-    """Recupera profilo e ruolo utente da Supabase."""
+def get_user_profile(user_id: str, access_token: str = None):
+    """Recupera profilo e ruolo utente da Supabase.
+    
+    Usa access_token per autenticare la query PostgREST — necessario
+    quando la RLS richiede auth.uid() = id.
+    """
     try:
         supabase = get_supabase()
+        if access_token:
+            # Imposta il JWT dell'utente loggato per rispettare la RLS
+            supabase.postgrest.auth(access_token)
         result = supabase.table("user_profiles").select("*").eq("id", user_id).single().execute()
         return result.data
-    except:
+    except Exception:
         return None
 
 
@@ -103,7 +110,11 @@ def login_page():
                     if result["success"]:
                         user_obj = result["user"]
                         session_obj = result["session"]
-                        profile = get_user_profile(user_obj.id)
+                        
+                        # ⚠️ IMPORTANTE: passa il token JWT al profilo
+                        # così la RLS (auth.uid() = id) viene rispettata
+                        access_token = session_obj.access_token if session_obj else None
+                        profile = get_user_profile(user_obj.id, access_token)
 
                         user_data = {
                             "id": user_obj.id,
@@ -111,7 +122,7 @@ def login_page():
                             "role": profile.get("role", "client") if profile else "client",
                             "full_name": profile.get("full_name", "") if profile else "",
                             "company_name": profile.get("company_name", "") if profile else "",
-                            "access_token": session_obj.access_token if session_obj else "",
+                            "access_token": access_token or "",
                         }
 
                         st.session_state["user"] = user_data
