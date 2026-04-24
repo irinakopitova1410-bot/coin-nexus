@@ -242,11 +242,12 @@ capex,350000,Investimenti
 
                     # Mostra anteprima campi rilevati
                     detected_fields = {k: v for k, v in parsed.items()
-                                       if k not in ("company_name", "error") and v != 0}
+                                       if k not in ("company_name", "error") and v != 0
+                                       and isinstance(v, (int, float))}
                     if detected_fields:
                         with st.expander(f"✅ {len(detected_fields)} campi rilevati dal file", expanded=False):
                             df_preview = pd.DataFrame([
-                                {"Campo": k, "Valore": f"€ {v:,.0f}"}
+                                {"Campo": k, "Valore": f"€ {float(v):,.0f}"}
                                 for k, v in detected_fields.items()
                             ])
                             st.dataframe(df_preview, use_container_width=True, hide_index=True)
@@ -264,34 +265,42 @@ capex,350000,Investimenti
 
                     # Prepara dati per il motore cashflow
                     # Calcola campi derivati se mancanti
-                    dep = parsed.get("depreciation", 0)
-                    ca = parsed.get("current_assets", 0)
-                    cl = parsed.get("current_liabilities", 0)
-                    td = parsed.get("total_debt", 0)
+                    def _num(key, default=0):
+                        """Legge un valore numerico dal parsed dict, ritorna float sicuro."""
+                        v = parsed.get(key, default)
+                        try:
+                            return float(v)
+                        except (TypeError, ValueError):
+                            return float(default)
+
+                    dep = _num("depreciation")
+                    ca  = _num("current_assets")
+                    cl  = _num("current_liabilities")
+                    td  = _num("total_debt")
 
                     data_upload = dict(
-                        revenue=parsed.get("revenue", 0),
-                        ebit=parsed.get("ebit", 0),
-                        ebitda=parsed.get("ebitda", 0),
-                        net_income=parsed.get("net_income", 0),
+                        revenue=_num("revenue"),
+                        ebit=_num("ebit"),
+                        ebitda=_num("ebitda"),
+                        net_income=_num("net_income"),
                         depreciation=dep,
-                        interest_expense=parsed.get("interest_expense", 0),
-                        tax_expense=parsed.get("tax_expense", 0),
-                        total_assets=parsed.get("total_assets", 0),
-                        equity=parsed.get("equity", 0),
+                        interest_expense=_num("interest_expense"),
+                        tax_expense=_num("tax_expense"),
+                        total_assets=_num("total_assets"),
+                        equity=_num("equity"),
                         total_debt=td,
                         current_assets=ca,
                         current_liabilities=cl,
-                        accounts_receivable=parsed.get("accounts_receivable", 0),
-                        accounts_payable=parsed.get("accounts_payable", 0),
-                        inventory=parsed.get("inventory", 0),
-                        capex=parsed.get("capex", dep * 1.1 if dep else 0),
-                        dividends=parsed.get("dividends", 0),
-                        debt_issued=parsed.get("debt_issued", 0),
-                        debt_repaid=parsed.get("debt_repaid", td * 0.1 if td else 0),
-                        prev_current_assets=parsed.get("prev_current_assets", ca * 0.95 if ca else 0),
-                        prev_current_liabilities=parsed.get("prev_current_liabilities", cl * 0.95 if cl else 0),
-                        prev_fixed_assets=parsed.get("prev_fixed_assets", 0),
+                        accounts_receivable=_num("accounts_receivable"),
+                        accounts_payable=_num("accounts_payable"),
+                        inventory=_num("inventory"),
+                        capex=_num("capex", dep * 1.1 if dep else 0),
+                        dividends=_num("dividends"),
+                        debt_issued=_num("debt_issued"),
+                        debt_repaid=_num("debt_repaid", td * 0.1 if td else 0),
+                        prev_current_assets=_num("prev_current_assets", ca * 0.95 if ca else 0),
+                        prev_current_liabilities=_num("prev_current_liabilities", cl * 0.95 if cl else 0),
+                        prev_fixed_assets=_num("prev_fixed_assets"),
                     )
 
                     _run_cashflow(data_upload, cn)
