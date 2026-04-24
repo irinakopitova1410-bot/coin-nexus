@@ -1,6 +1,7 @@
 """
 NEXUS Finance Pro — Entry Point
 Analisi finanziaria professionale per PMI italiane.
+v5.0 — Big Four Edition: Early Warning · ESG · AI Analyst · Open Banking · What-If
 """
 import streamlit as st
 import os
@@ -20,7 +21,6 @@ def get_secret(key: str, fallback: str = "") -> str:
     except Exception:
         return os.environ.get(key, fallback)
 
-# Rendi i secrets disponibili come env vars per i moduli services/
 if not os.environ.get("SUPABASE_URL"):
     url = get_secret("SUPABASE_URL")
     key = get_secret("SUPABASE_KEY")
@@ -77,7 +77,7 @@ with st.sidebar:
     <div style='text-align:center; padding:16px 0 8px 0;'>
         <div style='font-size:32px;'>📊</div>
         <div style='font-size:18px; font-weight:800; letter-spacing:1px;'>NEXUS Finance</div>
-        <div style='font-size:11px; opacity:0.8;'>Pro Analytics Platform</div>
+        <div style='font-size:11px; opacity:0.8;'>Pro Analytics Platform v5.0</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -92,23 +92,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin-bottom:6px;'>⚡ STRUMENTO PRINCIPALE</div>", unsafe_allow_html=True)
-
-    PAGES = {
-        "credit_readiness": ("⚡", "Credit Readiness"),
-        "dashboard":        ("🏠", "Dashboard"),
-        "erp_import":       ("🔌", "Import da ERP"),
-        "ratio_analysis":   ("📊", "Ratio Analysis"),
-        "cashflow":         ("💰", "Cash Flow"),
-        "risk_analysis":    ("🎯", "Z-Score Altman"),
-        "credit_scoring":   ("🏅", "Credit Scoring"),
-        "audit_report":     ("📄", "Audit Report"),
-        "history":          ("📁", "Storico Analisi"),
-    }
-
-    if user.get("role") == "admin":
-        PAGES["admin_panel"] = ("⚙️", "Admin Panel")
-
     if "current_page" not in st.session_state:
         st.session_state["current_page"] = "credit_readiness"
 
@@ -119,8 +102,38 @@ with st.sidebar:
             st.session_state["current_page"] = page_id
             st.rerun()
 
-    for pid, (icon, label) in PAGES.items():
-        nav_button(pid, icon, label)
+    # ── STRUMENTO PRINCIPALE ──
+    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin-bottom:4px;'>⚡ STRUMENTO PRINCIPALE</div>", unsafe_allow_html=True)
+    nav_button("credit_readiness", "⚡", "Credit Readiness")
+
+    # ── ANALISI FINANZIARIA ──
+    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>📊 ANALISI FINANZIARIA</div>", unsafe_allow_html=True)
+    nav_button("dashboard",      "🏠", "Dashboard")
+    nav_button("risk_analysis",  "🎯", "Z-Score Altman")
+    nav_button("credit_scoring", "🏅", "Credit Scoring")
+    nav_button("ratio_analysis", "📊", "Ratio Analysis")
+    nav_button("cashflow",       "💰", "Cash Flow")
+    nav_button("audit_report",   "📄", "Audit Report ISA 320")
+
+    # ── BIG FOUR SUITE (NUOVO) ──
+    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>🏆 BIG FOUR SUITE</div>", unsafe_allow_html=True)
+    nav_button("early_warning",   "🚨", "Early Warning CCII")
+    nav_button("esg_scoring",     "🌿", "ESG Scoring")
+    nav_button("ai_analyst",      "🤖", "AI Financial Analyst")
+    nav_button("open_banking",    "🏦", "Open Banking PSD2")
+    nav_button("whatif_simulator","🔮", "What-If Simulator")
+
+    # ── INTEGRAZIONI ──
+    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>🔌 INTEGRAZIONI</div>", unsafe_allow_html=True)
+    nav_button("erp_import", "🔌", "Import da ERP")
+
+    # ── STORICO ──
+    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>📁 ARCHIVIO</div>", unsafe_allow_html=True)
+    nav_button("history", "📁", "Storico Analisi")
+
+    if user.get("role") == "admin":
+        st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>⚙️ ADMIN</div>", unsafe_allow_html=True)
+        nav_button("admin_panel", "⚙️", "Admin Panel")
 
     st.markdown("---")
     if st.button("🚪 Esci", key="logout_btn"):
@@ -128,7 +141,7 @@ with st.sidebar:
 
     st.markdown("""
     <div style='text-align:center; font-size:10px; opacity:0.6; margin-top:16px;'>
-        NEXUS Finance Pro v4.0<br>© 2025 Irina Kopitova
+        NEXUS Finance Pro v5.0<br>Big Four Edition<br>© 2025 Irina Kopitova
     </div>
     """, unsafe_allow_html=True)
 
@@ -136,10 +149,12 @@ with st.sidebar:
 page_id = st.session_state.get("current_page", "credit_readiness")
 
 try:
+    # ── STRUMENTO PRINCIPALE ──
     if page_id == "credit_readiness":
         from pages_modules.credit_readiness import render_credit_readiness
         render_credit_readiness()
 
+    # ── ANALISI FINANZIARIA ──
     elif page_id == "dashboard":
         from pages_modules.dashboard import render_dashboard
         render_dashboard(user)
@@ -172,6 +187,28 @@ try:
         from pages_modules.history import show_history
         show_history()
 
+    # ── BIG FOUR SUITE ──
+    elif page_id == "early_warning":
+        from pages_modules.early_warning import show_early_warning
+        show_early_warning()
+
+    elif page_id == "esg_scoring":
+        from pages_modules.esg_scoring import show_esg_scoring
+        show_esg_scoring()
+
+    elif page_id == "ai_analyst":
+        from pages_modules.ai_analyst import show_ai_analyst
+        show_ai_analyst()
+
+    elif page_id == "open_banking":
+        from pages_modules.open_banking import show_open_banking
+        show_open_banking()
+
+    elif page_id == "whatif_simulator":
+        from pages_modules.whatif_simulator import show_whatif_simulator
+        show_whatif_simulator()
+
+    # ── ADMIN ──
     elif page_id == "admin_panel":
         if user.get("role") == "admin":
             from pages_modules.admin_panel import show_admin_panel
