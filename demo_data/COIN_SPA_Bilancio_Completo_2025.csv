@@ -1,0 +1,101 @@
+campo,valore,descrizione
+# ============================================================
+# COIN S.p.A. — BILANCIO COMPLETO 31/01/2025
+# Sede: Via Maderna 11, Venezia VE | P.IVA 04391480276
+# Compatibile con: Risk Analysis, Credit Scoring, Financial Ratios, Audit Report, Credit Readiness
+# ============================================================
+
+# --- ANAGRAFICA ---
+nome_azienda,COIN SPA,Ragione sociale
+azienda,COIN SPA,Alias per i moduli
+settore,Commercio al dettaglio,Settore merceologico
+anno_bilancio,2025,Esercizio chiuso al 31/01/2025
+rischio,high,Livello rischio (low/medium/high)
+
+# --- STATO PATRIMONIALE — ATTIVO ---
+immobilizzazioni_immateriali,85452801,B.I Totale immobilizzazioni immateriali
+immobilizzazioni_materiali,35317814,B.II Totale immobilizzazioni materiali
+totale_immobilizzazioni,120770615,B Totale immobilizzazioni
+rimanenze,32720113,C.I Rimanenze prodotti finiti e merci
+crediti_clienti,13403824,C.II Crediti verso clienti
+crediti_tributari,7726567,Crediti tributari
+imposte_anticipate,7283740,Imposte anticipate
+crediti_altri,10523685,Crediti verso altri
+totale_crediti,38937816,C.II Totale crediti
+disponibilita_liquide,28386793,C.IV Disponibilità liquide
+totale_attivo_circolante,100050419,C Totale attivo circolante
+ratei_risconti_attivi,4917898,D Ratei e risconti attivi
+totale_attivo,225738932,TOTALE ATTIVO
+
+# --- STATO PATRIMONIALE — PASSIVO ---
+capitale_sociale,33500000,A.I Capitale sociale
+riserva_soprapprezzo,6282595,A.II Riserva soprapprezzo azioni
+riserva_rivalutazione,8659931,A.III Riserve di rivalutazione
+riserva_legale,6000000,A.IV Riserva legale
+altre_riserve,3523935,A.VI Altre riserve
+perdite_precedenti,-142314751,A.VIII Perdite portate a nuovo
+perdita_esercizio,-89312772,A.IX Perdita dell'esercizio
+patrimonio_netto,-173661062,A Totale patrimonio netto
+fondi_rischi_oneri,28225204,B Fondi rischi e oneri
+tfr,8874311,C TFR
+debiti_banche,84885666,D Debiti verso banche
+debiti_fornitori,223483206,D Debiti verso fornitori
+debiti_tributari,22232802,D Debiti tributari
+debiti_previdenziali,3684547,D Debiti previdenziali
+altri_debiti,23873669,D Altri debiti
+totale_debiti,358159890,D Totale debiti
+ratei_risconti_passivi,4140589,E Ratei e risconti passivi
+totale_passivo,225738932,TOTALE PASSIVO
+
+# --- CONTO ECONOMICO ---
+ricavi_vendite,169947091,A.1 Ricavi delle vendite e prestazioni
+altri_ricavi,9058466,A.5 Altri ricavi e proventi
+totale_valore_produzione,179005557,A Totale valore della produzione
+costi_materie_prime,68266720,B.6 Materie prime e merci
+costi_servizi,31938671,B.7 Servizi
+costi_affitti,53667989,B.8 Godimento beni di terzi
+costi_personale,47007695,B.9 Costi per il personale
+salari_stipendi,33799380,Salari e stipendi
+oneri_sociali,10751401,Oneri sociali
+ammortamenti,13585454,B.10 Ammortamenti e svalutazioni
+ammortamenti_immateriali,6323100,Amm. immobilizzazioni immateriali
+ammortamenti_materiali,6712354,Amm. immobilizzazioni materiali
+svalutazioni_crediti,550000,Svalutazioni crediti
+variazioni_rimanenze,15538423,B.11 Variazioni rimanenze
+altri_accantonamenti,14943419,B.13 Altri accantonamenti
+oneri_diversi_gestione,14965532,B.14 Oneri diversi di gestione
+totale_costi_produzione,259913903,B Totale costi della produzione
+ebit,-80908346,EBIT = A - B (Risultato operativo)
+proventi_finanziari,46497,C Proventi finanziari
+oneri_finanziari,-8300203,C Interessi e oneri finanziari
+utili_perdite_cambi,-68445,C Utili/perdite su cambi
+totale_oneri_finanziari_netti,-8322151,C Totale oneri finanziari netti
+risultato_ante_imposte,-89230497,Risultato prima delle imposte
+imposte,82275,Imposte sul reddito
+utile_netto,-89312772,Utile (perdita) dell'esercizio
+
+# --- INDICATORI DERIVATI ---
+ebitda,-67322892,EBIT + Ammortamenti
+ricavi_netti,169947091,Alias per moduli (= ricavi_vendite)
+utile_lordo,-80908346,Alias per Audit Report (= EBIT)
+reddito_ante_imposte,-89230497,Alias per Audit Report
+fatturato,169947091,Alias per Credit Readiness
+
+# --- Z'-SCORE ALTMAN (modello aziende private) ---
+zscore_x1,-1.143,X1 = CCN / Totale Attivo
+zscore_x2,-0.6304,X2 = Utili Riportati / Totale Attivo
+zscore_x3,-0.3584,X3 = EBIT / Totale Attivo
+zscore_x4,-0.4849,X4 = PN / Totale Debiti
+zscore_x5,0.7528,X5 = Ricavi / Totale Attivo
+zscore_finale,-1.919,Z'-Score finale (Zona Distress < 1.23)
+capitale_circolante_netto,-258022471,CCN = Attivo Circolante - Totale Debiti correnti
+utili_non_distribuiti,-142314751,Utili (perdite) riportati a nuovo
+
+# --- KPI LIQUIDITÀ ---
+current_ratio,0.28,Attivo Circolante / Passivo Corrente
+quick_ratio,0.12,(Liquidità + Crediti) / Passivo Corrente
+leverage,1.59,Debiti Totali / Totale Attivo
+
+# --- AUDIT ISA 320 ---
+controlli_interni,3,Score qualità controlli interni (1-10; 3=debole)
+tasso_errori,8.5,Tasso errori stimato (%) — alto per distress
