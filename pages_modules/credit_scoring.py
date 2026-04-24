@@ -13,48 +13,6 @@ def show_credit_scoring():
     </div>
     """, unsafe_allow_html=True)
 
-    # ─── Upload File ──────────────────────────────────────────────────────────
-    st.subheader("📂 Carica Dati da File")
-    col_up, col_tmpl = st.columns([3, 1])
-    with col_up:
-        uploaded = st.file_uploader(
-            "Carica CSV o Excel con i dati finanziari",
-            type=["csv", "xlsx", "xls"],
-            help="Usa il template scaricabile per il formato corretto"
-        )
-    with col_tmpl:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.download_button(
-            "📥 Scarica Template CSV",
-            data=get_credit_template_bytes(),
-            file_name="template_credit_scoring.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-
-    # Valori di default (modificati se arriva file)
-    defaults = {
-        "nome_azienda": "",
-        "ebit": 120000.0,
-        "depreciation": 30000.0,
-        "interest_expense": 20000.0,
-        "debt_repayment": 50000.0,
-        "total_debt": 400000.0,
-        "total_equity": 300000.0,
-        "ebitda": 150000.0,
-        "net_revenue": 900000.0,
-        "current_assets": 350000.0,
-        "current_liabilities": 200000.0,
-    }
-
-    if uploaded:
-        parsed = parse_credit_file(uploaded)
-        if parsed["success"]:
-            defaults.update(parsed)
-            st.success(f"✅ File caricato correttamente! Dati importati per: **{parsed.get('nome_azienda', 'Azienda')}**")
-        else:
-            st.error(f"❌ Errore nel file: {parsed['error']}. Verifica il formato con il template.")
-
     # ================================================================
     # SEZIONE: CARICA & ANALIZZA (analisi automatica)
     # ================================================================
@@ -93,6 +51,14 @@ def show_credit_scoring():
             st.session_state.pop("credit_auto_result", None)
             st.rerun()
 
+        equity_val = auto_res.get("total_equity", 1)
+        revenue_val = auto_res.get("net_revenue", 1)
+        cl_val = auto_res.get("current_liabilities", 1)
+        # Evita divisione per zero
+        if abs(equity_val) < 1: equity_val = 1
+        if abs(revenue_val) < 1: revenue_val = 1
+        if abs(cl_val) < 1: cl_val = 1
+
         result_auto = calculate_credit_score(
             auto_res.get("ebit", 0),
             auto_res.get("depreciation", 0),
@@ -100,10 +66,10 @@ def show_credit_scoring():
             auto_res.get("debt_repayment", 0),
             auto_res.get("total_debt", 0),
             auto_res.get("ebitda", 0),
-            auto_res.get("net_revenue", 1),
+            revenue_val,
             auto_res.get("current_assets", 0),
-            auto_res.get("current_liabilities", 1),
-            auto_res.get("total_equity", 1),
+            cl_val,
+            equity_val,
         )
 
         rating = result_auto.get("rating","N/A")
@@ -131,7 +97,6 @@ def show_credit_scoring():
                 <div style="color:#4ADE80;font-size:1.8rem;font-weight:bold;">€ {fido:,.0f}</div>
             </div>""", unsafe_allow_html=True)
 
-        # Dettaglio KPI
         with st.expander("📊 Dettaglio KPI Credit"):
             kpi_rows = []
             for k, v in result_auto.items():
@@ -142,6 +107,48 @@ def show_credit_scoring():
 
     st.divider()
     st.markdown("### 📝 Form Manuale (opzionale)")
+
+    # ─── Upload File (form) ───────────────────────────────────────────────────
+    st.subheader("📂 Carica Dati da File")
+    col_up, col_tmpl = st.columns([3, 1])
+    with col_up:
+        uploaded = st.file_uploader(
+            "Carica CSV o Excel con i dati finanziari",
+            type=["csv", "xlsx", "xls"],
+            key="credit_form_upload",
+            help="Usa il template scaricabile per il formato corretto"
+        )
+    with col_tmpl:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.download_button(
+            "📥 Scarica Template CSV",
+            data=get_credit_template_bytes(),
+            file_name="template_credit_scoring.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+    defaults = {
+        "nome_azienda": "",
+        "ebit": 120000.0,
+        "depreciation": 30000.0,
+        "interest_expense": 20000.0,
+        "debt_repayment": 50000.0,
+        "total_debt": 400000.0,
+        "total_equity": 300000.0,
+        "ebitda": 150000.0,
+        "net_revenue": 900000.0,
+        "current_assets": 350000.0,
+        "current_liabilities": 200000.0,
+    }
+
+    if uploaded:
+        parsed = parse_credit_file(uploaded)
+        if parsed["success"]:
+            defaults.update(parsed)
+            st.success(f"✅ File caricato! Dati importati per: **{parsed.get('nome_azienda', 'Azienda')}**")
+        else:
+            st.error(f"❌ Errore nel file: {parsed['error']}")
 
     # ─── Inserimento Manuale ──────────────────────────────────────────────────
     st.subheader("📊 Dati Finanziari")
@@ -159,21 +166,28 @@ def show_credit_scoring():
     with col2:
         st.markdown("**🟡 Struttura Patrimoniale**")
         total_debt = st.number_input("Debiti Finanziari Totali (€)", min_value=0.0, value=float(defaults["total_debt"]), step=10000.0, format="%.0f")
-        total_equity = st.number_input("Patrimonio Netto (€)", min_value=1.0, value=float(defaults["total_equity"]), step=10000.0, format="%.0f")
+        # Patrimonio netto può essere negativo (es. aziende in perdita)
+        total_equity = st.number_input("Patrimonio Netto (€)", value=float(defaults["total_equity"]), step=10000.0, format="%.0f")
         ebitda = st.number_input("EBITDA (€)", value=float(defaults["ebitda"]), step=5000.0, format="%.0f")
-        net_revenue = st.number_input("Ricavi Netti (€)", min_value=1.0, value=float(defaults["net_revenue"]), step=10000.0, format="%.0f")
+        # Ricavi possono essere 0 in casi particolari
+        net_revenue = st.number_input("Ricavi Netti (€)", value=float(defaults["net_revenue"]), step=10000.0, format="%.0f")
 
     with col3:
         st.markdown("**🟢 Liquidità**")
         current_assets = st.number_input("Attivo Corrente (€)", min_value=0.0, value=float(defaults["current_assets"]), step=10000.0, format="%.0f")
-        current_liabilities = st.number_input("Passivo Corrente (€)", min_value=1.0, value=float(defaults["current_liabilities"]), step=10000.0, format="%.0f")
+        current_liabilities = st.number_input("Passivo Corrente (€)", min_value=0.0, value=float(defaults["current_liabilities"]), step=10000.0, format="%.0f")
 
     st.markdown("---")
 
     if st.button("💳 CALCOLA CREDIT SCORE", type="primary", use_container_width=True):
+        # Evita divisione per zero
+        eq_safe = total_equity if abs(total_equity) >= 1 else 1
+        rev_safe = net_revenue if abs(net_revenue) >= 1 else 1
+        cl_safe = current_liabilities if current_liabilities >= 1 else 1
+
         result = calculate_credit_score(
             ebit, depreciation, interest_expense, debt_repayment,
-            total_debt, ebitda, net_revenue, current_assets, current_liabilities, total_equity
+            total_debt, ebitda, rev_safe, current_assets, cl_safe, eq_safe
         )
 
         col1, col2, col3 = st.columns(3)
