@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from engine.calculations import calculate_credit_score
 from utils.charts import radar_chart, bar_chart
 from utils.file_parser import parse_credit_file, get_credit_template_bytes
@@ -54,7 +55,93 @@ def show_credit_scoring():
         else:
             st.error(f"❌ Errore nel file: {parsed['error']}. Verifica il formato con il template.")
 
-    st.markdown("---")
+    # ================================================================
+    # SEZIONE: CARICA & ANALIZZA (analisi automatica)
+    # ================================================================
+    st.markdown("""
+<div style="background:linear-gradient(135deg,#0D47A1,#1565C0);padding:20px 25px;border-radius:12px;margin-bottom:8px;">
+    <h3 style="color:white;margin:0;">⚡ Carica & Analizza</h3>
+    <p style="color:#BBDEFB;margin:4px 0 0 0;font-size:0.9rem;">Carica il tuo bilancio CSV o Excel → Credit Score istantaneo</p>
+</div>
+""", unsafe_allow_html=True)
+
+    col_up2, col_tmpl2 = st.columns([3,1])
+    with col_up2:
+        auto_file = st.file_uploader(
+            "Carica CSV o Excel",
+            type=["csv","xlsx","xls"],
+            key="credit_auto_upload",
+            label_visibility="collapsed"
+        )
+    with col_tmpl2:
+        st.download_button("📥 Template CSV", data=get_credit_template_bytes(),
+            file_name="template_credit_scoring.csv", mime="text/csv", use_container_width=True)
+
+    if auto_file:
+        parsed = parse_credit_file(auto_file)
+        if parsed["success"]:
+            st.session_state["credit_auto_result"] = parsed
+            st.rerun()
+        else:
+            st.error(f"❌ Errore nel file: {parsed['error']}")
+
+    auto_res = st.session_state.get("credit_auto_result")
+    if auto_res:
+        nome = auto_res.get("nome_azienda", "Azienda")
+        st.success(f"✅ **{nome}** — Credit Score calcolato automaticamente!")
+        if st.button("🗑️ Cancella e usa il form manuale", key="clear_auto_credit"):
+            st.session_state.pop("credit_auto_result", None)
+            st.rerun()
+
+        result_auto = calculate_credit_score(
+            auto_res.get("ebit", 0),
+            auto_res.get("depreciation", 0),
+            auto_res.get("interest_expense", 0),
+            auto_res.get("debt_repayment", 0),
+            auto_res.get("total_debt", 0),
+            auto_res.get("ebitda", 0),
+            auto_res.get("net_revenue", 1),
+            auto_res.get("current_assets", 0),
+            auto_res.get("current_liabilities", 1),
+            auto_res.get("total_equity", 1),
+        )
+
+        rating = result_auto.get("rating","N/A")
+        score = result_auto.get("score", 0)
+        fido = result_auto.get("credit_limit", 0)
+
+        rating_colors = {"AAA":"#4ADE80","AA":"#4ADE80","A":"#86EFAC","BBB":"#FCD34D",
+                         "BB":"#FCD34D","B":"#FB923C","CCC":"#F87171","CC":"#F87171","D":"#F87171"}
+        rc = rating_colors.get(rating, "#94A3B8")
+
+        col_r1, col_r2, col_r3 = st.columns(3)
+        with col_r1:
+            st.markdown(f"""<div style="background:{rc};padding:20px;border-radius:10px;text-align:center;">
+                <div style="font-size:0.85rem;color:#1E293B;">Rating</div>
+                <div style="font-size:3rem;font-weight:bold;color:#1E293B;">{rating}</div>
+            </div>""", unsafe_allow_html=True)
+        with col_r2:
+            st.markdown(f"""<div style="background:#1E293B;padding:20px;border-radius:10px;text-align:center;">
+                <div style="color:#94A3B8;font-size:0.85rem;">Score</div>
+                <div style="color:white;font-size:2.5rem;font-weight:bold;">{score:.0f}/100</div>
+            </div>""", unsafe_allow_html=True)
+        with col_r3:
+            st.markdown(f"""<div style="background:#0F172A;padding:20px;border-radius:10px;text-align:center;">
+                <div style="color:#94A3B8;font-size:0.85rem;">Fido Stimato</div>
+                <div style="color:#4ADE80;font-size:1.8rem;font-weight:bold;">€ {fido:,.0f}</div>
+            </div>""", unsafe_allow_html=True)
+
+        # Dettaglio KPI
+        with st.expander("📊 Dettaglio KPI Credit"):
+            kpi_rows = []
+            for k, v in result_auto.items():
+                if k not in ("rating","score","credit_limit") and isinstance(v, (int,float)):
+                    kpi_rows.append({"KPI": k.replace("_"," ").title(), "Valore": f"{v:.3f}"})
+            if kpi_rows:
+                st.dataframe(pd.DataFrame(kpi_rows), use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.markdown("### 📝 Form Manuale (opzionale)")
 
     # ─── Inserimento Manuale ──────────────────────────────────────────────────
     st.subheader("📊 Dati Finanziari")

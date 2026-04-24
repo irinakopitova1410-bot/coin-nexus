@@ -105,7 +105,104 @@ def render_risk_analysis():
     upload_data = st.session_state.get("zscore_upload_data", {})
     merged = {**erp_data, **upload_data}  # upload ha precedenza su ERP
 
+    # ================================================================
+    # SEZIONE: CARICA & ANALIZZA (analisi automatica)
+    # ================================================================
+    st.markdown("""
+<div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:20px 25px;border-radius:12px;margin-bottom:8px;">
+    <h3 style="color:white;margin:0;">⚡ Carica & Analizza</h3>
+    <p style="color:#C8E6C9;margin:4px 0 0 0;font-size:0.9rem;">Carica il tuo bilancio CSV o Excel → analisi Z-Score istantanea</p>
+</div>
+""", unsafe_allow_html=True)
+
+    col_up, col_t1, col_t2 = st.columns([3,1,1])
+    with col_up:
+        auto_file = st.file_uploader(
+            "Carica CSV o Excel",
+            type=["csv","xlsx","xls"],
+            key="zscore_auto_upload",
+            label_visibility="collapsed"
+        )
+    with col_t1:
+        st.download_button("📥 Template CSV", data=get_zscore_template_bytes(),
+            file_name="template_zscore.csv", mime="text/csv", use_container_width=True)
+    with col_t2:
+        try:
+            st.download_button("📥 Template Excel", data=get_zscore_template_excel(),
+                file_name="template_zscore.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True)
+        except Exception:
+            pass
+
+    if auto_file:
+        parsed = parse_zscore_file(auto_file)
+        if parsed["success"]:
+            st.session_state["zscore_auto_result"] = parsed
+            st.rerun()
+        else:
+            st.error(f"❌ Errore nel file: {parsed['error']}")
+
+    auto_res = st.session_state.get("zscore_auto_result")
+    if auto_res:
+        nome = auto_res.get("nome_azienda", "Azienda")
+        st.success(f"✅ **{nome}** — Analisi automatica completata!")
+        if st.button("🗑️ Cancella e usa il form manuale", key="clear_auto_zscore"):
+            st.session_state.pop("zscore_auto_result", None)
+            st.rerun()
+
+        # Calcola Z-Score con i dati del file
+        ta  = auto_res.get("total_assets", 1)
+        wc  = auto_res.get("working_capital", 0)
+        re  = auto_res.get("retained_earnings", 0)
+        eb  = auto_res.get("ebit", 0)
+        tl  = auto_res.get("total_liabilities", 1)
+        eq  = auto_res.get("equity_input", 0)
+        rv  = auto_res.get("revenue", 0)
+
+        # Usa il modello Z'-Score (1983) per aziende private
+        result_auto = altman_z_prime(wc, re, eb, eq, tl, rv, ta)
+        z = result_auto["z_score"]
+        zone = result_auto["zone"]
+        prob = result_auto["bankruptcy_probability"]
+
+        zone_color = {"Safe":"#1B5E20","Grey":"#F57F17","Distress":"#B71C1C"}.get(zone,"#333")
+        zone_label = {"Safe":"✅ ZONA SICURA","Grey":"⚠️ ZONA GRIGIA","Distress":"🔴 ZONA DI DISTRESS"}.get(zone, zone)
+
+        col_z1, col_z2, col_z3 = st.columns(3)
+        with col_z1:
+            st.markdown(f"""<div style="background:{zone_color};padding:20px;border-radius:10px;text-align:center;">
+                <div style="color:white;font-size:0.85rem;">Z'-Score</div>
+                <div style="color:white;font-size:2.5rem;font-weight:bold;">{z:.2f}</div>
+            </div>""", unsafe_allow_html=True)
+        with col_z2:
+            st.markdown(f"""<div style="background:#1A237E;padding:20px;border-radius:10px;text-align:center;">
+                <div style="color:#C5CAE9;font-size:0.85rem;">Zona</div>
+                <div style="color:white;font-size:1.2rem;font-weight:bold;">{zone_label}</div>
+            </div>""", unsafe_allow_html=True)
+        with col_z3:
+            st.markdown(f"""<div style="background:#4A148C;padding:20px;border-radius:10px;text-align:center;">
+                <div style="color:#E1BEE7;font-size:0.85rem;">Prob. Fallimento</div>
+                <div style="color:white;font-size:2rem;font-weight:bold;">{prob:.1f}%</div>
+            </div>""", unsafe_allow_html=True)
+
+        st.plotly_chart(_render_gauge(z, 2.9, 1.23), use_container_width=True)
+
+        # Dettaglio variabili
+        with st.expander("📊 Dettaglio variabili Z-Score"):
+            st.dataframe(pd.DataFrame({
+                "Variabile": ["Capitale Circolante/Totale Attivo","Utili non distr./Totale Attivo","EBIT/Totale Attivo","Equity/Totale Passivo","Ricavi/Totale Attivo"],
+                "Valore": [
+                    f"{wc/ta:.3f}" if ta else "N/A",
+                    f"{re/ta:.3f}" if ta else "N/A",
+                    f"{eb/ta:.3f}" if ta else "N/A",
+                    f"{eq/tl:.3f}" if tl else "N/A",
+                    f"{rv/ta:.3f}" if ta else "N/A",
+                ]
+            }), use_container_width=True, hide_index=True)
+
     st.divider()
+    st.markdown("### 📝 Form Manuale (opzionale)")
 
     # ── Selezione modello ────────────────────────────────────────────────────
     col_model, col_info = st.columns([2, 1])

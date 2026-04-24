@@ -104,7 +104,97 @@ def render_financial_ratios():
     merged = {**erp_data, **upload_data}  # upload ha precedenza
     company_name = merged.get("nome_azienda", st.session_state.get("erp_company", ""))
 
+    # ================================================================
+    # SEZIONE: CARICA & ANALIZZA (analisi automatica)
+    # ================================================================
+    st.markdown("""
+<div style="background:linear-gradient(135deg,#004D40,#00695C);padding:20px 25px;border-radius:12px;margin-bottom:8px;">
+    <h3 style="color:white;margin:0;">⚡ Carica & Analizza</h3>
+    <p style="color:#B2DFDB;margin:4px 0 0 0;font-size:0.9rem;">Carica il tuo bilancio CSV o Excel → 35+ ratio istantanei</p>
+</div>
+""", unsafe_allow_html=True)
+
+    col_up2, col_t1, col_t2 = st.columns([3,1,1])
+    with col_up2:
+        auto_file = st.file_uploader(
+            "Carica CSV o Excel",
+            type=["csv","xlsx","xls"],
+            key="ratios_auto_upload",
+            label_visibility="collapsed"
+        )
+    with col_t1:
+        st.download_button("📥 Template CSV", data=get_ratios_template_bytes(),
+            file_name="template_ratios.csv", mime="text/csv", use_container_width=True)
+    with col_t2:
+        try:
+            st.download_button("📥 Template Excel", data=get_ratios_template_excel(),
+                file_name="template_ratios.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True)
+        except Exception:
+            pass
+
+    if auto_file:
+        parsed = parse_ratios_file(auto_file)
+        if parsed["success"]:
+            st.session_state["ratios_auto_result"] = parsed
+            st.rerun()
+        else:
+            st.error(f"❌ Errore nel file: {parsed['error']}")
+
+    auto_res = st.session_state.get("ratios_auto_result")
+    if auto_res:
+        nome = auto_res.get("nome_azienda","Azienda")
+        st.success(f"✅ **{nome}** — 35+ Ratio calcolati automaticamente!")
+        if st.button("🗑️ Cancella e usa il form manuale", key="clear_auto_ratios"):
+            st.session_state.pop("ratios_auto_result", None)
+            st.rerun()
+
+        # Calcola tutti i ratio direttamente
+        data_in = {
+            "total_assets": auto_res.get("total_assets",1),
+            "total_liabilities": auto_res.get("total_liabilities",0),
+            "equity": auto_res.get("equity",0),
+            "current_assets": auto_res.get("current_assets",0),
+            "current_liabilities": auto_res.get("current_liabilities",1),
+            "revenue": auto_res.get("revenue",1),
+            "ebit": auto_res.get("ebit",0),
+            "ebitda": auto_res.get("ebitda",0),
+            "net_income": auto_res.get("net_income",0),
+            "depreciation": auto_res.get("depreciation",0),
+            "interest_expense": auto_res.get("interest_expense",0),
+            "inventory": auto_res.get("inventory",0),
+            "accounts_receivable": auto_res.get("accounts_receivable",0),
+            "accounts_payable": auto_res.get("accounts_payable",0),
+            "retained_earnings": auto_res.get("retained_earnings",0),
+            "cash": auto_res.get("cash",0),
+            "long_term_debt": auto_res.get("long_term_debt",0),
+        }
+
+        ratios = calculate_all_ratios(data_in, industry="Manifatturiero")
+
+        # Mostra KPI principali in card
+        st.markdown("#### 📊 KPI Principali")
+        cols = st.columns(4)
+        key_ratios = ["current_ratio","debt_to_equity","roe","ebitda_margin"]
+        labels = ["Current Ratio","Debt/Equity","ROE","EBITDA Margin"]
+        for i, (kr, lab) in enumerate(zip(key_ratios, labels)):
+            if kr in ratios:
+                v = ratios[kr]
+                val_str = f"{v:.1%}" if "margin" in kr or "roe" in kr.lower() else f"{v:.2f}"
+                cols[i % 4].metric(lab, val_str)
+
+        # Tabella completa di tutti i ratio
+        with st.expander("📋 Tutti i 35+ Ratio", expanded=True):
+            rows = []
+            for k, v in ratios.items():
+                if isinstance(v, (int, float)):
+                    rows.append({"Indicatore": k.replace("_"," ").title(), "Valore": f"{v:.4f}"})
+            if rows:
+                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
     st.divider()
+    st.markdown("### 📝 Form Manuale (opzionale)")
 
     # ── Parametri analisi ───────────────────────────────────────────────────
     with st.sidebar:
