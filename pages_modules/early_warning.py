@@ -140,7 +140,7 @@ def calcola_indici_ccii(dati: dict) -> dict:
     return risultati
 
 
-def genera_narrative_allerta(indici: dict, dscr_df: pd.DataFrame) -> list[str]:
+def genera_narrative_allerta(indici: dict, dscr_df: pd.DataFrame) -> list:
     """Genera messaggi di allerta legali con azioni correttive."""
     allerte = []
 
@@ -249,7 +249,7 @@ def grafico_radar_indici(indici: dict) -> go.Figure:
 
 
 # ─── Parse CSV per Early Warning ─────────────────────────────────────────────
-def parse_csv_early_warning(uploaded_file) -> dict | None:
+def parse_csv_early_warning(uploaded_file) -> dict:
     try:
         content = uploaded_file.read().decode("utf-8", errors="replace")
         uploaded_file.seek(0)
@@ -386,10 +386,10 @@ def _esegui_analisi_early_warning(dati: dict, crescita_ebitda: float = 0.0, cres
     with col_g2:
         st.plotly_chart(grafico_radar_indici(indici), use_container_width=True)
 
-    # Tabella DSCR mensile
+    # Tabella DSCR mensile — usa .map() invece di .applymap() (deprecato in pandas >= 2.1)
     with st.expander("📋 Dettaglio DSCR mese per mese"):
         st.dataframe(
-            dscr_df[["Mese", "DSCR", "Status"]].style.applymap(
+            dscr_df[["Mese", "DSCR", "Status"]].style.map(
                 lambda v: "color: #ef4444" if isinstance(v, str) and "Crisi" in v
                 else "color: #f59e0b" if isinstance(v, str) and "Allerta" in v
                 else "color: #22c55e" if isinstance(v, str) and "Sicuro" in v else "",
