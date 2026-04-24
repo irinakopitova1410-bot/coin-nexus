@@ -11,19 +11,23 @@ FIELD_MAP = {
     # nome_azienda
     "azienda": "company_name", "nome_azienda": "company_name",
     "company": "company_name", "company_name": "company_name",
-    # gross_profit
+    # gross_profit — accetta anche EBIT, utile operativo
     "utile_lordo": "gross_profit", "gross_profit": "gross_profit",
     "utile lordo": "gross_profit", "profit": "gross_profit",
+    "ebit": "gross_profit", "reddito_operativo": "gross_profit",
+    "utile_operativo": "gross_profit", "reddito operativo": "gross_profit",
     # total_assets
     "totale_attivo": "total_assets", "total_assets": "total_assets",
     "totale attivo": "total_assets", "assets": "total_assets",
     # net_revenue
     "ricavi_netti": "net_revenue", "net_revenue": "net_revenue",
     "ricavi netti": "net_revenue", "fatturato": "net_revenue",
-    "revenue": "net_revenue",
-    # pre_tax_income
+    "revenue": "net_revenue", "ricavi": "net_revenue",
+    # pre_tax_income — accetta anche EBT, utili non distribuiti come proxy
     "reddito_ante_imposte": "pre_tax_income", "pre_tax_income": "pre_tax_income",
     "reddito ante imposte": "pre_tax_income", "ebt": "pre_tax_income",
+    "utili_non_distribuiti": "pre_tax_income", "utile_netto": "pre_tax_income",
+    "risultato_netto": "pre_tax_income", "perdita_netta": "pre_tax_income",
     # internal_control_score
     "controlli_interni": "internal_control_score",
     "internal_control_score": "internal_control_score",
@@ -34,6 +38,9 @@ FIELD_MAP = {
     # risk_level
     "rischio": "risk_level", "risk_level": "risk_level",
     "livello_rischio": "risk_level", "livello rischio": "risk_level",
+    # campi extra da Z-Score / ratios (ignorati per audit ma non causano errore)
+    "capitale_circolante_netto": "_ccn", "totale_passivita": "_tp",
+    "patrimonio_netto": "_pn", "debiti_finanziari": "_df",
 }
 
 AUDIT_TEMPLATE_CSV = """campo,valore
@@ -48,7 +55,13 @@ rischio,medium
 """
 
 def _parse_audit_file(uploaded_file) -> dict | None:
-    """Legge CSV o Excel e restituisce dict con i campi audit normalizzati."""
+    """Legge CSV o Excel e restituisce dict con i campi audit normalizzati.
+    
+    Accetta 3 formati:
+    1. Colonnare 2+ colonne: prima col = campo, seconda col = valore (es. campo,valore,descrizione)
+    2. Riga singola: colonne = nomi campo, prima riga = valori
+    3. Qualsiasi file con almeno un campo riconosciuto → usa defaults per il resto
+    """
     try:
         name = uploaded_file.name.lower()
         if name.endswith(".csv"):
@@ -57,34 +70,36 @@ def _parse_audit_file(uploaded_file) -> dict | None:
             df = pd.read_excel(uploaded_file)
 
         data = {}
+        col0 = df.columns[0].lower().strip() if len(df.columns) > 0 else ""
 
-        # Formato colonnare: campo | valore
-        if df.shape[1] == 2:
-            col_key = df.columns[0].lower().strip()
-            col_val = df.columns[1].lower().strip()
-            if col_key in ("campo", "field", "key", "nome") and col_val in ("valore", "value", "val"):
-                for _, row in df.iterrows():
-                    raw_key = str(row.iloc[0]).strip().lower()
-                    raw_val = str(row.iloc[1]).strip()
-                    mapped = FIELD_MAP.get(raw_key)
-                    if mapped:
-                        data[mapped] = raw_val
-            else:
-                # Formato riga singola: colonne = campi
-                df.columns = [c.lower().strip() for c in df.columns]
-                for col in df.columns:
-                    mapped = FIELD_MAP.get(col)
-                    if mapped:
-                        data[mapped] = str(df[col].iloc[0]).strip()
+        # Formato colonnare: prima colonna = nome campo, seconda = valore
+        # Funziona con 2 O 3+ colonne (es. campo, valore, descrizione)
+        if col0 in ("campo", "field", "key", "nome", "parametro"):
+            col_val_idx = 1  # seconda colonna = valori
+            for _, row in df.iterrows():
+                raw_key = str(row.iloc[0]).strip().lower()
+                raw_val = str(row.iloc[col_val_idx]).strip() if len(row) > 1 else ""
+                mapped = FIELD_MAP.get(raw_key)
+                if mapped and not mapped.startswith("_"):  # ignora campi con prefisso _
+                    data[mapped] = raw_val
+                elif mapped and mapped.startswith("_"):
+                    pass  # campo noto ma non usato in audit — ok, non errore
         else:
-            # Più colonne: prima riga = dati
+            # Formato riga singola: colonne = campi
             df.columns = [c.lower().strip() for c in df.columns]
             for col in df.columns:
                 mapped = FIELD_MAP.get(col)
-                if mapped:
+                if mapped and not mapped.startswith("_"):
                     data[mapped] = str(df[col].iloc[0]).strip()
 
-        return data if data else None
+        # Se abbiamo trovato ALMENO UN campo utile → procedi con defaults per il resto
+        audit_fields = {"company_name", "gross_profit", "total_assets", "net_revenue",
+                        "pre_tax_income", "internal_control_score", "error_rate", "risk_level"}
+        found = set(data.keys()) & audit_fields
+        if not found:
+            return None  # file completamente irriconoscibile
+
+        return data  # i campi mancanti avranno defaults in _safe_float/_safe_int
     except Exception as e:
         st.error(f"Errore lettura file: {e}")
         return None
