@@ -88,16 +88,6 @@ def render_risk_analysis():
 
         col1, col2, col3 = st.columns(3)
 
-        def ei(label, key, help_txt=""):
-            return col1.number_input(label, value=float(erp_data.get(key, 0)),
-                                     format="%.2f", help=help_txt, key=f"zs_{key}")
-        def ei2(label, key, help_txt=""):
-            return col2.number_input(label, value=float(erp_data.get(key, 0)),
-                                     format="%.2f", help=help_txt, key=f"zs_{key}")
-        def ei3(label, key, help_txt=""):
-            return col3.number_input(label, value=float(erp_data.get(key, 0)),
-                                     format="%.2f", help=help_txt, key=f"zs_{key}")
-
         with col1:
             st.markdown("**📊 Stato Patrimoniale**")
             total_assets = st.number_input("Totale Attivo (€)", value=float(erp_data.get("total_assets", 0)), format="%.2f", key="zs_ta")
@@ -158,7 +148,6 @@ def render_risk_analysis():
 
     with col2:
         # Metriche principali
-        zone_colors = {"safe": "normal", "grey": "off", "distress": "inverse"}
         st.metric("📍 Zona", result.zone_label)
         st.metric("📊 Z-Score", result.z_score)
         prob = result.bankruptcy_probability
@@ -227,8 +216,9 @@ def render_risk_analysis():
     for i, cat in enumerate(ratio_result.categories):
         cols[i].metric(f"{cat.icon} {cat.name.split()[0]}", f"{cat.score:.0f}/100")
 
-    # ── Salva su Supabase ─────────────────────────────────────────────────────
-    save_risk_analysis({
+    # ── Salva su Supabase (con JWT per RLS) ───────────────────────────────────
+    access_token = st.session_state.get("access_token", "")
+    saved = save_risk_analysis({
         "company_name": company_name,
         "model": result.model,
         "z_score": result.z_score,
@@ -238,7 +228,9 @@ def render_risk_analysis():
         "total_assets": total_assets,
         "revenue": revenue,
         "ebit": ebit,
-    })
+    }, access_token=access_token)
+    if saved:
+        st.toast("✅ Analisi salvata nello storico Supabase", icon="💾")
 
     # ── Export PDF ────────────────────────────────────────────────────────────
     st.divider()
