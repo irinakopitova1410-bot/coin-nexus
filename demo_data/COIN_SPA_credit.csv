@@ -1,0 +1,12 @@
+campo,valore,descrizione
+nome_azienda,COIN SPA,Nome dell'azienda
+ebit,-80908346,EBIT - Reddito Operativo (EUR)
+ammortamenti,13585454,Ammortamenti e svalutazioni (EUR)
+interessi_passivi,8300203,Interessi passivi (EUR)
+rimborso_debito,84885666,Rimborso debito annuo (EUR)
+debiti_finanziari_totali,84885666,Debiti finanziari totali (EUR)
+patrimonio_netto,-173661062,Patrimonio Netto (EUR)
+ebitda,-67322892,EBITDA (EUR)
+ricavi_netti,169947091,Ricavi Netti (EUR)
+attivo_corrente,100050419,Attivo Corrente (EUR)
+passivo_corrente,334286221,Passivo Corrente (EUR)
