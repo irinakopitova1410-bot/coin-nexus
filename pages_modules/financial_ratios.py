@@ -1,5 +1,5 @@
 """
-NEXUS Finance Pro — Financial Ratios Dashboard
+NEXUS Finance Pro -- Financial Ratios Dashboard
 35+ indicatori finanziari con benchmark, score, alert e export PDF.
 """
 import streamlit as st
@@ -11,6 +11,9 @@ from engine.financial_ratios import (
     calculate_all_ratios, INDUSTRY_BENCHMARKS, REQUIRED_FIELDS, OPTIONAL_FIELDS
 )
 from utils.pdf_export import generate_full_report
+from utils.file_parser import (
+    get_ratios_template_bytes, get_ratios_template_excel, parse_ratios_file
+)
 
 
 def _gauge(value: float, title: str, max_val: float = 100) -> go.Figure:
@@ -36,37 +39,96 @@ def _gauge(value: float, title: str, max_val: float = 100) -> go.Figure:
 
 
 def _status_badge(status: str) -> str:
-    return {"ok": "🟢", "warning": "🟡", "danger": "🔴"}.get(status, "⚪")
+    return {"ok": "OK", "warning": "WARN", "danger": "CRIT"}.get(status, "--")
 
 
 def render_financial_ratios():
-    st.title("📊 Ratio Analysis — 35+ Indicatori Finanziari")
+    st.title("Ratio Analysis -- 35+ Indicatori Finanziari")
 
-    # ── Dati da ERP import o inserimento manuale ──────────────────────────────
+    # ================================================================
+    # BLOCCO UPLOAD FILE -- PROMINENTE IN CIMA
+    # ================================================================
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#004D40,#00695C);padding:20px 25px;border-radius:12px;margin-bottom:20px;">
+        <h3 style="color:white;margin:0 0 5px 0;">Carica il tuo Bilancio</h3>
+        <p style="color:#B2DFDB;margin:0;font-size:0.9rem;">Carica un file Excel o CSV -- i campi si compilano automaticamente</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    up_col, tmpl_col1, tmpl_col2 = st.columns([3, 1, 1])
+
+    with up_col:
+        uploaded = st.file_uploader(
+            "Trascina qui il tuo file",
+            type=["csv", "xlsx", "xls"],
+            key="ratios_upload_main",
+            label_visibility="collapsed",
+            help="Formati supportati: CSV, Excel (.xlsx, .xls)"
+        )
+
+    with tmpl_col1:
+        st.download_button(
+            "Template CSV",
+            data=get_ratios_template_bytes(),
+            file_name="template_ratios.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    with tmpl_col2:
+        try:
+            excel_tpl = get_ratios_template_excel()
+            st.download_button(
+                "Template Excel",
+                data=excel_tpl,
+                file_name="template_ratios.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        except Exception:
+            pass
+
+    upload_data = {}
+    if uploaded:
+        parsed = parse_ratios_file(uploaded)
+        if parsed["success"]:
+            upload_data = parsed
+            st.session_state["ratios_upload_data"] = parsed
+            st.success(f"File caricato! Dati importati automaticamente.")
+            st.rerun()
+        else:
+            st.error(f"Errore nel file: {parsed['error']}")
+
+    upload_data = st.session_state.get("ratios_upload_data", {})
     erp_data = st.session_state.get("erp_data", {})
-    company_name = st.session_state.get("erp_company", "")
+    merged = {**erp_data, **upload_data}  # upload ha precedenza
+    company_name = merged.get("nome_azienda", st.session_state.get("erp_company", ""))
 
+    st.divider()
+
+    # ── Parametri analisi ───────────────────────────────────────────────────
     with st.sidebar:
-        st.subheader("⚙️ Parametri Analisi")
+        st.subheader("Parametri Analisi")
         industry = st.selectbox("Settore di riferimento",
                                 list(INDUSTRY_BENCHMARKS.keys()), index=0)
-        if erp_data:
-            st.success("✅ Dati da ERP import caricati")
-            if st.button("🔄 Inserimento manuale"):
+        if merged:
+            st.success("Dati da file caricato")
+            if st.button("Cancella dati caricati"):
+                st.session_state.pop("ratios_upload_data", None)
                 st.session_state.pop("erp_data", None)
                 st.rerun()
 
     with st.expander(
-        "📋 Inserisci dati di bilancio" if not erp_data else "📋 Modifica dati di bilancio",
-        expanded=not bool(erp_data)
+        "Inserisci / modifica dati di bilancio" if not merged else "Modifica dati (precompilati da file)",
+        expanded=not bool(merged)
     ):
-        company_name = st.text_input("Nome Azienda", value=company_name or "", key="ra_company")
+        company_name = st.text_input("Nome Azienda", value=company_name, key="ra_company")
 
         all_labels = {**REQUIRED_FIELDS, **OPTIONAL_FIELDS}
         data = {}
         cols = st.columns(3)
         for i, (key, label) in enumerate(all_labels.items()):
-            default = float(erp_data.get(key, 0))
+            default = float(merged.get(key, 0))
             with cols[i % 3]:
                 data[key] = st.number_input(label, value=default, format="%.2f",
                                             key=f"ra_{key}")
@@ -76,27 +138,27 @@ def render_financial_ratios():
 
     # ── Header Score ──────────────────────────────────────────────────────────
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("🏆 Health Score", f"{result.overall_score:.0f}/100", result.health_label)
+    col1.metric("Health Score", f"{result.overall_score:.0f}/100", result.health_label)
 
     ok_count = sum(sum(1 for r in c.ratios if r.status == "ok") for c in result.categories)
     warn_count = sum(sum(1 for r in c.ratios if r.status == "warning") for c in result.categories)
     danger_count = sum(sum(1 for r in c.ratios if r.status == "danger") for c in result.categories)
     total_count = ok_count + warn_count + danger_count
 
-    col2.metric("🟢 OK", ok_count, f"{ok_count/total_count*100:.0f}%" if total_count else "")
-    col3.metric("🟡 Attenzione", warn_count, f"{warn_count/total_count*100:.0f}%" if total_count else "")
-    col4.metric("🔴 Critico", danger_count, f"{danger_count/total_count*100:.0f}%" if total_count else "")
+    col2.metric("OK", ok_count, f"{ok_count/total_count*100:.0f}%" if total_count else "")
+    col3.metric("Attenzione", warn_count, f"{warn_count/total_count*100:.0f}%" if total_count else "")
+    col4.metric("Critico", danger_count, f"{danger_count/total_count*100:.0f}%" if total_count else "")
 
-    # ── Gauge per categoria ────────────────────────────────────────────────────
-    st.subheader("📈 Score per Categoria")
+    # ── Gauge per categoria ───────────────────────────────────────────────────
+    st.subheader("Score per Categoria")
     gauge_cols = st.columns(3)
     for i, cat in enumerate(result.categories[:6]):
         with gauge_cols[i % 3]:
             st.plotly_chart(_gauge(cat.score, f"{cat.icon} {cat.name}"),
                             use_container_width=True, key=f"gauge_{i}")
 
-    # ── Radar Chart ────────────────────────────────────────────────────────────
-    st.subheader("🕸️ Profilo Finanziario")
+    # ── Radar Chart ───────────────────────────────────────────────────────────
+    st.subheader("Profilo Finanziario")
     cats = [c.name for c in result.categories]
     scores = [c.score for c in result.categories]
     fig_radar = go.Figure(go.Scatterpolar(
@@ -107,7 +169,6 @@ def render_financial_ratios():
         line=dict(color="rgb(13, 71, 161)", width=2),
         name=company_name or "Azienda",
     ))
-    # Benchmark
     bm_scores = [75] * len(cats)
     fig_radar.add_trace(go.Scatterpolar(
         r=bm_scores + [bm_scores[0]],
@@ -123,12 +184,10 @@ def render_financial_ratios():
     )
     st.plotly_chart(fig_radar, use_container_width=True)
 
-    # ── Dettaglio per categoria ─────────────────────────────────────────────
-    st.subheader("📋 Dettaglio Indicatori")
-
+    # ── Dettaglio per categoria ───────────────────────────────────────────────
+    st.subheader("Dettaglio Indicatori")
     for cat in result.categories:
-        score_color = "#00C853" if cat.score >= 70 else ("#FFD600" if cat.score >= 40 else "#D50000")
-        with st.expander(f"{cat.icon} {cat.name}  —  Score: {cat.score:.0f}/100", expanded=False):
+        with st.expander(f"{cat.icon} {cat.name}  --  Score: {cat.score:.0f}/100", expanded=False):
             rows = []
             for r in cat.ratios:
                 delta = None
@@ -136,32 +195,32 @@ def render_financial_ratios():
                     diff_pct = (r.value - r.benchmark) / abs(r.benchmark) * 100 if r.benchmark != 0 else 0
                     delta = f"{diff_pct:+.1f}% vs benchmark"
                 rows.append({
-                    "": _status_badge(r.status),
+                    "Stato": _status_badge(r.status),
                     "Indicatore": r.name,
                     "Valore": r.formatted,
                     "Benchmark": r.benchmark_formatted,
-                    "Vs Benchmark": delta or "—",
+                    "Vs Benchmark": delta or "--",
                     "Descrizione": r.description,
                 })
             if rows:
                 df_cat = pd.DataFrame(rows)
                 st.dataframe(df_cat, use_container_width=True, hide_index=True)
 
-    # ── Alert e Strengths ─────────────────────────────────────────────────────
+    # ── Alert e Strengths ────────────────────────────────────────────────────
     col1, col2 = st.columns(2)
     with col1:
         if result.key_alerts:
-            st.subheader("⚠️ Alert Principali")
+            st.subheader("Alert Principali")
             for alert in result.key_alerts:
                 st.warning(alert)
     with col2:
         if result.strengths:
-            st.subheader("✅ Punti di Forza")
+            st.subheader("Punti di Forza")
             for s in result.strengths:
                 st.success(s)
 
-    # ── Bar chart confronto vs benchmark ──────────────────────────────────────
-    st.subheader("📊 Confronto vs Benchmark di Settore")
+    # ── Bar chart vs benchmark ────────────────────────────────────────────────
+    st.subheader("Confronto vs Benchmark di Settore")
     all_ratios_flat = [r for cat in result.categories for r in cat.ratios
                        if r.benchmark is not None and r.value != 0]
     if all_ratios_flat:
@@ -178,11 +237,11 @@ def render_financial_ratios():
         fig_bar.update_layout(barmode="group", height=380, xaxis_tickangle=-30)
         st.plotly_chart(fig_bar, use_container_width=True)
 
-    # ── Export PDF ───────────────────────────────────────────────────────────
+    # ── Export ───────────────────────────────────────────────────────────────
     st.divider()
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("📄 Genera Report PDF Completo", type="primary", use_container_width=True):
+        if st.button("Genera Report PDF Completo", type="primary", use_container_width=True):
             with st.spinner("Generazione PDF in corso..."):
                 try:
                     pdf_bytes = generate_full_report(
@@ -191,18 +250,17 @@ def render_financial_ratios():
                         raw_data=data,
                     )
                     st.download_button(
-                        "⬇️ Scarica Report PDF",
+                        "Scarica Report PDF",
                         data=pdf_bytes,
                         file_name=f"nexus_ratio_{company_name or 'report'}.pdf",
                         mime="application/pdf",
                         use_container_width=True,
                     )
-                    st.success("✅ PDF generato!")
+                    st.success("PDF generato!")
                 except Exception as e:
                     st.error(f"Errore PDF: {e}")
 
     with col2:
-        # Export Excel
         rows_export = []
         for cat in result.categories:
             for r in cat.ratios:
@@ -219,7 +277,7 @@ def render_financial_ratios():
         buf = io.BytesIO()
         df_exp.to_excel(buf, index=False)
         st.download_button(
-            "📊 Esporta Excel",
+            "Esporta Excel risultati",
             data=buf.getvalue(),
             file_name=f"nexus_ratios_{company_name or 'export'}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
