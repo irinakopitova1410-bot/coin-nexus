@@ -32,7 +32,6 @@ if not os.environ.get("SUPABASE_URL"):
 # ── CSS globale ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Sidebar */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #0D47A1 0%, #1565C0 60%, #0097A7 100%);
     color: white;
@@ -50,7 +49,6 @@ st.markdown("""
 [data-testid="stSidebar"] .stButton > button:hover {
     background: rgba(255,255,255,0.25);
 }
-/* Metric cards */
 [data-testid="metric-container"] {
     background: #f8faff;
     border-radius: 12px;
@@ -58,9 +56,7 @@ st.markdown("""
     border: 1px solid #e3eafc;
     box-shadow: 0 2px 8px rgba(13,71,161,0.06);
 }
-/* Headers */
 h1, h2, h3 { color: #0D47A1; }
-/* Hide Streamlit default menu */
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
 </style>
@@ -87,7 +83,6 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Info utente
     role_label = "👑 Admin" if user.get("role") == "admin" else "👤 Cliente"
     company = user.get("company_name") or user.get("email", "")
     st.markdown(f"""
@@ -97,7 +92,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Navigazione principale ─────────────────────────────────────────────────
     st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin-bottom:6px;'>⚡ STRUMENTO PRINCIPALE</div>", unsafe_allow_html=True)
 
     PAGES = {
@@ -120,8 +114,6 @@ with st.sidebar:
 
     def nav_button(page_id, icon, label):
         is_active = st.session_state.get("current_page") == page_id
-        btn_style = "background:rgba(255,255,255,0.3) !important;" if is_active else ""
-        # Usa un marker visivo
         prefix = "▶ " if is_active else "   "
         if st.button(f"{prefix}{icon} {label}", key=f"nav_{page_id}"):
             st.session_state["current_page"] = page_id
@@ -169,21 +161,21 @@ try:
         render_risk_analysis()
 
     elif page_id == "credit_scoring":
-        from pages_modules.credit_scoring import render_credit_scoring
-        render_credit_scoring()
+        from pages_modules.credit_scoring import show_credit_scoring
+        show_credit_scoring()
 
     elif page_id == "audit_report":
-        from pages_modules.audit_report import render_audit_report
-        render_audit_report()
+        from pages_modules.audit_report import show_audit_report
+        show_audit_report()
 
     elif page_id == "history":
-        from pages_modules.history import render_history
-        render_history(user)
+        from pages_modules.history import show_history
+        show_history()
 
     elif page_id == "admin_panel":
         if user.get("role") == "admin":
-            from pages_modules.admin_panel import render_admin_panel
-            render_admin_panel()
+            from pages_modules.admin_panel import show_admin_panel
+            show_admin_panel()
         else:
             st.error("Accesso non autorizzato.")
 
