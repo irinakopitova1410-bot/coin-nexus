@@ -38,7 +38,7 @@ def _render_gauge(z_score: float, safe: float, grey: float) -> go.Figure:
     return fig
 
 
-def _show_zscore_result(result, data_for_ratios, company_name, industry, access_token=""):
+def _show_zscore_result(result, data_for_ratios, company_name, industry, access_token="", key_suffix=""):
     """Mostra i risultati Z-Score completi."""
     z = result.z_score
     zone = result.zone
@@ -134,7 +134,7 @@ def _show_zscore_result(result, data_for_ratios, company_name, industry, access_
     st.divider()
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("📄 Genera Report PDF", type="primary", use_container_width=True, key="pdf_btn"):
+        if st.button("📄 Genera Report PDF", type="primary", use_container_width=True, key=f"pdf_btn_{key_suffix}"):
             with st.spinner("Generazione PDF..."):
                 try:
                     from utils.pdf_export import generate_full_report
@@ -238,6 +238,7 @@ def render_risk_analysis():
                 company_name=nome,
                 industry="Manifatturiero",
                 access_token=access_token,
+                key_suffix="auto",
             )
         else:
             st.error(f"❌ Errore nel file: {parsed['error']}")
@@ -323,4 +324,4 @@ def render_risk_analysis():
             accounts_payable=accounts_payable, interest_expense=interest_expense,
             retained_earnings=retained_earnings, depreciation=depreciation,
         )
-        _show_zscore_result(result, data_for_ratios, company_name, industry, access_token)
+        _show_zscore_result(result, data_for_ratios, company_name, industry, access_token, key_suffix="manual")
