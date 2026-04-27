@@ -7,7 +7,9 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 import io
+import datetime
 from engine.credit_readiness import analyze_credit_readiness, CreditReadinessResult
+from utils.pdf_export import generate_credit_readiness_pdf
 
 
 # ─── Helpers UI ──────────────────────────────────────────────────────────────
@@ -115,67 +117,32 @@ def score_breakdown_chart(breakdown: dict) -> go.Figure:
 # ─── Parser file CSV/Excel ────────────────────────────────────────────────────
 
 FIELD_MAP = {
-    # fatturato
-    "fatturato": "fatturato",
-    "ricavi": "fatturato",
-    "revenue": "fatturato",
+    "fatturato": "fatturato", "ricavi": "fatturato", "revenue": "fatturato",
     "ricavi_netti": "fatturato",
-    # ebitda
     "ebitda": "ebitda",
-    # ebit
-    "ebit": "ebit",
-    "reddito_operativo": "ebit",
-    # utile netto
-    "utile_netto": "utile_netto",
-    "net_income": "utile_netto",
-    "risultato_netto": "utile_netto",
-    # fatturato precedente
-    "fatturato_prev": "fatturato_prev",
-    "fatturato_precedente": "fatturato_prev",
+    "ebit": "ebit", "reddito_operativo": "ebit",
+    "utile_netto": "utile_netto", "net_income": "utile_netto", "risultato_netto": "utile_netto",
+    "fatturato_prev": "fatturato_prev", "fatturato_precedente": "fatturato_prev",
     "ricavi_anno_precedente": "fatturato_prev",
-    # attivo corrente
-    "attivo_corrente": "attivo_corrente",
-    "current_assets": "attivo_corrente",
-    # passivo corrente
-    "passivo_corrente": "passivo_corrente",
-    "current_liabilities": "passivo_corrente",
-    # debiti finanziari
-    "debiti_finanziari": "debiti_finanziari",
-    "total_debt": "debiti_finanziari",
+    "attivo_corrente": "attivo_corrente", "current_assets": "attivo_corrente",
+    "passivo_corrente": "passivo_corrente", "current_liabilities": "passivo_corrente",
+    "debiti_finanziari": "debiti_finanziari", "total_debt": "debiti_finanziari",
     "debiti_totali": "debiti_finanziari",
-    # patrimonio netto
-    "patrimonio_netto": "patrimonio_netto",
-    "equity": "patrimonio_netto",
+    "patrimonio_netto": "patrimonio_netto", "equity": "patrimonio_netto",
     "total_equity": "patrimonio_netto",
-    # totale attivo
-    "totale_attivo": "totale_attivo",
-    "total_assets": "totale_attivo",
-    # costo personale
-    "costo_personale": "costo_personale",
-    "labor_cost": "costo_personale",
+    "totale_attivo": "totale_attivo", "total_assets": "totale_attivo",
+    "costo_personale": "costo_personale", "labor_cost": "costo_personale",
     "costi_personale": "costo_personale",
-    # costo materie
-    "costo_materie": "costo_materie",
-    "costo_materie_prime": "costo_materie",
-    "acquisti": "costo_materie",
-    "cogs": "costo_materie",
-    # costi operativi
-    "costi_operativi": "costi_operativi",
-    "opex": "costi_operativi",
+    "costo_materie": "costo_materie", "costo_materie_prime": "costo_materie",
+    "acquisti": "costo_materie", "cogs": "costo_materie",
+    "costi_operativi": "costi_operativi", "opex": "costi_operativi",
     "costi_generali": "costi_operativi",
-    # oneri finanziari
-    "oneri_finanziari": "oneri_finanziari",
-    "interest_expense": "oneri_finanziari",
+    "oneri_finanziari": "oneri_finanziari", "interest_expense": "oneri_finanziari",
     "interessi_passivi": "oneri_finanziari",
-    # cash operativo
-    "cash_operativo": "cash_operativo",
-    "cash_flow_operativo": "cash_operativo",
+    "cash_operativo": "cash_operativo", "cash_flow_operativo": "cash_operativo",
     "operating_cashflow": "cash_operativo",
-    # cash corrente
-    "cash_corrente": "cash_corrente",
-    "liquidita": "cash_corrente",
-    "disponibilita_liquide": "cash_corrente",
-    "cash": "cash_corrente",
+    "cash_corrente": "cash_corrente", "liquidita": "cash_corrente",
+    "disponibilita_liquide": "cash_corrente", "cash": "cash_corrente",
 }
 
 DEFAULTS = {
@@ -205,7 +172,6 @@ def _parse_uploaded_file(uploaded_file) -> dict | None:
         st.error(f"Errore lettura file: {e}")
         return None
 
-    # Prova a trovare struttura: colonna chiave + colonna valore
     parsed = dict(DEFAULTS)
     company_name = ""
 
@@ -214,11 +180,9 @@ def _parse_uploaded_file(uploaded_file) -> dict | None:
             continue
         key_raw = str(row.iloc[0]).strip().lower().replace(" ", "_").replace("(€)", "").replace("(", "").replace(")", "")
         val_raw = row.iloc[1]
-        # cerca nome azienda
         if "azienda" in key_raw or "company" in key_raw or "nome" in key_raw:
             company_name = str(val_raw).strip()
             continue
-        # mappa il campo
         mapped = FIELD_MAP.get(key_raw)
         if mapped:
             try:
@@ -233,7 +197,6 @@ def _parse_uploaded_file(uploaded_file) -> dict | None:
 
 
 def _get_cr_template_csv() -> bytes:
-    """Template CSV scaricabile per Credit Readiness."""
     lines = [
         "campo,valore",
         "azienda,Nome Azienda Srl",
@@ -257,7 +220,7 @@ def _get_cr_template_csv() -> bytes:
     return "\n".join(lines).encode("utf-8")
 
 
-# ─── Render risultati (condiviso tra upload e form) ───────────────────────────
+# ─── Render risultati ─────────────────────────────────────────────────────────
 
 def _render_results(result: CreditReadinessResult, company_name: str = ""):
     """Mostra tutti i risultati Credit Readiness."""
@@ -435,12 +398,38 @@ def _render_results(result: CreditReadinessResult, company_name: str = ""):
     else:
         st.success("✅ La struttura aziendale è già ottimizzata. Mantieni questi livelli per consolidare il rating.")
 
-    # Footer export
+    # ── PULSANTE PIANO D'AZIONE PDF ──────────────────────────────────────────
     st.markdown("---")
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        if st.button("📄 Esporta PDF", use_container_width=True, key="cr_pdf_btn"):
-            st.info("Export PDF disponibile nel modulo Audit Report — include il Credit Readiness completo.")
+    st.markdown("### 📄 Esporta Piano d'Azione per la Banca")
+    st.caption("PDF professionale con Credit Score, EBITDA Booster, Crisis Detector e Roadmap — pronto da consegnare alla banca")
+
+    col_pdf, col_info = st.columns([1, 3])
+    with col_pdf:
+        try:
+            nome_file = company_name.replace(" ", "_") if company_name else "Azienda"
+            data_oggi = datetime.datetime.now().strftime("%Y%m%d")
+            pdf_bytes = generate_credit_readiness_pdf(
+                result=result,
+                company_name=company_name or "Azienda",
+            )
+            st.download_button(
+                label="📥 Scarica Piano d'Azione PDF",
+                data=pdf_bytes,
+                file_name=f"Piano_Azione_CreditReadiness_{nome_file}_{data_oggi}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="cr_piano_pdf_btn",
+            )
+        except Exception as e:
+            st.error(f"Errore generazione PDF: {e}")
+    with col_info:
+        st.markdown("""
+        Il PDF include:
+        - ✅ **Credit Score** e Rating con stato di finanziabilità
+        - 🔥 **EBITDA Booster** — tutte le azioni con impatto su credito
+        - ⚠️ **Crisis Detector** — segnali di rischio con probabilità
+        - 📋 **Roadmap** — da non finanziabile a finanziabile, step by step
+        """)
 
 
 # ─── Render principale ────────────────────────────────────────────────────────
@@ -490,7 +479,6 @@ def render_credit_readiness():
     </style>
     """, unsafe_allow_html=True)
 
-    # Header
     st.markdown("""
     <div class="cr-hero">
         <h1>⚡ Credit Readiness Dashboard</h1>
@@ -498,7 +486,6 @@ def render_credit_readiness():
     </div>
     """, unsafe_allow_html=True)
 
-    # ── TAB: Carica & Analizza | Form Manuale ────────────────────────────────
     tab_upload, tab_form = st.tabs(["⚡ Carica & Analizza", "📝 Inserisci Manualmente"])
 
     # ════════════════════════════════════════════════════════════════════════
@@ -559,8 +546,6 @@ def render_credit_readiness():
                 _render_results(result, company_name=company_name)
         else:
             st.info("👆 Carica un file CSV o Excel per vedere l'analisi Credit Readiness completa — istantanea, zero click.")
-
-            # Mostra campi supportati
             with st.expander("📋 Campi supportati nel file"):
                 st.markdown("""
                 | Campo CSV | Descrizione |
@@ -584,7 +569,7 @@ def render_credit_readiness():
                 """)
 
     # ════════════════════════════════════════════════════════════════════════
-    # TAB 2 — FORM MANUALE (invariato, come prima)
+    # TAB 2 — FORM MANUALE
     # ════════════════════════════════════════════════════════════════════════
     with tab_form:
         with st.expander("📋 Inserisci dati di bilancio", expanded=True):
