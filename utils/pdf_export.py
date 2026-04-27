@@ -33,8 +33,8 @@ def clean_text(text: str) -> str:
         text = str(text)
     replacements = {
         # Trattini e lineette
-        "\u2014": " - ",   # em dash —
-        "\u2013": " - ",   # en dash –
+        "\u2014": " - ",   # em dash
+        "\u2013": " - ",   # en dash
         "\u2012": "-",
         "\u2015": "-",
         # Virgolette tipografiche
@@ -63,8 +63,8 @@ def clean_text(text: str) -> str:
         "\u00B1": "+/-",
         "\u2264": "<=",
         "\u2265": ">=",
-        # Simboli speciali
-        "\u20AC": "EUR",  # Euro sign (cp1252=0x80, NON in Latin-1)
+        # Simboli valuta e speciali
+        "\u20AC": "EUR",   # Euro sign (cp1252=0x80, NON in Latin-1 -- causa crash)
         "\u00A9": "(c)",
         "\u00AE": "(R)",
         "\u2122": "(TM)",
@@ -82,7 +82,6 @@ def clean_text(text: str) -> str:
         "\u2716": "X",
         # Emoji aggiuntive usate nel motore
         "\U0001F4E6": "[Box]",
-        "\U0001F4C8": "[Up]",
         "\U0001F6A8": "[Alert]",
         "\U0001F534": "[Red]",
         "\U0001F7E2": "[Green]",
@@ -90,19 +89,19 @@ def clean_text(text: str) -> str:
         "\u23F0": "[Clock]",
         "\u26D4": "[Stop]",
         "\U0001F4B3": "[Card]",
-        "\U0001F4C9": "[Down]",
         "\U0001F4C4": "[Doc]",
         "\u2699": "[Gear]",
         "\U0001F465": "[People]",
+        "\U0001F4C8": "[Graph]",
     }
     for char, replacement in replacements.items():
         text = text.replace(char, replacement)
-    # Fallback: usa latin-1 (ISO-8859-1) — stesso charset di Helvetica
+    # Fallback: usa latin-1 (ISO-8859-1) -- stesso charset di Helvetica
     # NOTA: cp1252 non va bene perche' accetta caratteri (0x80-0x9F) che Helvetica rifiuta
     result = ""
     for ch in text:
         try:
-            ch.encode("latin-1")  # <-- FIX: era cp1252
+            ch.encode("latin-1")  # FIX: era cp1252
             result += ch
         except (UnicodeEncodeError, UnicodeDecodeError):
             result += "?"
@@ -235,7 +234,7 @@ def generate_credit_readiness_pdf(
     pdf = NexusPDF(company_name=company_name, report_type="Piano d'Azione Credit Readiness")
     pdf.add_page()
 
-    # ── COPERTINA ──────────────────────────────────────────────────────────
+    # COPERTINA
     pdf.set_fill_color(*PRIMARY)
     pdf.rect(0, 18, 210, 60, "F")
     pdf.set_text_color(*WHITE)
@@ -254,7 +253,7 @@ def generate_credit_readiness_pdf(
     )
     pdf.ln(52)
 
-    # ── STATO FINANZIABILITA' ──────────────────────────────────────────────
+    # STATO FINANZIABILITA'
     stato = getattr(result, "stato", "borderline")
     score = getattr(result, "credit_score", 0)
     rating = getattr(result, "rating", "N/D")
@@ -265,8 +264,11 @@ def generate_credit_readiness_pdf(
     pdf.set_fill_color(*sc)
     pdf.set_text_color(*WHITE)
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 10, clean_text(f"  Stato: {stato.upper()}  |  Credit Score: {score:.0f}/100  |  Rating: {rating}"),
-             fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(
+        0, 10,
+        clean_text(f"  Stato: {stato.upper()}  |  Credit Score: {score:.0f}/100  |  Rating: {rating}"),
+        fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT
+    )
     pdf.ln(2)
     if messaggio:
         pdf.set_font("Helvetica", "I", 9)
@@ -274,7 +276,7 @@ def generate_credit_readiness_pdf(
         pdf.multi_cell(0, 5, clean_text(messaggio))
     pdf.ln(3)
 
-    # ── KPI CREDITO ────────────────────────────────────────────────────────
+    # KPI CREDITO
     pdf.section_title("CAPACITA' CREDITIZIA")
     credito_oggi = getattr(result, "credito_oggi_eur", 0)
     credito_pot = getattr(result, "credito_potenziale_eur", 0)
@@ -297,7 +299,7 @@ def generate_credit_readiness_pdf(
     ]
     pdf.two_col_table(kpi_rows, "Indicatore", "Valore")
 
-    # ── SCORE BREAKDOWN ────────────────────────────────────────────────────
+    # SCORE BREAKDOWN
     breakdown = getattr(result, "score_breakdown", {})
     if breakdown:
         pdf.section_title("DETTAGLIO SCORE PER DIMENSIONE")
@@ -307,15 +309,15 @@ def generate_credit_readiness_pdf(
         }
         bd_rows = []
         for dim, val in breakdown.items():
-            # Normalizza il nome dimensione (rimuove accenti non Latin-1)
             dim_clean = clean_text(dim)
+            # Cerca prima la chiave originale, poi quella cleaned
             mx = max_vals.get(dim, max_vals.get(dim_clean, 20))
             pct = (val / mx * 100) if mx > 0 else 0
             badge = "OTTIMO" if pct >= 70 else ("ADEGUATO" if pct >= 40 else "CRITICO")
             bd_rows.append((dim_clean, f"{val:.0f}/{mx}", f"{pct:.0f}%  [{badge}]"))
         pdf.three_col_table(["Dimensione", "Score", "Performance"], bd_rows)
 
-    # ── AZIONI EBITDA BOOSTER ──────────────────────────────────────────────
+    # AZIONI EBITDA BOOSTER
     azioni = getattr(result, "azioni", [])
     if azioni:
         pdf.section_title("AZIONI PRIORITARIE - EBITDA BOOSTER")
@@ -362,7 +364,7 @@ def generate_credit_readiness_pdf(
                      new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.ln(4)
 
-    # ── CRISIS DETECTOR ────────────────────────────────────────────────────
+    # CRISIS DETECTOR
     segnali = getattr(result, "segnali", [])
     if segnali:
         pdf.section_title("CRISIS DETECTOR - SEGNALI DI RISCHIO")
@@ -376,7 +378,7 @@ def generate_credit_readiness_pdf(
             sig_rows.append((tipo, f"{sev} ({prob:.0f}%)", timeline_str))
         pdf.three_col_table(["Tipo Segnale", "Severita' / Prob.", "Crisi Prevista"], sig_rows)
 
-    # ── ROADMAP PIANO D'AZIONE ─────────────────────────────────────────────
+    # ROADMAP
     if azioni:
         pdf.section_title("ROADMAP - DA NON FINANZIABILE A FINANZIABILE")
         total_ebitda = sum(getattr(a, "impatto_ebitda_eur", 0) for a in azioni)
@@ -392,7 +394,7 @@ def generate_credit_readiness_pdf(
         ]
         pdf.two_col_table(summary, "Obiettivo", "Risultato Atteso")
 
-        # NOTE: tutte le stringhe usano trattino semplice, NON em-dash
+        # Tutte le stringhe usano trattino semplice, non em-dash
         steps = [
             "1. BREVE TERMINE (1-2 mesi): Avvia azioni a difficolta' BASSA - risultati rapidi, credito immediato",
             "2. MEDIO TERMINE (2-4 mesi): Affronta le azioni a difficolta' MEDIA - impatto significativo sul rating",
@@ -402,7 +404,7 @@ def generate_credit_readiness_pdf(
         for step in steps:
             pdf.alert_box(step, "info")
 
-    # ── NOTE FINALI ────────────────────────────────────────────────────────
+    # NOTE FINALI
     pdf.ln(5)
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(*GRAY)
@@ -507,11 +509,10 @@ def generate_full_report(
     if ratio_result:
         pdf.section_title("ANALISI RATIOS FINANZIARI")
         for cat in ratio_result.categories:
-            pdf.set_font("Helvetica", "B", 10)
-            pdf.set_text_color(*PRIMARY)
             score_c = SUCCESS if cat.score >= 70 else (WARNING if cat.score >= 40 else DANGER)
             pdf.set_fill_color(*score_c)
             pdf.set_text_color(*WHITE)
+            pdf.set_font("Helvetica", "B", 10)
             pdf.cell(
                 0, 7,
                 clean_text(f"  {cat.name}   [Score: {cat.score:.0f}/100]"),
@@ -532,14 +533,14 @@ def generate_full_report(
     if cashflow_result:
         pdf.section_title("RENDICONTO FINANZIARIO (METODO INDIRETTO)")
         cf_rows = [
-            ("Utile Netto",                     f"EUR {cashflow_result.net_income:,.0f}"),
-            "(+) Ammortamenti",                  f"EUR {cashflow_result.depreciation:,.0f}"),
-            ("(+/-) Var. Capitale Circolante",   f"EUR {cashflow_result.delta_working_capital:,.0f}"),
-            ("= CASH FLOW OPERATIVO",            f"EUR {cashflow_result.operating_cashflow:,.0f}"),
-            ("(-) CapEx",                        f"EUR {-cashflow_result.capex:,.0f}"),
-            ("= FREE CASH FLOW",                 f"EUR {cashflow_result.free_cashflow:,.0f}"),
-            ("Cash Flow Finanziario",             f"EUR {cashflow_result.financing_cashflow:,.0f}"),
-            ("VARIAZIONE NETTA CASSA",           f"EUR {cashflow_result.net_change:,.0f}"),
+            ("Utile Netto",                    f"EUR {cashflow_result.net_income:,.0f}"),
+            ("(+) Ammortamenti",               f"EUR {cashflow_result.depreciation:,.0f}"),
+            ("(+/-) Var. Capitale Circolante", f"EUR {cashflow_result.delta_working_capital:,.0f}"),
+            ("= CASH FLOW OPERATIVO",          f"EUR {cashflow_result.operating_cashflow:,.0f}"),
+            ("(-) CapEx",                      f"EUR {-cashflow_result.capex:,.0f}"),
+            ("= FREE CASH FLOW",               f"EUR {cashflow_result.free_cashflow:,.0f}"),
+            ("Cash Flow Finanziario",           f"EUR {cashflow_result.financing_cashflow:,.0f}"),
+            ("VARIAZIONE NETTA CASSA",         f"EUR {cashflow_result.net_change:,.0f}"),
         ]
         pdf.two_col_table(cf_rows, "Voce", "Importo")
         if cashflow_result.covenants:
