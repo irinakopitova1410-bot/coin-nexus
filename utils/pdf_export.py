@@ -23,42 +23,53 @@ WHITE = (255, 255, 255)
 
 def clean_text(text: str) -> str:
     """
-    Sostituisce caratteri Unicode non supportati da Helvetica (Latin-1/cp1252)
-    con equivalenti ASCII sicuri. Previene CharacterNotFoundError in fpdf2.
+    Sostituisce caratteri Unicode non supportati da Helvetica (Latin-1/ISO-8859-1)
+    con equivalenti ASCII sicuri.
+    IMPORTANTE: usa latin-1 (non cp1252!) perche' Helvetica supporta solo ISO-8859-1.
+    I caratteri cp1252 nel range 0x80-0x9F (come euro=0x80, em-dash=0x97) passano
+    l'encoding cp1252 ma vengono rifiutati da Helvetica.
     """
     if not isinstance(text, str):
         text = str(text)
     replacements = {
-        "\u2014": " - ",
-        "\u2013": " - ",
+        # Trattini e lineette
+        "\u2014": " - ",   # em dash —
+        "\u2013": " - ",   # en dash –
         "\u2012": "-",
         "\u2015": "-",
+        # Virgolette tipografiche
         "\u201C": '"',
         "\u201D": '"',
         "\u2018": "'",
         "\u2019": "'",
         "\u201A": "'",
         "\u201E": '"',
+        # Ellipsis e bullet
         "\u2026": "...",
         "\u2022": "*",
         "\u2023": "-",
         "\u25CF": "*",
         "\u25BA": ">",
+        # Frecce
         "\u2192": "->",
         "\u2190": "<-",
         "\u2191": "^",
         "\u2193": "v",
         "\u21D2": "=>",
+        # Operatori matematici
         "\u00D7": "x",
         "\u00F7": "/",
         "\u2212": "-",
         "\u00B1": "+/-",
         "\u2264": "<=",
         "\u2265": ">=",
+        # Simboli speciali
+        "\u20AC": "EUR",  # Euro sign (cp1252=0x80, NON in Latin-1)
         "\u00A9": "(c)",
         "\u00AE": "(R)",
         "\u2122": "(TM)",
         "\u00B0": "deg",
+        # Emoji comuni
         "\U0001F4CA": "[Chart]",
         "\U0001F3AF": "[Target]",
         "\U0001F4B0": "[Money]",
@@ -69,13 +80,29 @@ def clean_text(text: str) -> str:
         "\u274C": "[X]",
         "\u2714": "OK",
         "\u2716": "X",
+        # Emoji aggiuntive usate nel motore
+        "\U0001F4E6": "[Box]",
+        "\U0001F4C8": "[Up]",
+        "\U0001F6A8": "[Alert]",
+        "\U0001F534": "[Red]",
+        "\U0001F7E2": "[Green]",
+        "\U0001F7E1": "[Yellow]",
+        "\u23F0": "[Clock]",
+        "\u26D4": "[Stop]",
+        "\U0001F4B3": "[Card]",
+        "\U0001F4C9": "[Down]",
+        "\U0001F4C4": "[Doc]",
+        "\u2699": "[Gear]",
+        "\U0001F465": "[People]",
     }
     for char, replacement in replacements.items():
         text = text.replace(char, replacement)
+    # Fallback: usa latin-1 (ISO-8859-1) — stesso charset di Helvetica
+    # NOTA: cp1252 non va bene perche' accetta caratteri (0x80-0x9F) che Helvetica rifiuta
     result = ""
     for ch in text:
         try:
-            ch.encode("cp1252")
+            ch.encode("latin-1")  # <-- FIX: era cp1252
             result += ch
         except (UnicodeEncodeError, UnicodeDecodeError):
             result += "?"
@@ -96,7 +123,7 @@ class NexusPDF(FPDF):
         self.set_text_color(*WHITE)
         self.set_font("Helvetica", "B", 12)
         self.set_xy(8, 4)
-        self.cell(80, 8, "NEXUS Finance Pro", align="L")
+        self.cell(80, 8, self.company_name, align="L")
         self.set_font("Helvetica", "", 9)
         self.set_xy(90, 4)
         self.cell(80, 8, self.company_name, align="C")
@@ -183,7 +210,7 @@ class NexusPDF(FPDF):
 
 
 def _fmt_eur(value: float) -> str:
-    """Formatta valore in EUR con suffisso M/K."""
+    """Formatta valore in EUR con suffisso M/K (senza simbolo euro, compatibile Latin-1)."""
     try:
         value = float(value)
     except (TypeError, ValueError):
@@ -214,7 +241,7 @@ def generate_credit_readiness_pdf(
     pdf.set_text_color(*WHITE)
     pdf.set_font("Helvetica", "B", 22)
     pdf.set_xy(15, 26)
-    pdf.cell(180, 12, "PIANO D'AZIONE — CREDIT READINESS", align="C")
+    pdf.cell(180, 12, "PIANO D'AZIONE - CREDIT READINESS", align="C")
     pdf.set_font("Helvetica", "B", 16)
     pdf.set_xy(15, 42)
     pdf.cell(180, 10, clean_text(company_name.upper()), align="C")
@@ -259,14 +286,14 @@ def generate_credit_readiness_pdf(
     mesi_crisi = getattr(result, "mesi_alla_crisi", None)
 
     kpi_rows = [
-        ("Credito Bancario Oggi",       _fmt_eur(credito_oggi)),
+        ("Credito Bancario Oggi",              _fmt_eur(credito_oggi)),
         ("Credito Potenziale (post-ottimiz.)", _fmt_eur(credito_pot)),
-        ("Delta Credito Sbloccabile",   _fmt_eur(delta)),
-        ("EBITDA Attuale",              _fmt_eur(ebitda_att)),
-        ("EBITDA Potenziale",           _fmt_eur(ebitda_pot)),
-        ("EBITDA da Ottimizzare",       _fmt_eur(ebitda_gap)),
-        ("Probabilita' di Default",     f"{pd_pct:.1f}%"),
-        ("Crisi Prevista",              f"tra {mesi_crisi} mesi" if mesi_crisi else "Nessuna rilevata"),
+        ("Delta Credito Sbloccabile",          _fmt_eur(delta)),
+        ("EBITDA Attuale",                     _fmt_eur(ebitda_att)),
+        ("EBITDA Potenziale",                  _fmt_eur(ebitda_pot)),
+        ("EBITDA da Ottimizzare",              _fmt_eur(ebitda_gap)),
+        ("Probabilita' di Default",            f"{pd_pct:.1f}%"),
+        ("Crisi Prevista",                     f"tra {mesi_crisi} mesi" if mesi_crisi else "Nessuna rilevata"),
     ]
     pdf.two_col_table(kpi_rows, "Indicatore", "Valore")
 
@@ -280,16 +307,18 @@ def generate_credit_readiness_pdf(
         }
         bd_rows = []
         for dim, val in breakdown.items():
-            mx = max_vals.get(dim, 20)
+            # Normalizza il nome dimensione (rimuove accenti non Latin-1)
+            dim_clean = clean_text(dim)
+            mx = max_vals.get(dim, max_vals.get(dim_clean, 20))
             pct = (val / mx * 100) if mx > 0 else 0
             badge = "OTTIMO" if pct >= 70 else ("ADEGUATO" if pct >= 40 else "CRITICO")
-            bd_rows.append((clean_text(dim), f"{val:.0f}/{mx}", f"{pct:.0f}%  [{badge}]"))
+            bd_rows.append((dim_clean, f"{val:.0f}/{mx}", f"{pct:.0f}%  [{badge}]"))
         pdf.three_col_table(["Dimensione", "Score", "Performance"], bd_rows)
 
     # ── AZIONI EBITDA BOOSTER ──────────────────────────────────────────────
     azioni = getattr(result, "azioni", [])
     if azioni:
-        pdf.section_title("AZIONI PRIORITARIE — EBITDA BOOSTER")
+        pdf.section_title("AZIONI PRIORITARIE - EBITDA BOOSTER")
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*GRAY)
         pdf.multi_cell(0, 5, "Ogni azione e' collegata direttamente all'incremento di credito ottenibile dalla tua banca.")
@@ -310,65 +339,64 @@ def generate_credit_readiness_pdf(
             pdf.set_fill_color(*PRIMARY)
             pdf.set_text_color(*WHITE)
             pdf.set_font("Helvetica", "B", 10)
-            pdf.cell(0, 7, clean_text(f"  #{i}  {cat}"),
+            pdf.cell(0, 7, f"  #{i}  {cat}",
                      fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
             # Descrizione
             pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(*DARK_TEXT)
             pdf.set_fill_color(*LIGHT_BG)
-            pdf.multi_cell(0, 5, clean_text(f"  {desc}"), fill=True)
+            pdf.multi_cell(0, 5, f"  {desc}", fill=True)
 
             # KPI azione: 4 celle affiancate
             pdf.set_font("Helvetica", "B", 9)
             pdf.set_fill_color(*diff_color)
             pdf.set_text_color(*WHITE)
-            pdf.cell(47, 7, clean_text(f"Difficolta': {diff}"), fill=True, border=1, align="C")
+            pdf.cell(47, 7, f"Difficolta': {diff}", fill=True, border=1, align="C")
             pdf.set_fill_color(*GRAY)
-            pdf.cell(47, 7, clean_text(f"Timeline: {timeline} mesi"), fill=True, border=1, align="C")
+            pdf.cell(47, 7, f"Timeline: {timeline} mesi", fill=True, border=1, align="C")
             pdf.set_fill_color(*SUCCESS)
-            pdf.cell(47, 7, clean_text(f"EBITDA: +{_fmt_eur(imp_ebitda)}"), fill=True, border=1, align="C")
+            pdf.cell(47, 7, f"EBITDA: +{_fmt_eur(imp_ebitda)}", fill=True, border=1, align="C")
             pdf.set_fill_color(*PRIMARY)
-            pdf.cell(47, 7, clean_text(f"Credito: +{_fmt_eur(imp_credito)}"), fill=True, border=1, align="C",
+            pdf.cell(47, 7, f"Credito: +{_fmt_eur(imp_credito)}", fill=True, border=1, align="C",
                      new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.ln(4)
 
     # ── CRISIS DETECTOR ────────────────────────────────────────────────────
     segnali = getattr(result, "segnali", [])
     if segnali:
-        pdf.section_title("CRISIS DETECTOR — SEGNALI DI RISCHIO")
+        pdf.section_title("CRISIS DETECTOR - SEGNALI DI RISCHIO")
         sig_rows = []
         for s in segnali:
             tipo = clean_text(getattr(s, "tipo", ""))
             sev = clean_text(getattr(s, "severita", ""))
             prob = getattr(s, "probabilita_pct", 0)
             mc = getattr(s, "mesi_alla_crisi", None)
-            timeline_str = f"{mc} mesi" if mc else "—"
+            timeline_str = f"{mc} mesi" if mc else "N/D"
             sig_rows.append((tipo, f"{sev} ({prob:.0f}%)", timeline_str))
         pdf.three_col_table(["Tipo Segnale", "Severita' / Prob.", "Crisi Prevista"], sig_rows)
 
     # ── ROADMAP PIANO D'AZIONE ─────────────────────────────────────────────
     if azioni:
-        pdf.section_title("ROADMAP — DA NON FINANZIABILE A FINANZIABILE")
+        pdf.section_title("ROADMAP - DA NON FINANZIABILE A FINANZIABILE")
         total_ebitda = sum(getattr(a, "impatto_ebitda_eur", 0) for a in azioni)
         total_credito = sum(getattr(a, "impatto_credito_eur", 0) for a in azioni)
         max_tl = max((getattr(a, "timeline_mesi", 0) for a in azioni), default=0)
 
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.set_text_color(*DARK_TEXT)
         summary = [
-            ("EBITDA aggiuntivo totale", _fmt_eur(total_ebitda)),
-            ("Credito sbloccabile totale", _fmt_eur(total_credito)),
-            ("Tempo per ottimizzazione completa", f"{max_tl} mesi"),
-            ("Credito attuale", _fmt_eur(credito_oggi)),
-            ("Credito dopo ottimizzazione", _fmt_eur(credito_pot)),
+            ("EBITDA aggiuntivo totale",          _fmt_eur(total_ebitda)),
+            ("Credito sbloccabile totale",         _fmt_eur(total_credito)),
+            ("Tempo per ottimizzazione completa",  f"{max_tl} mesi"),
+            ("Credito attuale",                    _fmt_eur(credito_oggi)),
+            ("Credito dopo ottimizzazione",        _fmt_eur(credito_pot)),
         ]
         pdf.two_col_table(summary, "Obiettivo", "Risultato Atteso")
 
+        # NOTE: tutte le stringhe usano trattino semplice, NON em-dash
         steps = [
-            "1. BREVE TERMINE (1-2 mesi): Avvia azioni a difficolta' BASSA — risultati rapidi, credito immediato",
-            "2. MEDIO TERMINE (2-4 mesi): Affronta le azioni a difficolta' MEDIA — impatto significativo sul rating",
-            "3. LUNGO TERMINE (4-6 mesi): Pianifica le azioni a difficolta' ALTA — trasformazione strutturale",
+            "1. BREVE TERMINE (1-2 mesi): Avvia azioni a difficolta' BASSA - risultati rapidi, credito immediato",
+            "2. MEDIO TERMINE (2-4 mesi): Affronta le azioni a difficolta' MEDIA - impatto significativo sul rating",
+            "3. LUNGO TERMINE (4-6 mesi): Pianifica le azioni a difficolta' ALTA - trasformazione strutturale",
             f"4. OBIETTIVO FINALE: Da {_fmt_eur(credito_oggi)} a {_fmt_eur(credito_pot)} di capacita' creditizia in {max_tl} mesi",
         ]
         for step in steps:
@@ -442,12 +470,12 @@ def generate_full_report(
     if raw_data:
         fmt = lambda v: f"EUR {v:,.0f}" if isinstance(v, (int, float)) else str(v)
         kpis = [
-            ("Totale Attivo", fmt(raw_data.get("total_assets", 0))),
-            ("Ricavi", fmt(raw_data.get("revenue", 0))),
-            ("EBITDA", fmt(raw_data.get("ebitda", 0))),
+            ("Totale Attivo",    fmt(raw_data.get("total_assets", 0))),
+            ("Ricavi",           fmt(raw_data.get("revenue", 0))),
+            ("EBITDA",           fmt(raw_data.get("ebitda", 0))),
             ("Patrimonio Netto", fmt(raw_data.get("equity", 0))),
-            ("Utile Netto", fmt(raw_data.get("net_income", 0))),
-            ("Totale Passivo", fmt(raw_data.get("total_liabilities", 0))),
+            ("Utile Netto",      fmt(raw_data.get("net_income", 0))),
+            ("Totale Passivo",   fmt(raw_data.get("total_liabilities", 0))),
         ]
         pdf.two_col_table(kpis, "Voce di Bilancio", "Valore (EUR)")
 
@@ -504,14 +532,14 @@ def generate_full_report(
     if cashflow_result:
         pdf.section_title("RENDICONTO FINANZIARIO (METODO INDIRETTO)")
         cf_rows = [
-            ("Utile Netto", f"EUR {cashflow_result.net_income:,.0f}"),
-            ("(+) Ammortamenti", f"EUR {cashflow_result.depreciation:,.0f}"),
-            ("(+/-) Var. Capitale Circolante", f"EUR {cashflow_result.delta_working_capital:,.0f}"),
-            ("= CASH FLOW OPERATIVO", f"EUR {cashflow_result.operating_cashflow:,.0f}"),
-            ("(-) CapEx", f"EUR {-cashflow_result.capex:,.0f}"),
-            ("= FREE CASH FLOW", f"EUR {cashflow_result.free_cashflow:,.0f}"),
-            ("Cash Flow Finanziario", f"EUR {cashflow_result.financing_cashflow:,.0f}"),
-            ("VARIAZIONE NETTA CASSA", f"EUR {cashflow_result.net_change:,.0f}"),
+            ("Utile Netto",                     f"EUR {cashflow_result.net_income:,.0f}"),
+            "(+) Ammortamenti",                  f"EUR {cashflow_result.depreciation:,.0f}"),
+            ("(+/-) Var. Capitale Circolante",   f"EUR {cashflow_result.delta_working_capital:,.0f}"),
+            ("= CASH FLOW OPERATIVO",            f"EUR {cashflow_result.operating_cashflow:,.0f}"),
+            ("(-) CapEx",                        f"EUR {-cashflow_result.capex:,.0f}"),
+            ("= FREE CASH FLOW",                 f"EUR {cashflow_result.free_cashflow:,.0f}"),
+            ("Cash Flow Finanziario",             f"EUR {cashflow_result.financing_cashflow:,.0f}"),
+            ("VARIAZIONE NETTA CASSA",           f"EUR {cashflow_result.net_change:,.0f}"),
         ]
         pdf.two_col_table(cf_rows, "Voce", "Importo")
         if cashflow_result.covenants:
