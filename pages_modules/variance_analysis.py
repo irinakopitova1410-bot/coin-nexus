@@ -482,7 +482,6 @@ imposte_actual,0
         }
         st.session_state["var_data_form"] = data_input
         st.session_state["var_company_name"] = company_name
-        st.session_state["var_period"] = period
 
     # ── ANALISI (sotto entrambe le tab) ───────────────────────────────────────
     st.markdown("---")
