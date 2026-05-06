@@ -117,11 +117,12 @@ with st.sidebar:
 
     # ── BIG FOUR SUITE (NUOVO) ──
     st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>🏆 BIG FOUR SUITE</div>", unsafe_allow_html=True)
-    nav_button("early_warning",   "🚨", "Early Warning CCII")
-    nav_button("esg_scoring",     "🌿", "ESG Scoring")
-    nav_button("ai_analyst",      "🤖", "AI Financial Analyst")
-    nav_button("open_banking",    "🏦", "Open Banking PSD2")
-    nav_button("whatif_simulator","🔮", "What-If Simulator")
+    nav_button("early_warning",    "🚨", "Early Warning CCII")
+    nav_button("esg_scoring",      "🌿", "ESG Scoring")
+    nav_button("ai_analyst",       "🤖", "AI Financial Analyst")
+    nav_button("open_banking",     "🏦", "Open Banking PSD2")
+    nav_button("whatif_simulator", "🔮", "What-If Simulator")
+    nav_button("variance_analysis","📊", "Variance Analysis")
 
     # ── INTEGRAZIONI ──
     st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>🔌 INTEGRAZIONI</div>", unsafe_allow_html=True)
@@ -141,7 +142,7 @@ with st.sidebar:
 
     st.markdown("""
     <div style='text-align:center; font-size:10px; opacity:0.6; margin-top:16px;'>
-        NEXUS Finance Pro v5.0<br>Big Four Edition<br>© 2025 Irina Kopitova
+        NEXUS Finance Pro v5.1<br>Big Four + Variance Suite<br>© 2025 Irina Kopitova
     </div>
     """, unsafe_allow_html=True)
 
@@ -207,6 +208,10 @@ try:
     elif page_id == "whatif_simulator":
         from pages_modules.whatif_simulator import show_whatif_simulator
         show_whatif_simulator()
+
+    elif page_id == "variance_analysis":
+        from pages_modules.variance_analysis import show_variance_analysis
+        show_variance_analysis()
 
     # ── ADMIN ──
     elif page_id == "admin_panel":
