@@ -4,16 +4,19 @@ from typing import Optional, Dict, List
 import datetime
 import jwt as pyjwt
 
+_SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
+_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQxNzEsImV4cCI6MjA5MTY3MDE3MX0.HRFDqEKVCygVSKByVupgK3XGIkkpxxCyO7PH4LucPZg"
+
 @st.cache_resource
 def get_supabase() -> Client:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    url = st.secrets.get("SUPABASE_URL", _SUPABASE_URL)
+    key = st.secrets.get("SUPABASE_KEY", _SUPABASE_KEY)
     return create_client(url, key)
 
 def get_auth_supabase(access_token: str = None) -> Client:
     """Client Supabase con JWT utente — necessario per RLS."""
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    url = st.secrets.get("SUPABASE_URL", _SUPABASE_URL)
+    key = st.secrets.get("SUPABASE_KEY", _SUPABASE_KEY)
     client = create_client(url, key)
     if access_token:
         client.postgrest.auth(access_token)

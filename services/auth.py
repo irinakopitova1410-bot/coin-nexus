@@ -3,14 +3,17 @@ from supabase import create_client
 import os
 
 
+SUPABASE_URL_DEFAULT = "https://ipmttldwfsxuubugiyir.supabase.co"
+SUPABASE_KEY_DEFAULT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQxNzEsImV4cCI6MjA5MTY3MDE3MX0.HRFDqEKVCygVSKByVupgK3XGIkkpxxCyO7PH4LucPZg"
+
 def get_supabase():
-    url = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", ""))
-    key = st.secrets.get("SUPABASE_KEY", os.getenv("SUPABASE_KEY", ""))
+    url = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", SUPABASE_URL_DEFAULT))
+    key = st.secrets.get("SUPABASE_KEY", os.getenv("SUPABASE_KEY", SUPABASE_KEY_DEFAULT))
     return create_client(url, key)
 
 
 def get_supabase_url() -> str:
-    return st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", ""))
+    return st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", SUPABASE_URL_DEFAULT))
 
 
 def login(email: str, password: str):
@@ -34,20 +37,13 @@ def logout():
         st.session_state.pop(key, None)
 
 
-def get_user_profile(user_id: str, access_token: str = None):
-    """Recupera profilo e ruolo utente da Supabase.
-    
-    Usa access_token per autenticare la query PostgREST — necessario
-    quando la RLS richiede auth.uid() = id.
-    """
+def get_user_profile(user_id: str):
+    """Recupera profilo e ruolo utente da Supabase."""
     try:
         supabase = get_supabase()
-        if access_token:
-            # Imposta il JWT dell'utente loggato per rispettare la RLS
-            supabase.postgrest.auth(access_token)
         result = supabase.table("user_profiles").select("*").eq("id", user_id).single().execute()
         return result.data
-    except Exception:
+    except:
         return None
 
 
@@ -110,11 +106,7 @@ def login_page():
                     if result["success"]:
                         user_obj = result["user"]
                         session_obj = result["session"]
-                        
-                        # ⚠️ IMPORTANTE: passa il token JWT al profilo
-                        # così la RLS (auth.uid() = id) viene rispettata
-                        access_token = session_obj.access_token if session_obj else None
-                        profile = get_user_profile(user_obj.id, access_token)
+                        profile = get_user_profile(user_obj.id)
 
                         user_data = {
                             "id": user_obj.id,
@@ -122,7 +114,7 @@ def login_page():
                             "role": profile.get("role", "client") if profile else "client",
                             "full_name": profile.get("full_name", "") if profile else "",
                             "company_name": profile.get("company_name", "") if profile else "",
-                            "access_token": access_token or "",
+                            "access_token": session_obj.access_token if session_obj else "",
                         }
 
                         st.session_state["user"] = user_data
