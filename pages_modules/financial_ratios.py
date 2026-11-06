@@ -1,303 +1,399 @@
 """
-NEXUS Finance Pro -- Financial Ratios Dashboard
-35+ indicatori con upload istantaneo + form manuale.
+NEXUS Finance Pro — Cash Flow Analysis Page
+Rendiconto finanziario, proiezioni 5 anni, covenant, stress test.
 """
 import streamlit as st
 import plotly.graph_objects as go
+import plotly.express as px
 import pandas as pd
 import io
-from engine.financial_ratios import (
-    calculate_all_ratios, INDUSTRY_BENCHMARKS, REQUIRED_FIELDS, OPTIONAL_FIELDS
-)
+from engine.cashflow import calculate_cashflow
+from services.erp_connectors import REQUIRED_FIELDS, OPTIONAL_FIELDS
 from utils.pdf_export import generate_full_report
-from utils.file_parser import (
-    get_ratios_template_bytes, get_ratios_template_excel, parse_ratios_file
-)
+from utils.file_parser import parse_financial_file
 
 
-def _gauge(value: float, title: str) -> go.Figure:
-    color = "#00C853" if value >= 75 else ("#FFD600" if value >= 40 else "#D50000")
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=value,
-        title={"text": title, "font": {"size": 14}},
-        gauge={
-            "axis": {"range": [0, 100], "tickwidth": 1},
-            "bar": {"color": color},
-            "steps": [
-                {"range": [0, 40], "color": "#FFEBEE"},
-                {"range": [40, 70], "color": "#FFF9C4"},
-                {"range": [70, 100], "color": "#E8F5E9"},
-            ],
-        },
-        number={"suffix": "/100", "font": {"size": 20}},
-    ))
-    fig.update_layout(height=200, margin=dict(l=10, r=10, t=40, b=10))
-    return fig
+def _run_cashflow(data: dict, company_name: str):
+    """Calcola e visualizza tutti i risultati Cash Flow."""
 
+    cf = calculate_cashflow(data)
 
-def _status_badge(status: str) -> str:
-    return {"ok": "✅ OK", "warning": "⚠️ WARN", "danger": "🔴 CRIT"}.get(status, "--")
+    # ── Alert ─────────────────────────────────────────────────────────────────
+    for alert in cf.alerts:
+        kind = "error" if "🔴" in alert else "warning"
+        getattr(st, kind)(alert)
 
-
-def _show_ratio_result(result, company_name, industry):
-    """Mostra i risultati completi dei ratio."""
-    # Header Score
+    # ── KPI principali ────────────────────────────────────────────────────────
+    st.subheader("💡 KPI Cash Flow")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Health Score", f"{result.overall_score:.0f}/100", result.health_label)
-    ok_count = sum(sum(1 for r in c.ratios if r.status == "ok") for c in result.categories)
-    warn_count = sum(sum(1 for r in c.ratios if r.status == "warning") for c in result.categories)
-    danger_count = sum(sum(1 for r in c.ratios if r.status == "danger") for c in result.categories)
-    total_count = ok_count + warn_count + danger_count
-    col2.metric("✅ OK", ok_count)
-    col3.metric("⚠️ Attenzione", warn_count)
-    col4.metric("🔴 Critico", danger_count)
+    col1.metric("Cash Flow Operativo", f"€ {cf.operating_cashflow:,.0f}",
+                "🟢 Positivo" if cf.operating_cashflow > 0 else "🔴 Negativo")
+    col2.metric("Free Cash Flow", f"€ {cf.free_cashflow:,.0f}",
+                "🟢 Positivo" if cf.free_cashflow > 0 else "🔴 Negativo")
+    col3.metric("FCF Margin", f"{cf.fcf_margin:.1%}", "vs revenue")
+    col4.metric("Cash Conversion", f"{cf.cash_conversion_ratio:.2f}x", "OCF/Utile Netto")
 
-    # Gauge per categoria
-    st.subheader("Score per Categoria")
-    gauge_cols = st.columns(3)
-    for i, cat in enumerate(result.categories[:6]):
-        with gauge_cols[i % 3]:
-            st.plotly_chart(_gauge(cat.score, f"{cat.icon} {cat.name}"),
-                            use_container_width=True, key=f"gauge_auto_{i}")
+    # ── Rendiconto finanziario ────────────────────────────────────────────────
+    st.subheader("📋 Rendiconto Finanziario — Metodo Indiretto")
 
-    # Radar Chart
-    st.subheader("Profilo Finanziario")
-    cats = [c.name for c in result.categories]
-    scores = [c.score for c in result.categories]
-    fig_radar = go.Figure(go.Scatterpolar(
-        r=scores + [scores[0]], theta=cats + [cats[0]],
-        fill="toself", fillcolor="rgba(13,71,161,0.2)",
-        line=dict(color="rgb(13,71,161)", width=2), name=company_name or "Azienda",
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("**🔄 Area Operativa**")
+        op_data = {
+            "Utile Netto": cf.net_income,
+            "(+) Ammortamenti": cf.depreciation,
+            "(±) Δ Cap. Circolante": cf.delta_working_capital,
+            "(±) Altre variazioni": cf.other_operating,
+        }
+        for k, v in op_data.items():
+            color = "🟢" if v >= 0 else "🔴"
+            st.markdown(f"{color} **{k}**: € {v:,.0f}")
+        st.markdown("---")
+        ocf_color = "🟢" if cf.operating_cashflow >= 0 else "🔴"
+        st.markdown(f"**{ocf_color} = Cash Flow Operativo: € {cf.operating_cashflow:,.0f}**")
+
+    with col2:
+        st.markdown("**🏗️ Area Investimenti**")
+        inv_data = {
+            "(−) CapEx": -cf.capex,
+            "(−) Acquisizioni": -cf.acquisitions,
+        }
+        for k, v in inv_data.items():
+            color = "🟢" if v >= 0 else "🔴"
+            st.markdown(f"{color} **{k}**: € {v:,.0f}")
+        st.markdown("---")
+        inv_color = "🟢" if cf.investing_cashflow >= 0 else "🔴"
+        st.markdown(f"**{inv_color} = CF Investimenti: € {cf.investing_cashflow:,.0f}**")
+
+    with col3:
+        st.markdown("**🏦 Area Finanziaria**")
+        fin_data = {
+            "(+) Nuovi Debiti": cf.debt_issued,
+            "(−) Rimborso Debiti": -cf.debt_repaid,
+            "(−) Dividendi": -cf.dividends,
+        }
+        for k, v in fin_data.items():
+            color = "🟢" if v >= 0 else "🔴"
+            st.markdown(f"{color} **{k}**: € {v:,.0f}")
+        st.markdown("---")
+        fin_color = "🟢" if cf.financing_cashflow >= 0 else "🔴"
+        st.markdown(f"**{fin_color} = CF Finanziario: € {cf.financing_cashflow:,.0f}**")
+
+    net_color = "🟢" if cf.net_change >= 0 else "🔴"
+    st.markdown(f"### {net_color} Variazione Netta Cassa: € {cf.net_change:,.0f}")
+
+    # ── Waterfall Chart ───────────────────────────────────────────────────────
+    st.subheader("📊 Waterfall Cash Flow")
+    measures = ["relative", "relative", "relative", "total",
+                "relative", "total",
+                "relative", "relative", "relative", "total",
+                "total"]
+    x_labels = ["Utile Netto", "Ammortamenti", "Δ WC", "CF Operativo",
+                 "CapEx", "Free CF",
+                 "Nuovi Debiti", "Rimborso", "Dividendi", "CF Finanziario",
+                 "Variazione Netta"]
+    y_vals = [cf.net_income, cf.depreciation, cf.delta_working_capital,
+              cf.operating_cashflow,
+              -cf.capex, cf.free_cashflow,
+              cf.debt_issued, -cf.debt_repaid, -cf.dividends,
+              cf.financing_cashflow,
+              cf.net_change]
+    fig_wf = go.Figure(go.Waterfall(
+        orientation="v",
+        measure=measures,
+        x=x_labels,
+        y=y_vals,
+        connector={"line": {"color": "#0D47A1"}},
+        increasing={"marker": {"color": "#00C853"}},
+        decreasing={"marker": {"color": "#D50000"}},
+        totals={"marker": {"color": "#0D47A1"}},
+        texttemplate="%{y:,.0f}",
+        textposition="outside",
     ))
-    fig_radar.add_trace(go.Scatterpolar(
-        r=[75]*len(cats) + [75], theta=cats + [cats[0]],
-        fill="toself", fillcolor="rgba(0,150,136,0.1)",
-        line=dict(color="rgb(0,150,136)", width=1, dash="dash"),
-        name=f"Benchmark {industry}",
-    ))
-    fig_radar.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
-        showlegend=True, height=400
-    )
-    st.plotly_chart(fig_radar, use_container_width=True)
+    fig_wf.update_layout(height=420, title="Cash Flow Waterfall (€)", showlegend=False)
+    st.plotly_chart(fig_wf, use_container_width=True)
 
-    # Dettaglio per categoria
-    st.subheader("Dettaglio Indicatori")
-    for cat in result.categories:
-        with st.expander(f"{cat.icon} {cat.name}  —  Score: {cat.score:.0f}/100", expanded=False):
-            rows = []
-            for r in cat.ratios:
-                delta = None
-                if r.benchmark and r.value:
-                    diff_pct = (r.value - r.benchmark) / abs(r.benchmark) * 100 if r.benchmark != 0 else 0
-                    delta = f"{diff_pct:+.1f}% vs benchmark"
-                rows.append({
-                    "Stato": _status_badge(r.status),
-                    "Indicatore": r.name,
-                    "Valore": r.formatted,
-                    "Benchmark": r.benchmark_formatted,
-                    "Vs Benchmark": delta or "--",
-                    "Descrizione": r.description,
-                })
-            if rows:
-                st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    # ── Proiezioni ────────────────────────────────────────────────────────────
+    st.subheader("📈 Proiezioni a 5 anni")
+    df_proj = pd.DataFrame(cf.projections)
+    st.dataframe(df_proj.style.format({
+        "OCF Base": "€ {:,.0f}", "FCF Base": "€ {:,.0f}",
+        "OCF Stress": "€ {:,.0f}", "FCF Stress": "€ {:,.0f}",
+    }), use_container_width=True, hide_index=True)
 
-    # Alert e Strengths
+    fig_proj = go.Figure()
+    fig_proj.add_trace(go.Scatter(x=df_proj["Anno"], y=df_proj["FCF Base"],
+                                   name="FCF Base", mode="lines+markers",
+                                   line=dict(color="#00C853", width=2)))
+    fig_proj.add_trace(go.Scatter(x=df_proj["Anno"], y=df_proj["FCF Stress"],
+                                   name="FCF Stress", mode="lines+markers",
+                                   line=dict(color="#D50000", width=2, dash="dash")))
+    fig_proj.add_trace(go.Scatter(x=df_proj["Anno"], y=df_proj["OCF Base"],
+                                   name="OCF Base", mode="lines+markers",
+                                   line=dict(color="#0D47A1", width=2)))
+    fig_proj.update_layout(height=350, title="Free Cash Flow — Proiezioni 5 Anni")
+    st.plotly_chart(fig_proj, use_container_width=True)
+
+    # ── Covenant ─────────────────────────────────────────────────────────────
+    if cf.covenants:
+        st.subheader("🏦 Covenant Bancari")
+        df_cov = pd.DataFrame(cf.covenants)
+        st.dataframe(df_cov, use_container_width=True, hide_index=True)
+
+    # ── KPI avanzati ──────────────────────────────────────────────────────────
+    st.subheader("📐 KPI Avanzati")
+    kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
+    kpi_col1.metric("CapEx Intensity", f"{cf.capex_intensity:.1%}", "CapEx/Ricavi")
+    kpi_col2.metric("Reinvestment Rate", f"{cf.reinvestment_rate:.1%}", "CapEx/(CapEx+FCF)")
+    kpi_col3.metric("Cash Conversion", f"{cf.cash_conversion_ratio:.2f}x", "OCF/Utile Netto")
+    kpi_col4.metric("FCF Margin", f"{cf.fcf_margin:.1%}", "FCF/Ricavi")
+
+    # ── Export ────────────────────────────────────────────────────────────────
+    st.divider()
     col1, col2 = st.columns(2)
     with col1:
-        if result.key_alerts:
-            st.subheader("⚠️ Alert Principali")
-            for alert in result.key_alerts:
-                st.warning(alert)
+        if st.button("📄 Genera Report PDF", type="primary", use_container_width=True, key="cf_pdf_btn"):
+            with st.spinner("Generazione PDF..."):
+                try:
+                    pdf_bytes = generate_full_report(
+                        company_name=company_name or "Azienda",
+                        cashflow_result=cf,
+                        raw_data=data,
+                    )
+                    st.download_button("⬇️ Scarica PDF", data=pdf_bytes,
+                                       file_name=f"cashflow_{company_name or 'report'}.pdf",
+                                       mime="application/pdf", use_container_width=True)
+                    st.success("✅ PDF pronto!")
+                except Exception as e:
+                    st.error(f"Errore PDF: {e}")
     with col2:
-        if result.strengths:
-            st.subheader("💪 Punti di Forza")
-            for s in result.strengths:
-                st.success(s)
-
-    # Bar chart vs benchmark
-    st.subheader("Confronto vs Benchmark di Settore")
-    all_ratios_flat = [r for cat in result.categories for r in cat.ratios
-                       if r.benchmark is not None and r.value != 0]
-    if all_ratios_flat:
-        df_bm = pd.DataFrame({
-            "Indicatore": [r.name for r in all_ratios_flat],
-            "Azienda": [r.value * (100 if r.unit == "%" else 1) for r in all_ratios_flat],
-            "Benchmark": [r.benchmark * (100 if r.unit == "%" else 1) for r in all_ratios_flat],
-        }).head(12)
-        fig_bar = go.Figure()
-        fig_bar.add_bar(name="Azienda", x=df_bm["Indicatore"], y=df_bm["Azienda"],
-                        marker_color="#0D47A1")
-        fig_bar.add_bar(name=f"Benchmark ({industry})", x=df_bm["Indicatore"],
-                        y=df_bm["Benchmark"], marker_color="#009688", opacity=0.7)
-        fig_bar.update_layout(barmode="group", height=380, xaxis_tickangle=-30)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        csv_buf = io.StringIO()
+        df_proj.to_csv(csv_buf, index=False)
+        st.download_button("📊 Esporta Proiezioni CSV", data=csv_buf.getvalue().encode(),
+                           file_name="proiezioni_cashflow.csv", mime="text/csv",
+                           use_container_width=True)
 
 
-def render_financial_ratios():
-    st.title("Ratio Analysis — 35+ Indicatori Finanziari")
+def render_cashflow_analysis():
+    st.title("💰 Cash Flow Analysis")
+    st.markdown("Rendiconto finanziario con metodo indiretto, proiezioni a 5 anni e covenant bancari.")
 
     erp_data = st.session_state.get("erp_data", {})
+    company_name = st.session_state.get("erp_company", "")
 
-    # ================================================================
-    # ⚡ CARICA & ANALIZZA — UPLOAD UNICO + RISULTATI ISTANTANEI
-    # ================================================================
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#004D40,#00695C);padding:20px 25px;border-radius:12px;margin-bottom:16px;">
-        <h3 style="color:white;margin:0;">⚡ Carica & Analizza</h3>
-        <p style="color:#B2DFDB;margin:6px 0 0 0;font-size:0.9rem;">
-            Carica il tuo bilancio CSV o Excel → 35+ ratio istantanei senza compilare nulla
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    tab_upload, tab_form = st.tabs(["⚡ Carica & Analizza", "📝 Form Manuale"])
 
-    col_up, col_t1, col_t2 = st.columns([3, 1, 1])
-    with col_up:
-        uploaded = st.file_uploader(
-            "Carica CSV o Excel",
-            type=["csv", "xlsx", "xls"],
-            key="ratios_upload",
-            label_visibility="collapsed",
-            help="Usa il template per il formato corretto"
+    # ═══════════════════════════════════════════════════════════════════════════
+    # TAB 1 — CARICA & ANALIZZA
+    # ═══════════════════════════════════════════════════════════════════════════
+    with tab_upload:
+        st.markdown("### 📂 Carica il bilancio aziendale")
+        st.markdown(
+            "Carica un file **CSV, Excel o PDF** con i dati finanziari. "
+            "L'analisi Cash Flow parte in automatico."
         )
-    with col_t1:
-        st.download_button("📥 Template CSV", data=get_ratios_template_bytes(),
-            file_name="template_ratios.csv", mime="text/csv", use_container_width=True)
-    with col_t2:
-        try:
-            st.download_button("📥 Template Excel", data=get_ratios_template_excel(),
-                file_name="template_ratios.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True)
-        except Exception:
-            pass
 
-    file_data = None
-    if uploaded:
-        parsed = parse_ratios_file(uploaded)
-        if parsed["success"]:
-            file_data = parsed
-            nome = parsed.get("nome_azienda", "Azienda")
-            st.success(f"✅ **{nome}** — Dati importati! Analisi qui sotto ↓")
+        # Formato CSV atteso
+        with st.expander("📋 Formato CSV atteso (clicca per vedere esempio)", expanded=False):
+            st.markdown("""
+Il CSV deve avere 2 o 3 colonne: `campo`, `valore`, (opzionale: `descrizione`).
 
-            data_in = {
-                "total_assets": parsed.get("total_assets", 1) or 1,
-                "total_liabilities": parsed.get("total_liabilities", 0),
-                "equity": parsed.get("equity", 0),
-                "current_assets": parsed.get("current_assets", 0),
-                "current_liabilities": parsed.get("current_liabilities", 1) or 1,
-                "revenue": parsed.get("revenue", 1) or 1,
-                "ebit": parsed.get("ebit", 0),
-                "ebitda": parsed.get("ebitda", 0),
-                "net_income": parsed.get("net_income", 0),
-                "depreciation": parsed.get("depreciation", 0),
-                "interest_expense": parsed.get("interest_expense", 0),
-                "inventory": parsed.get("inventory", 0),
-                "accounts_receivable": parsed.get("accounts_receivable", 0),
-                "accounts_payable": parsed.get("accounts_payable", 0),
-                "retained_earnings": parsed.get("retained_earnings", 0),
-                "cash": parsed.get("cash", 0),
-                "long_term_debt": parsed.get("long_term_debt", 0),
-            }
+```
+campo,valore,descrizione
+revenue,5000000,Ricavi netti
+ebitda,800000,EBITDA
+ebit,500000,EBIT
+net_income,250000,Utile Netto
+depreciation,300000,Ammortamenti
+interest_expense,120000,Oneri Finanziari
+tax_expense,80000,Imposte
+total_assets,8000000,Totale Attivo
+equity,2500000,Patrimonio Netto
+total_debt,3000000,Debiti Finanziari
+current_assets,2000000,Attivo Corrente
+current_liabilities,1500000,Passivo Corrente
+accounts_receivable,900000,Crediti Commerciali
+accounts_payable,600000,Debiti Fornitori
+inventory,400000,Magazzino
+capex,350000,Investimenti
+```
 
-            ratios_result = calculate_all_ratios(data_in, industry="Manifatturiero")
-            st.markdown("#### 📊 Risultato Analisi Automatica")
-            _show_ratio_result(ratios_result, nome, "Manifatturiero")
+**Puoi anche usare il file demo:** `COIN_SPA_Bilancio_Completo_2025.csv`
+            """)
 
-            # Export diretto
-            st.divider()
-            rows_export = []
-            for cat in ratios_result.categories:
-                for r in cat.ratios:
-                    rows_export.append({
-                        "Categoria": cat.name, "Indicatore": r.name,
-                        "Valore": r.formatted, "Benchmark": r.benchmark_formatted,
-                        "Status": _status_badge(r.status),
-                    })
-            df_exp = pd.DataFrame(rows_export)
-            buf = io.BytesIO()
-            df_exp.to_excel(buf, index=False)
-            st.download_button("📥 Esporta Excel risultati", data=buf.getvalue(),
-                file_name=f"ratios_{nome}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True)
+        uploaded_file = st.file_uploader(
+            "📎 Trascina qui il file oppure clicca per sceglierlo",
+            type=["csv", "xlsx", "xls", "pdf"],
+            key="cf_upload",
+            help="Formati supportati: CSV (separato da virgola), Excel (.xlsx/.xls), PDF"
+        )
+
+        if uploaded_file is not None:
+            st.info(f"📄 File caricato: **{uploaded_file.name}** ({uploaded_file.size / 1024:.1f} KB)")
+
+            with st.spinner("🔍 Analisi in corso..."):
+                try:
+                    parsed = parse_financial_file(uploaded_file)
+
+                    if "error" in parsed:
+                        st.error(f"❌ Errore nel parsing: {parsed['error']}")
+                        st.stop()
+
+                    # Mostra anteprima campi rilevati
+                    detected_fields = {k: v for k, v in parsed.items()
+                                       if k not in ("company_name", "error") and v != 0
+                                       and isinstance(v, (int, float))}
+                    if detected_fields:
+                        with st.expander(f"✅ {len(detected_fields)} campi rilevati dal file", expanded=False):
+                            df_preview = pd.DataFrame([
+                                {"Campo": k, "Valore": f"€ {float(v):,.0f}"}
+                                for k, v in detected_fields.items()
+                            ])
+                            st.dataframe(df_preview, use_container_width=True, hide_index=True)
+
+                    # Nome azienda da file o input
+                    file_company = parsed.get("company_name", "")
+                    cn = st.text_input(
+                        "🏢 Nome Azienda",
+                        value=file_company or company_name or "",
+                        key="cf_upload_company"
+                    )
+
+                    st.success("✅ File analizzato! Risultati Cash Flow qui sotto:")
+                    st.divider()
+
+                    # Prepara dati per il motore cashflow
+                    # Calcola campi derivati se mancanti
+                    def _num(key, default=0):
+                        """Legge un valore numerico dal parsed dict, ritorna float sicuro."""
+                        v = parsed.get(key, default)
+                        try:
+                            return float(v)
+                        except (TypeError, ValueError):
+                            return float(default)
+
+                    dep = _num("depreciation")
+                    ca  = _num("current_assets")
+                    cl  = _num("current_liabilities")
+                    td  = _num("total_debt")
+
+                    data_upload = dict(
+                        revenue=_num("revenue"),
+                        ebit=_num("ebit"),
+                        ebitda=_num("ebitda"),
+                        net_income=_num("net_income"),
+                        depreciation=dep,
+                        interest_expense=_num("interest_expense"),
+                        tax_expense=_num("tax_expense"),
+                        total_assets=_num("total_assets"),
+                        equity=_num("equity"),
+                        total_debt=td,
+                        current_assets=ca,
+                        current_liabilities=cl,
+                        accounts_receivable=_num("accounts_receivable"),
+                        accounts_payable=_num("accounts_payable"),
+                        inventory=_num("inventory"),
+                        capex=_num("capex", dep * 1.1 if dep else 0),
+                        dividends=_num("dividends"),
+                        debt_issued=_num("debt_issued"),
+                        debt_repaid=_num("debt_repaid", td * 0.1 if td else 0),
+                        prev_current_assets=_num("prev_current_assets", ca * 0.95 if ca else 0),
+                        prev_current_liabilities=_num("prev_current_liabilities", cl * 0.95 if cl else 0),
+                        prev_fixed_assets=_num("prev_fixed_assets"),
+                    )
+
+                    _run_cashflow(data_upload, cn)
+
+                except Exception as e:
+                    st.error(f"❌ Errore durante l'analisi: {e}")
+                    st.info("💡 Controlla il formato del file o usa il Form Manuale.")
+
         else:
-            st.error(f"❌ Errore nel file: {parsed['error']}")
-            st.info("💡 Scarica il **Template CSV** per il formato corretto e riprova.")
+            # Stato vuoto — guida visiva
+            st.markdown("---")
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                st.markdown("""
+**📊 CSV / Excel**
+- 2 o 3 colonne
+- Nomi campi standard
+- Qualsiasi valuta
+                """)
+            with col_b:
+                st.markdown("""
+**📄 PDF Bilancio**
+- Estratto automatico
+- Formato XBRL/IFRS
+- Dati rilevati con AI
+                """)
+            with col_c:
+                st.markdown("""
+**⚡ Risultati istantanei**
+- Waterfall CF
+- Proiezioni 5 anni
+- Covenant bancari
+                """)
 
-    st.divider()
+            st.info("⬆️ Carica il file per avviare l'analisi, oppure usa il tab **📝 Form Manuale** per inserire i dati a mano.")
 
-    # ================================================================
-    # 📝 FORM MANUALE
-    # ================================================================
-    st.markdown("### 📝 Inserimento Manuale (opzionale)")
-    st.caption("I campi si precompilano se hai caricato un file sopra")
+    # ═══════════════════════════════════════════════════════════════════════════
+    # TAB 2 — FORM MANUALE (contenuto originale)
+    # ═══════════════════════════════════════════════════════════════════════════
+    with tab_form:
+        st.markdown("### 📝 Inserimento Manuale Dati")
 
-    merged = {**erp_data, **(file_data or {})}
-    company_name = merged.get("nome_azienda", st.session_state.get("erp_company", ""))
+        with st.expander("📋 Inserisci / Modifica dati", expanded=True):
+            company_name_form = st.text_input("Nome Azienda", value=company_name or "", key="cf_company")
 
-    with st.sidebar:
-        st.subheader("Parametri Analisi")
-        industry = st.selectbox("Settore di riferimento",
-                                list(INDUSTRY_BENCHMARKS.keys()), index=0)
+            c1, c2, c3 = st.columns(3)
+            def n(label, key, default=0.0):
+                d = float(erp_data.get(key, default))
+                return st.number_input(label, value=d, format="%.2f", key=f"cf_{key}")
 
-    with st.expander(
-        "Inserisci / modifica dati di bilancio" if not merged else "Modifica dati (precompilati da file)",
-        expanded=not bool(merged)
-    ):
-        company_name = st.text_input("Nome Azienda", value=company_name, key="ra_company")
-        all_labels = {**REQUIRED_FIELDS, **OPTIONAL_FIELDS}
-        data = {}
-        cols = st.columns(3)
-        for i, (key, label) in enumerate(all_labels.items()):
-            default = float(merged.get(key, 0))
-            with cols[i % 3]:
-                data[key] = st.number_input(label, value=default, format="%.2f", key=f"ra_{key}")
+            with c1:
+                st.markdown("**📊 Conto Economico**")
+                revenue = n("Ricavi", "revenue")
+                ebit = n("EBIT", "ebit")
+                ebitda = n("EBITDA", "ebitda")
+                net_income = n("Utile Netto", "net_income")
+                depreciation = n("Ammortamenti", "depreciation")
+                interest_expense = n("Oneri Finanziari", "interest_expense")
+                tax_expense = n("Imposte", "tax_expense")
 
-    if st.button("📊 CALCOLA TUTTI I RATIO", type="primary", use_container_width=True):
-        # Safe values per calcolo
-        safe_data = data.copy()
-        if safe_data.get("total_assets", 0) == 0:
-            safe_data["total_assets"] = 1
-        if safe_data.get("current_liabilities", 0) == 0:
-            safe_data["current_liabilities"] = 1
-        if safe_data.get("revenue", 0) == 0:
-            safe_data["revenue"] = 1
+            with c2:
+                st.markdown("**📋 Stato Patrimoniale**")
+                total_assets = n("Totale Attivo", "total_assets")
+                equity = n("Patrimonio Netto", "equity")
+                total_debt = n("Debiti Finanziari", "total_debt")
+                current_assets = n("Attivo Corrente", "current_assets")
+                current_liabilities = n("Passivo Corrente", "current_liabilities")
+                accounts_receivable = n("Crediti Commerciali", "accounts_receivable")
+                accounts_payable = n("Debiti Commerciali", "accounts_payable")
+                inventory = n("Magazzino", "inventory")
 
-        result = calculate_all_ratios(safe_data, industry)
-        st.markdown("#### 📊 Risultato Analisi Manuale")
-        _show_ratio_result(result, company_name, industry)
+            with c3:
+                st.markdown("**📈 Dati Aggiuntivi**")
+                capex = st.number_input("CapEx (Investimenti)", value=float(erp_data.get("capex", depreciation * 1.1 if depreciation else 0)), format="%.2f", key="cf_capex")
+                dividends = st.number_input("Dividendi distribuiti", value=0.0, format="%.2f", key="cf_div")
+                debt_issued = st.number_input("Nuovi Debiti Emessi", value=0.0, format="%.2f", key="cf_debtissued")
+                debt_repaid = st.number_input("Debiti Rimborsati", value=float(total_debt * 0.1) if total_debt else 0.0, format="%.2f", key="cf_debtrepaid")
+                prev_ca = st.number_input("Attivo Corrente Anno Prec.", value=float(current_assets * 0.95) if current_assets else 0.0, format="%.2f", key="cf_pca")
+                prev_cl = st.number_input("Passivo Corrente Anno Prec.", value=float(current_liabilities * 0.95) if current_liabilities else 0.0, format="%.2f", key="cf_pcl")
+                prev_fa = st.number_input("Immobilizzazioni Anno Prec.", value=0.0, format="%.2f", key="cf_pfa")
 
-        # Export PDF
-        st.divider()
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("📄 Genera Report PDF", type="primary", use_container_width=True, key="pdf_ratio"):
-                with st.spinner("Generazione PDF..."):
-                    try:
-                        pdf_bytes = generate_full_report(
-                            company_name=company_name or "Azienda",
-                            ratio_result=result, raw_data=data,
-                        )
-                        st.download_button("📥 Scarica Report PDF", data=pdf_bytes,
-                            file_name=f"ratios_{company_name or 'report'}.pdf",
-                            mime="application/pdf", use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Errore PDF: {e}")
-        with col2:
-            rows_export = []
-            for cat in result.categories:
-                for r in cat.ratios:
-                    rows_export.append({
-                        "Categoria": cat.name, "Indicatore": r.name,
-                        "Valore": r.formatted, "Benchmark": r.benchmark_formatted,
-                        "Status": _status_badge(r.status), "Descrizione": r.description,
-                    })
-            df_exp = pd.DataFrame(rows_export)
-            buf = io.BytesIO()
-            df_exp.to_excel(buf, index=False)
-            st.download_button("📥 Esporta Excel risultati", data=buf.getvalue(),
-                file_name=f"ratios_{company_name or 'export'}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True)
+        data_form = dict(
+            revenue=revenue, ebit=ebit, ebitda=ebitda, net_income=net_income,
+            depreciation=depreciation, interest_expense=interest_expense,
+            tax_expense=tax_expense, total_assets=total_assets, equity=equity,
+            total_debt=total_debt, current_assets=current_assets,
+            current_liabilities=current_liabilities,
+            accounts_receivable=accounts_receivable, accounts_payable=accounts_payable,
+            inventory=inventory, capex=capex, dividends=dividends,
+            debt_issued=debt_issued, debt_repaid=debt_repaid,
+            prev_current_assets=prev_ca, prev_current_liabilities=prev_cl,
+            prev_fixed_assets=prev_fa,
+        )
+
+        _run_cashflow(data_form, company_name_form)
+
