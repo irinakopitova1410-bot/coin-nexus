@@ -8,7 +8,7 @@ import plotly.express as px
 import pandas as pd
 import io
 from engine.cashflow import calculate_cashflow
-from engine.financial_ratios import REQUIRED_FIELDS, OPTIONAL_FIELDS
+from services.erp_connectors import REQUIRED_FIELDS, OPTIONAL_FIELDS
 from utils.pdf_export import generate_full_report
 from utils.file_parser import parse_financial_file
 

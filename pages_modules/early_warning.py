@@ -10,6 +10,18 @@ import plotly.express as px
 from datetime import datetime, timedelta
 import io
 
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
 
 # ─── Costanti CCII ───────────────────────────────────────────────────────────
 DSCR_SOGLIA_CRITICA = 1.0      # Sotto → rischio crisi CCII
@@ -215,7 +227,7 @@ def grafico_dscr_proiezione(df: pd.DataFrame) -> go.Figure:
         height=420,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e2e8f0"),
+        font=dict(color="#0B1230"),
         showlegend=False
     )
     return fig
@@ -242,7 +254,7 @@ def grafico_radar_indici(indici: dict) -> go.Figure:
         title="🕸️ Radar Indici di Allerta CCII",
         height=380,
         paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e2e8f0"),
+        font=dict(color="#0B1230"),
         showlegend=False
     )
     return fig
@@ -251,10 +263,13 @@ def grafico_radar_indici(indici: dict) -> go.Figure:
 # ─── Parse CSV per Early Warning ─────────────────────────────────────────────
 def parse_csv_early_warning(uploaded_file) -> dict | None:
     try:
-        content = uploaded_file.read().decode("utf-8", errors="replace")
-        uploaded_file.seek(0)
-        lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
-        df = pd.read_csv(io.StringIO("\n".join(lines)), header=0)
+        if uploaded_file.name.lower().endswith((".xlsx", ".xls")):
+            df = pd.read_excel(uploaded_file)
+        else:
+            content = uploaded_file.read().decode("utf-8", errors="replace")
+            uploaded_file.seek(0)
+            lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
+            df = pd.read_csv(io.StringIO("\n".join(lines)), header=0)
         df.columns = [str(c).strip().lower() for c in df.columns]
         if "campo" in df.columns and ("valore" in df.columns or df.columns[1]):
             val_col = "valore" if "valore" in df.columns else df.columns[1]
@@ -292,17 +307,12 @@ def parse_csv_early_warning(uploaded_file) -> dict | None:
 
 # ─── UI Principale ────────────────────────────────────────────────────────────
 def show_early_warning():
-    st.markdown("""
-    <div style='background: linear-gradient(135deg, #dc2626, #991b1b);
-                padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem;'>
-        <h2 style='color:white; margin:0; font-size:1.8rem;'>
-            🚨 Early Warning System
-        </h2>
-        <p style='color: rgba(255,255,255,0.85); margin: 0.3rem 0 0;'>
-            Codice della Crisi d'Impresa — D.Lgs. 14/2019 | DSCR monitoring a 12 mesi
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Big Four Suite · CCII — D.Lgs. 14/2019",
+        title="Early Warning",
+        highlight="System",
+        subtitle="DSCR monitoring a 12 mesi · indici di allerta obbligatori per legge · rilevazione tempestiva dello stato di crisi.",
+    )
 
     # Info normativa
     with st.expander("ℹ️ Cos'è il DSCR e perché è obbligatorio?", expanded=False):

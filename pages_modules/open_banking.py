@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 import random
 import io
 
+from utils.ui_kit import page_header
+
 
 # ─── Dati demo realistici ────────────────────────────────────────────────────
 def genera_movimenti_demo(saldo_iniziale: float = 50000, giorni: int = 90) -> pd.DataFrame:
@@ -123,7 +125,7 @@ def grafico_saldo_storico(df: pd.DataFrame) -> go.Figure:
         height=350,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e2e8f0")
+        font=dict(color="#0B1230")
     )
     return fig
 
@@ -143,7 +145,7 @@ def grafico_previsione(df_prev: pd.DataFrame) -> go.Figure:
         height=320,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e2e8f0")
+        font=dict(color="#0B1230")
     )
     return fig
 
@@ -163,22 +165,18 @@ def grafico_entrate_uscite(df: pd.DataFrame) -> go.Figure:
     ])
     fig.update_layout(barmode="group", title="📊 Entrate vs Uscite per mese",
                       height=320, paper_bgcolor="rgba(0,0,0,0)",
-                      plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"))
+                      plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#0B1230"))
     return fig
 
 
 # ─── UI ──────────────────────────────────────────────────────────────────────
 def show_open_banking():
-    st.markdown("""
-    <div style='background: linear-gradient(135deg, #0f172a, #1e3a5f);
-                padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem;
-                border: 1px solid #2563eb;'>
-        <h2 style='color:white; margin:0; font-size:1.8rem;'>🏦 Open Banking</h2>
-        <p style='color: rgba(255,255,255,0.85); margin: 0.3rem 0 0;'>
-            PSD2/PSD3 · Saldi reali · Previsione sconfinamento · Alert automatici
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Integrazioni · PSD2 / PSD3",
+        title="Open",
+        highlight="Banking",
+        subtitle="Saldi reali · Previsione sconfinamento · Alert automatici — Nexus non vede mai le tue credenziali bancarie.",
+    )
 
     tab_connetti, tab_demo, tab_upload = st.tabs([
         "🔌 Collega la tua Banca", "🎯 Demo Live", "📂 Carica Estratto Conto"
@@ -196,7 +194,7 @@ def _tab_connetti_banca():
     st.markdown("### 🔌 Collegamento Open Banking (PSD2/PSD3)")
 
     st.markdown("""
-    <div style='background: rgba(37,99,235,0.1); border: 1px solid rgba(37,99,235,0.3);
+    <div style='background: rgba(30,55,108,0.1); border: 1px solid rgba(30,55,108,0.3);
                 border-radius: 10px; padding: 1.5rem; margin-bottom: 1rem;'>
         <b>Come funziona:</b><br>
         1. Seleziona la tua banca dalla lista<br>

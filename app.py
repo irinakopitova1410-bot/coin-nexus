@@ -1,7 +1,7 @@
 """
 NEXUS Finance Pro — Entry Point
-Analisi finanziaria professionale per PMI italiane.
-v5.0 — Big Four Edition: Early Warning · ESG · AI Analyst · Open Banking · What-If
+La prossima generazione di financial intelligence per PMI italiane.
+v6.0 — Aurora Edition: Copilot AI · Design System · Big Four Suite
 """
 import streamlit as st
 import os
@@ -9,7 +9,7 @@ import os
 # ── Configurazione pagina ──────────────────────────────────────────────────────
 st.set_page_config(
     page_title="NEXUS Finance Pro",
-    page_icon="📊",
+    page_icon="◆",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -29,43 +29,22 @@ if not os.environ.get("SUPABASE_URL"):
     if key:
         os.environ["SUPABASE_KEY"] = key
 
-# ── CSS globale ────────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0D47A1 0%, #1565C0 60%, #0097A7 100%);
-    color: white;
-}
-[data-testid="stSidebar"] * { color: white !important; }
-[data-testid="stSidebar"] .stButton > button {
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.3);
-    color: white !important;
-    border-radius: 8px;
-    width: 100%;
-    text-align: left;
-    margin-bottom: 2px;
-}
-[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(255,255,255,0.25);
-}
-[data-testid="metric-container"] {
-    background: #f8faff;
-    border-radius: 12px;
-    padding: 16px;
-    border: 1px solid #e3eafc;
-    box-shadow: 0 2px 8px rgba(13,71,161,0.06);
-}
-h1, h2, h3 { color: #0D47A1; }
-#MainMenu { visibility: hidden; }
-footer { visibility: hidden; }
-</style>
-""", unsafe_allow_html=True)
+# ── Design System Aurora ───────────────────────────────────────────────────────
+from utils.ui_kit import inject_global_css
+inject_global_css()
 
 # ── Autenticazione ─────────────────────────────────────────────────────────────
 from services.auth import login_page, get_current_user, logout
 
-user = get_current_user()
+# Bypass solo per sviluppo locale (mai attivo su Streamlit Cloud)
+if not os.environ.get("NEXUS_DEV_BYPASS"):
+    user = get_current_user()
+else:
+    user = {
+        "id": "dev", "email": "demo@nexus.local",
+        "role": "admin", "full_name": "Demo Aurora",
+        "company_name": "NEXUS Demo", "access_token": "",
+    }
 
 if not user:
     login_page()
@@ -74,75 +53,92 @@ if not user:
 # ── Sidebar navigazione ────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style='text-align:center; padding:16px 0 8px 0;'>
-        <div style='font-size:32px;'>📊</div>
-        <div style='font-size:18px; font-weight:800; letter-spacing:1px;'>NEXUS Finance</div>
-        <div style='font-size:11px; opacity:0.8;'>Pro Analytics Platform v5.0</div>
+    <div style='padding:10px 4px 2px 4px;'>
+        <div style='display:flex; align-items:center; gap:10px;'>
+            <div style='width:34px; height:34px; border-radius:10px;
+                        background:linear-gradient(135deg,#1E376C 0%,#4A6FA5 100%);
+                        display:flex; align-items:center; justify-content:center;
+                        color:white; font-weight:800; font-size:16px;
+                        font-family:Playfair Display, serif;'>N</div>
+            <div>
+                <div class='nx-side-brand'>NEXUS</div>
+                <div class='nx-side-tag'>Financial Intelligence</div>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("---")
 
-    role_label = "👑 Admin" if user.get("role") == "admin" else "👤 Cliente"
+    role_label = "Admin" if user.get("role") == "admin" else "Cliente"
     company = user.get("company_name") or user.get("email", "")
+    name = user.get("full_name") or company
     st.markdown(f"""
-    <div style='background:rgba(255,255,255,0.12); border-radius:8px; padding:10px 12px; margin-bottom:12px;'>
-        <div style='font-size:13px; font-weight:700;'>{role_label}</div>
-        <div style='font-size:11px; opacity:0.85; word-break:break-all;'>{company}</div>
+    <div class='nx-side-user'>
+        <div style='font-size:12.5px; font-weight:700;'>{name}</div>
+        <div style='font-size:10.5px; opacity:0.65; word-break:break-all; margin-top:2px;'>{company}</div>
+        <div style='margin-top:6px;'><span style='font-family:IBM Plex Mono, monospace; font-size:9px;
+            letter-spacing:0.14em; text-transform:uppercase; background:rgba(201,162,39,0.28);
+            border:1px solid rgba(245,226,141,0.5); border-radius:999px; padding:2px 9px;'>{role_label}</span></div>
     </div>
     """, unsafe_allow_html=True)
 
     if "current_page" not in st.session_state:
         st.session_state["current_page"] = "credit_readiness"
 
-    def nav_button(page_id, icon, label):
+    def nav_button(page_id, label):
         is_active = st.session_state.get("current_page") == page_id
-        prefix = "▶ " if is_active else "   "
-        if st.button(f"{prefix}{icon} {label}", key=f"nav_{page_id}"):
+        prefix = "› " if is_active else ""
+        weight = "font-weight:700;" if is_active else ""
+        if st.button(f"{prefix}{label}", key=f"nav_{page_id}"):
             st.session_state["current_page"] = page_id
             st.rerun()
 
     # ── STRUMENTO PRINCIPALE ──
-    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin-bottom:4px;'>⚡ STRUMENTO PRINCIPALE</div>", unsafe_allow_html=True)
-    nav_button("credit_readiness", "⚡", "Credit Readiness")
+    st.markdown("<div class='nx-side-label'>⚡ Strumento principale</div>", unsafe_allow_html=True)
+    nav_button("credit_readiness", "Credit Readiness")
+
+    # ── COPILOT AI ──
+    st.markdown("<div class='nx-side-label'>◆ Copilot AI</div>", unsafe_allow_html=True)
+    nav_button("copilot", "NEXUS Copilot")
 
     # ── ANALISI FINANZIARIA ──
-    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>📊 ANALISI FINANZIARIA</div>", unsafe_allow_html=True)
-    nav_button("dashboard",      "🏠", "Dashboard")
-    nav_button("risk_analysis",  "🎯", "Z-Score Altman")
-    nav_button("credit_scoring", "🏅", "Credit Scoring")
-    nav_button("ratio_analysis", "📊", "Ratio Analysis")
-    nav_button("cashflow",       "💰", "Cash Flow")
-    nav_button("audit_report",   "📄", "Audit Report ISA 320")
+    st.markdown("<div class='nx-side-label'>📊 Analisi finanziaria</div>", unsafe_allow_html=True)
+    nav_button("dashboard",      "Dashboard")
+    nav_button("risk_analysis",  "Z-Score Altman")
+    nav_button("credit_scoring", "Credit Scoring")
+    nav_button("ratio_analysis", "Ratio Analysis")
+    nav_button("cashflow",       "Cash Flow")
+    nav_button("audit_report",   "Audit Report ISA 320")
 
-    # ── BIG FOUR SUITE (NUOVO) ──
-    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>🏆 BIG FOUR SUITE</div>", unsafe_allow_html=True)
-    nav_button("early_warning",    "🚨", "Early Warning CCII")
-    nav_button("esg_scoring",      "🌿", "ESG Scoring")
-    nav_button("ai_analyst",       "🤖", "AI Financial Analyst")
-    nav_button("open_banking",     "🏦", "Open Banking PSD2")
-    nav_button("whatif_simulator", "🔮", "What-If Simulator")
-    nav_button("variance_analysis","📊", "Variance Analysis")
+    # ── BIG FOUR SUITE ──
+    st.markdown("<div class='nx-side-label'>🏆 Big Four Suite</div>", unsafe_allow_html=True)
+    nav_button("early_warning",    "Early Warning CCII")
+    nav_button("esg_scoring",      "ESG Scoring")
+    nav_button("ai_analyst",       "AI Financial Analyst")
+    nav_button("open_banking",     "Open Banking PSD2")
+    nav_button("whatif_simulator", "What-If Simulator")
+    nav_button("variance_analysis","Variance Analysis")
 
     # ── INTEGRAZIONI ──
-    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>🔌 INTEGRAZIONI</div>", unsafe_allow_html=True)
-    nav_button("erp_import", "🔌", "Import da ERP")
+    st.markdown("<div class='nx-side-label'>🔌 Integrazioni</div>", unsafe_allow_html=True)
+    nav_button("erp_import", "Import da ERP")
 
     # ── STORICO ──
-    st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>📁 ARCHIVIO</div>", unsafe_allow_html=True)
-    nav_button("history", "📁", "Storico Analisi")
+    st.markdown("<div class='nx-side-label'>📁 Archivio</div>", unsafe_allow_html=True)
+    nav_button("history", "Storico Analisi")
 
     if user.get("role") == "admin":
-        st.markdown("<div style='font-size:11px; opacity:0.7; font-weight:600; letter-spacing:1px; margin: 8px 0 4px;'>⚙️ ADMIN</div>", unsafe_allow_html=True)
-        nav_button("admin_panel", "⚙️", "Admin Panel")
+        st.markdown("<div class='nx-side-label'>⚙️ Admin</div>", unsafe_allow_html=True)
+        nav_button("admin_panel", "Admin Panel")
 
     st.markdown("---")
-    if st.button("🚪 Esci", key="logout_btn"):
+    if st.button("Esci", key="logout_btn"):
         logout()
 
     st.markdown("""
-    <div style='text-align:center; font-size:10px; opacity:0.6; margin-top:16px;'>
-        NEXUS Finance Pro v5.1<br>Big Four + Variance Suite<br>© 2025 Irina Kopitova
+    <div class='nx-side-footer'>
+        NEXUS v6.0 · Aurora<br>© 2026 Irina Kopitova
     </div>
     """, unsafe_allow_html=True)
 
@@ -154,6 +150,11 @@ try:
     if page_id == "credit_readiness":
         from pages_modules.credit_readiness import render_credit_readiness
         render_credit_readiness()
+
+    # ── COPILOT ──
+    elif page_id == "copilot":
+        from pages_modules.copilot import render_copilot
+        render_copilot(user)
 
     # ── ANALISI FINANZIARIA ──
     elif page_id == "dashboard":

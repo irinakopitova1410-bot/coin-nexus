@@ -9,34 +9,36 @@ from services.db import save_credit_report
 def _show_credit_result(result, company_name="", access_token=""):
     """Mostra i risultati del credit scoring."""
     rating_colors = {
-        "AAA": "#4ADE80", "AA": "#4ADE80", "A": "#86EFAC",
-        "BBB": "#FCD34D", "BB": "#FCD34D", "B": "#FB923C",
-        "CCC": "#F87171", "CC": "#F87171", "D": "#EF4444"
+        "AAA": "#15803D", "AA": "#16A34A", "A": "#22C55E",
+        "BBB": "#D97706", "BB": "#F59E0B", "B": "#EA580C",
+        "CCC": "#DC2626", "CC": "#B91C1C", "D": "#991B1B"
     }
+    dec_color = {"#4ADE80": "#16A34A", "#FCD34D": "#D97706",
+                 "#F87171": "#DC2626"}.get(result.decision_color, result.decision_color)
     rc = rating_colors.get(result.rating, "#94A3B8")
 
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f"""
-        <div style="background:#1E293B;border-radius:12px;padding:25px;text-align:center;border:2px solid {result.decision_color};">
-            <div style="color:#94A3B8;font-size:0.85rem;">SCORE</div>
-            <div style="color:{result.decision_color};font-size:3.5rem;font-weight:800;">{result.score}</div>
+        <div style="background:#FFFFFF;border:1px solid #E6EAF2;border-radius:12px;padding:25px;text-align:center;border-top:3px solid {dec_color};box-shadow:0 1px 3px rgba(11,18,48,0.06);">
+            <div style="color:#5A6478;font-size:0.85rem;">SCORE</div>
+            <div style="color:{dec_color};font-size:3.5rem;font-weight:800;">{result.score}</div>
             <div style="color:#64748B;font-size:0.75rem;">su 100</div>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
-        <div style="background:#1E293B;border-radius:12px;padding:25px;text-align:center;border:2px solid {rc};">
-            <div style="color:#94A3B8;font-size:0.85rem;">RATING Basel IV</div>
+        <div style="background:#FFFFFF;border:1px solid #E6EAF2;border-radius:12px;padding:25px;text-align:center;border-top:3px solid {rc};box-shadow:0 1px 3px rgba(11,18,48,0.06);">
+            <div style="color:#5A6478;font-size:0.85rem;">RATING Basel IV</div>
             <div style="color:{rc};font-size:3.5rem;font-weight:800;">{result.rating}</div>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
-        <div style="background:#1E293B;border-radius:12px;padding:25px;text-align:center;border:2px solid {result.decision_color};">
-            <div style="color:#94A3B8;font-size:0.85rem;">DECISIONE</div>
-            <div style="color:{result.decision_color};font-size:1.6rem;font-weight:700;">{result.decision}</div>
-            <div style="color:#4ADE80;font-size:0.85rem;">Fido max: €{result.max_credit:,.0f}</div>
+        <div style="background:#FFFFFF;border:1px solid #E6EAF2;border-radius:12px;padding:25px;text-align:center;border-top:3px solid {dec_color};box-shadow:0 1px 3px rgba(11,18,48,0.06);">
+            <div style="color:#5A6478;font-size:0.85rem;">DECISIONE</div>
+            <div style="color:{dec_color};font-size:1.6rem;font-weight:700;">{result.decision}</div>
+            <div style="color:#16A34A;font-size:0.85rem;">Fido max: €{result.max_credit:,.0f}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -51,10 +53,10 @@ def _show_credit_result(result, company_name="", access_token=""):
 
     st.subheader("📏 Indicatori Chiave")
     m1, m2, m3, m4 = st.columns(4)
-    dscr_c = "#4ADE80" if result.dscr >= 1.5 else "#FCD34D" if result.dscr >= 1.0 else "#F87171"
-    lev_c = "#4ADE80" if result.leverage <= 2 else "#FCD34D" if result.leverage <= 4 else "#F87171"
-    eb_c = "#4ADE80" if result.ebitda_margin >= 15 else "#FCD34D" if result.ebitda_margin >= 8 else "#F87171"
-    cr_c = "#4ADE80" if result.current_ratio >= 1.5 else "#FCD34D" if result.current_ratio >= 1.0 else "#F87171"
+    dscr_c = "#16A34A" if result.dscr >= 1.5 else "#D97706" if result.dscr >= 1.0 else "#DC2626"
+    lev_c = "#16A34A" if result.leverage <= 2 else "#D97706" if result.leverage <= 4 else "#DC2626"
+    eb_c = "#16A34A" if result.ebitda_margin >= 15 else "#D97706" if result.ebitda_margin >= 8 else "#DC2626"
+    cr_c = "#16A34A" if result.current_ratio >= 1.5 else "#D97706" if result.current_ratio >= 1.0 else "#DC2626"
 
     for col, label, val, color, suffix, desc in [
         (m1, "DSCR", result.dscr, dscr_c, "x", "Soglia: ≥1.25"),
@@ -64,8 +66,8 @@ def _show_credit_result(result, company_name="", access_token=""):
     ]:
         with col:
             st.markdown(f"""
-            <div style="background:#1E293B;border-radius:8px;padding:15px;text-align:center;">
-                <div style="color:#94A3B8;font-size:0.75rem;">{label}</div>
+            <div style="background:#FFFFFF;border:1px solid #E6EAF2;border-radius:8px;padding:15px;text-align:center;box-shadow:0 1px 3px rgba(11,18,48,0.05);">
+                <div style="color:#5A6478;font-size:0.75rem;">{label}</div>
                 <div style="color:{color};font-size:1.6rem;font-weight:700;">{val:.2f}{suffix}</div>
                 <div style="color:#64748B;font-size:0.7rem;">{desc}</div>
             </div>

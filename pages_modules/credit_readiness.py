@@ -8,6 +8,12 @@ import plotly.graph_objects as go
 import pandas as pd
 import io
 from engine.credit_readiness import analyze_credit_readiness, CreditReadinessResult
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
 
 
 # ─── Helpers UI ──────────────────────────────────────────────────────────────
@@ -450,11 +456,6 @@ def render_credit_readiness():
 
     st.markdown("""
     <style>
-    .cr-hero { background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
-               padding: 2rem; border-radius: 16px; color: white; margin-bottom: 1.5rem; }
-    .cr-hero h1 { font-size: 1.8rem; font-weight: 700; margin: 0; }
-    .cr-hero p  { color: #94a3b8; margin: 0.3rem 0 0 0; }
-
     .upload-zone { background: linear-gradient(135deg, #f0fdf4, #dcfce7);
                    border: 2px dashed #22c55e; border-radius: 14px;
                    padding: 1.5rem; margin-bottom: 1.2rem; }
@@ -491,12 +492,12 @@ def render_credit_readiness():
     """, unsafe_allow_html=True)
 
     # Header
-    st.markdown("""
-    <div class="cr-hero">
-        <h1>⚡ Credit Readiness Dashboard</h1>
-        <p>Quanto credito puoi ottenere oggi — e cosa fare per sbloccare il tuo potenziale</p>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Strumento principale · Potenziale di credito",
+        title="Credit",
+        highlight="Readiness",
+        subtitle="Quanto credito puoi ottenere oggi — e cosa fare per sbloccare il tuo potenziale.",
+    )
 
     # ── TAB: Carica & Analizza | Form Manuale ────────────────────────────────
     tab_upload, tab_form = st.tabs(["⚡ Carica & Analizza", "📝 Inserisci Manualmente"])

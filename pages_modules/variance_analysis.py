@@ -12,6 +12,20 @@ Features:
 """
 
 import streamlit as st
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -393,19 +407,12 @@ DEFAULT_DRIVERS = [
 # ─── Render Main ──────────────────────────────────────────────────────────────
 
 def show_variance_analysis():
-    st.markdown("""
-    <div style='background:linear-gradient(135deg,#0D47A1,#1565C0);
-                border-radius:16px; padding:24px 28px; margin-bottom:24px;'>
-        <div style='font-size:28px; font-weight:800; color:white;'>
-            📊 Variance Analysis Suite
-        </div>
-        <div style='font-size:14px; color:rgba(255,255,255,0.85); margin-top:6px;'>
-            Analisi Scostamenti Budget vs Actual &nbsp;|&nbsp;
-            Waterfall P&amp;L &nbsp;|&nbsp; Breakdown Business Unit &nbsp;|&nbsp;
-            9 Driver di Scostamento &nbsp;|&nbsp; Export Invitalia-ready
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Big Four Suite · Budget vs Actual",
+        title="Variance",
+        highlight="Analysis",
+        subtitle="Waterfall P&L · Breakdown Business Unit · 9 Driver di Scostamento · Export Invitalia-ready.",
+    )
 
     tab1, tab2 = st.tabs(["⚡ Carica & Analizza", "📝 Inserimento Manuale"])
 

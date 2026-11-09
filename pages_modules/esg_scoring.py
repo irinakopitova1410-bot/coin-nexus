@@ -8,6 +8,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 import io
 
+from utils.ui_kit import page_header
+
 
 # ─── Pesi ESG (EBA Guidelines on Loan Origination) ───────────────────────────
 PESI = {"E": 0.35, "S": 0.35, "G": 0.30}
@@ -99,12 +101,12 @@ def calcola_esg_totale(dati_e: dict, dati_s: dict, dati_g: dict) -> dict:
 
 # ─── Grafici ─────────────────────────────────────────────────────────────────
 def grafico_gauge_esg(score: float, label: str) -> go.Figure:
-    color = "#22c55e" if score >= 70 else "#f59e0b" if score >= 40 else "#ef4444"
+    color = "#16A34A" if score >= 70 else "#D97706" if score >= 40 else "#ef4444"
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=score,
         domain={"x": [0, 1], "y": [0, 1]},
-        title={"text": label, "font": {"color": "#e2e8f0", "size": 14}},
+        title={"text": label, "font": {"color": "#0B1230", "size": 14}},
         number={"suffix": "/100", "font": {"color": color, "size": 28}},
         gauge={
             "axis": {"range": [0, 100], "tickcolor": "#64748b"},
@@ -119,7 +121,7 @@ def grafico_gauge_esg(score: float, label: str) -> go.Figure:
         }
     ))
     fig.update_layout(height=220, margin=dict(l=20, r=20, t=40, b=10),
-                      paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#e2e8f0"))
+                      paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#0B1230"))
     return fig
 
 
@@ -131,7 +133,7 @@ def grafico_radar_esg(risultati: dict) -> go.Figure:
         theta=cats + [cats[0]],
         fill="toself",
         fillcolor="rgba(34,197,94,0.2)",
-        line=dict(color="#22c55e", width=2),
+        line=dict(color="#16A34A", width=2),
         name="ESG Score"
     ))
     fig.update_layout(
@@ -139,7 +141,7 @@ def grafico_radar_esg(risultati: dict) -> go.Figure:
         title="🌿 Profilo ESG",
         height=350,
         paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e2e8f0"),
+        font=dict(color="#0B1230"),
         showlegend=False
     )
     return fig
@@ -148,7 +150,7 @@ def grafico_radar_esg(risultati: dict) -> go.Figure:
 def grafico_benchmark(score: float) -> go.Figure:
     categorie = ["La tua azienda", "PMI Media Italia", "PMI Virtuosa", "Standard bancario"]
     valori = [score, 42, 72, 55]
-    colori = ["#6366f1", "#94a3b8", "#22c55e", "#f59e0b"]
+    colori = ["#6366f1", "#94a3b8", "#16A34A", "#D97706"]
     fig = go.Figure(go.Bar(
         x=valori, y=categorie,
         orientation="h",
@@ -162,22 +164,19 @@ def grafico_benchmark(score: float) -> go.Figure:
         height=280,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e2e8f0")
+        font=dict(color="#0B1230")
     )
     return fig
 
 
 # ─── UI ──────────────────────────────────────────────────────────────────────
 def show_esg_scoring():
-    st.markdown("""
-    <div style='background: linear-gradient(135deg, #166534, #15803d);
-                padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem;'>
-        <h2 style='color:white; margin:0; font-size:1.8rem;'>🌿 ESG Scoring</h2>
-        <p style='color: rgba(255,255,255,0.85); margin: 0.3rem 0 0;'>
-            Environmental · Social · Governance — EBA Guidelines 2026 | Rating per accesso credito bancario
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Big Four Suite · EBA Guidelines 2026",
+        title="ESG",
+        highlight="Scoring",
+        subtitle="Environmental · Social · Governance — il rating che le banche valutano per accesso al credito e Green Loan.",
+    )
 
     with st.expander("ℹ️ Perché l'ESG è cruciale per il credito nel 2026?", expanded=False):
         st.markdown("""
@@ -209,12 +208,13 @@ def _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda="Azienda"):
     # Score totale prominente
     col_r, col_e, col_s, col_g = st.columns(4)
     with col_r:
-        color = "#22c55e" if score_tot >= 70 else "#f59e0b" if score_tot >= 40 else "#ef4444"
+        color = "#16A34A" if score_tot >= 70 else "#D97706" if score_tot >= 40 else "#ef4444"
         st.markdown(f"""
-        <div style='text-align:center; background: rgba(0,0,0,0.2); border-radius:12px; padding:1rem;
-                    border: 2px solid {color};'>
+        <div style='text-align:center; background:#FFFFFF; border-radius:12px; padding:1rem;
+                    border: 1px solid #E6EAF2; border-top: 3px solid {color};
+                    box-shadow: 0 1px 3px rgba(11,18,48,0.06);'>
             <div style='font-size:2.5rem; font-weight:700; color:{color};'>{score_tot}</div>
-            <div style='color:#94a3b8; font-size:0.9rem;'>ESG Score /100</div>
+            <div style='color:#5A6478; font-size:0.9rem;'>ESG Score /100</div>
             <div style='color:{color}; font-weight:600; font-size:1.1rem;'>{rating}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -226,12 +226,13 @@ def _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda="Azienda"):
         st.plotly_chart(grafico_gauge_esg(risultati["G"]["score"], "⚖️ Governance"), use_container_width=True)
 
     # Impatto credito
-    impatto_color = "#22c55e" if score_tot >= 55 else "#f59e0b" if score_tot >= 40 else "#ef4444"
+    impatto_color = "#16A34A" if score_tot >= 55 else "#D97706" if score_tot >= 40 else "#ef4444"
     st.markdown(f"""
-    <div style='background: rgba(0,0,0,0.2); border-left: 4px solid {impatto_color};
-                padding: 1rem; border-radius: 0 8px 8px 0; margin: 1rem 0;'>
+    <div style='background:#FFFFFF; border: 1px solid #E6EAF2; border-left: 4px solid {impatto_color};
+                padding: 1rem; border-radius: 0 8px 8px 0; margin: 1rem 0;
+                box-shadow: 0 1px 3px rgba(11,18,48,0.05);'>
         <b style='color:{impatto_color};'>💰 Impatto sul credito bancario:</b>
-        <span style='color:#e2e8f0;'> {risultati["impatto_credito"]}</span>
+        <span style='color:#0B1230;'> {risultati["impatto_credito"]}</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -258,7 +259,7 @@ def _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda="Azienda"):
         st.success("🏆 Ottimo profilo ESG! Sei posizionato per i migliori tassi sui Green Loan.")
     else:
         for area, azione, priorita in raccomandazioni[:5]:
-            color_p = "#ef4444" if priorita == "Alta" else "#f59e0b"
+            color_p = "#ef4444" if priorita == "Alta" else "#D97706"
             st.markdown(f"- **{area}** — {azione} <span style='color:{color_p};'>({priorita} priorità)</span>",
                         unsafe_allow_html=True)
 

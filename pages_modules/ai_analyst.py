@@ -8,6 +8,10 @@ import pandas as pd
 import io
 from datetime import datetime
 
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
 
 # ─── Motore XAI (regole + template professionali) ─────────────────────────────
 def genera_relazione_gestione(dati: dict) -> dict:
@@ -191,10 +195,13 @@ def genera_relazione_gestione(dati: dict) -> dict:
 # ─── Parse CSV ───────────────────────────────────────────────────────────────
 def parse_csv_ai(uploaded_file) -> dict | None:
     try:
-        content = uploaded_file.read().decode("utf-8", errors="replace")
-        uploaded_file.seek(0)
-        lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
-        df = pd.read_csv(io.StringIO("\n".join(lines)), header=0)
+        if uploaded_file.name.lower().endswith((".xlsx", ".xls")):
+            df = pd.read_excel(uploaded_file)
+        else:
+            content = uploaded_file.read().decode("utf-8", errors="replace")
+            uploaded_file.seek(0)
+            lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
+            df = pd.read_csv(io.StringIO("\n".join(lines)), header=0)
         df.columns = [str(c).strip().lower() for c in df.columns]
         val_col = "valore" if "valore" in df.columns else df.columns[1]
         data = {str(r[df.columns[0]]).strip().lower(): r[val_col]
@@ -233,15 +240,12 @@ def parse_csv_ai(uploaded_file) -> dict | None:
 
 # ─── UI ──────────────────────────────────────────────────────────────────────
 def show_ai_analyst():
-    st.markdown("""
-    <div style='background: linear-gradient(135deg, #4f46e5, #7c3aed);
-                padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem;'>
-        <h2 style='color:white; margin:0; font-size:1.8rem;'>🤖 AI Financial Analyst</h2>
-        <p style='color: rgba(255,255,255,0.85); margin: 0.3rem 0 0;'>
-            Explainable AI · Relazione sulla Gestione automatica · Stile Big Four
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Big Four Suite · Explainable AI",
+        title="AI Financial",
+        highlight="Analyst",
+        subtitle="Relazione sulla Gestione automatica · XAI · ogni giudizio spiegato con i dati che lo hanno generato.",
+    )
 
     with st.expander("ℹ️ Come funziona l'AI Analyst?", expanded=False):
         st.markdown("""
@@ -272,15 +276,15 @@ def _mostra_relazione(relazione: dict):
     n_crit  = relazione["n_critiche"]
 
     color_rating = {
-        "OTTIMO": "#22c55e", "BUONO": "#6366f1",
-        "MEDIO": "#f59e0b",  "CRITICO": "#ef4444"
+        "OTTIMO": "#16A34A", "BUONO": "#6366f1",
+        "MEDIO": "#D97706",  "CRITICO": "#ef4444"
     }.get(rating, "#94a3b8")
 
     st.markdown(f"---")
     st.markdown(f"""
-    <div style='background: rgba(0,0,0,0.2); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem;'>
-        <h3 style='color: white; margin: 0;'>📄 Relazione sulla Gestione — {azienda}</h3>
-        <div style='color: #94a3b8; font-size: 0.9rem; margin-top: 0.3rem;'>
+    <div style='background: #FFFFFF; border: 1px solid #E6EAF2; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(11,18,48,0.06);'>
+        <h3 style='color: #0B1230; margin: 0;'>📄 Relazione sulla Gestione — {azienda}</h3>
+        <div style='color: #5A6478; font-size: 0.9rem; margin-top: 0.3rem;'>
             Esercizio {anno} · Generata da AI Financial Analyst Nexus · {datetime.now().strftime("%d/%m/%Y %H:%M")}
         </div>
         <div style='margin-top: 0.8rem;'>
@@ -289,7 +293,7 @@ def _mostra_relazione(relazione: dict):
                          border-radius: 20px; font-weight: 700;'>
                 Giudizio complessivo: {rating}
             </span>
-            {'<span style="margin-left: 8px; color: #ef4444;">⚠️ ' + str(n_crit) + ' criticità rilevate</span>' if n_crit > 0 else '<span style="margin-left: 8px; color: #22c55e;">✅ Nessuna criticità grave</span>'}
+            {'<span style="margin-left: 8px; color: #ef4444;">⚠️ ' + str(n_crit) + ' criticità rilevate</span>' if n_crit > 0 else '<span style="margin-left: 8px; color: #16A34A;">✅ Nessuna criticità grave</span>'}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -298,7 +302,7 @@ def _mostra_relazione(relazione: dict):
         with st.container():
             st.markdown(f"#### {titolo}")
             st.markdown(f"""
-            <div style='background: rgba(255,255,255,0.04); border-left: 3px solid #6366f1;
+            <div style='background: rgba(124,58,237,0.05); border-left: 3px solid #7C3AED;
                          padding: 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem;
                          line-height: 1.7;'>
                 {testo.replace(chr(10), '<br>')}

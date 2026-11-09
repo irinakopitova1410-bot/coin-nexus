@@ -9,6 +9,13 @@ import io
 from engine.calculations import altman_z_original, altman_z_prime, altman_z_doubleprime
 from engine.financial_ratios import calculate_all_ratios
 from services.db import save_risk_analysis
+from utils.ui_kit import action_card
+from utils.ui_kit import action_card
+from utils.ui_kit import action_card
+from utils.ui_kit import action_card
+from utils.ui_kit import action_card
+from utils.ui_kit import action_card
+from utils.ui_kit import action_card
 from utils.file_parser import (
     get_zscore_template_bytes, get_zscore_template_excel, parse_zscore_file
 )
@@ -174,14 +181,8 @@ def render_risk_analysis():
     # ================================================================
     # ⚡ CARICA & ANALIZZA — UN SOLO UPLOAD, RISULTATI ISTANTANEI
     # ================================================================
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#0D47A1,#1565C0);padding:20px 25px;border-radius:12px;margin-bottom:16px;">
-        <h3 style="color:white;margin:0;">⚡ Carica & Analizza</h3>
-        <p style="color:#BBDEFB;margin:6px 0 0 0;font-size:0.9rem;">
-            Carica il tuo bilancio CSV o Excel → analisi Z-Score istantanea senza compilare nulla
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    action_card("⚡ Carica & Analizza",
+                "Carica il tuo bilancio CSV o Excel → analisi Z-Score istantanea senza compilare nulla.")
 
     col_up, col_t1, col_t2 = st.columns([3, 1, 1])
     with col_up:

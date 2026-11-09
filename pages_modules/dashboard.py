@@ -8,71 +8,73 @@ import plotly.express as px
 import pandas as pd
 from datetime import datetime, timedelta
 from services.db import get_supabase
+from utils.ui_kit import page_header, kpi_row, feature_grid, empty_state
 
 
 def render_dashboard(user: dict):
     role = user.get("role", "client")
     name = user.get("full_name") or user.get("email", "Utente")
 
-    # Header
+    # Header Aurora
     ora = datetime.now().hour
     saluto = "Buongiorno" if ora < 12 else ("Buon pomeriggio" if ora < 18 else "Buonasera")
-    st.markdown(f"""
-    <div class="nexus-header">
-        <div style='font-size:1.6rem; font-weight:700;'>{saluto}, {name.split()[0] if name else ""}! 👋</div>
-        <div style='font-size:0.95rem; opacity:0.85; margin-top:0.3rem;'>
-            NEXUS Finance Pro — Dashboard Esecutiva &nbsp;|&nbsp; {datetime.now().strftime("%A %d %B %Y")}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    giorno_it = ["lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"][datetime.now().weekday()]
+    page_header(
+        kicker=f"Nexus · Dashboard Esecutiva · {giorno_it} {datetime.now().strftime('%d %B %Y')}",
+        title=f"{saluto},",
+        highlight=f"{name.split()[0] if name else ''}! 👋",
+        subtitle="Tutte le tue analisi, i risultati e le azioni successive — in una sola schermata.",
+    )
 
     # ── Quick actions ──────────────────────────────────────────────────────────
-    st.subheader("⚡ Azioni Rapide")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        if st.button("🔌 Import ERP", use_container_width=True, type="primary"):
-            st.session_state["nav_page"] = "🔌 Import da ERP"
-            st.rerun()
-    with col2:
-        if st.button("📊 Ratio Analysis", use_container_width=True):
-            st.session_state["nav_page"] = "📊 Ratio Analysis"
-            st.rerun()
-    with col3:
-        if st.button("💰 Cash Flow", use_container_width=True):
-            st.session_state["nav_page"] = "💰 Cash Flow"
-            st.rerun()
-    with col4:
-        if st.button("🎯 Z-Score", use_container_width=True):
-            st.session_state["nav_page"] = "🎯 Z-Score Altman"
-            st.rerun()
-    with col5:
-        if st.button("🏅 Credit Score", use_container_width=True):
-            st.session_state["nav_page"] = "🏅 Credit Scoring"
-            st.rerun()
+    st.subheader("⚡ Azioni rapide")
+    qa = [
+        ("🔌 Import ERP", "erp_import", "primary"),
+        ("📊 Ratio Analysis", "ratio_analysis", "secondary"),
+        ("💰 Cash Flow", "cashflow", "secondary"),
+        ("🎯 Z-Score", "risk_analysis", "secondary"),
+        ("🏅 Credit Score", "credit_scoring", "secondary"),
+    ]
+    qcols = st.columns(len(qa))
+    for i, (label, page_key, kind) in enumerate(qa):
+        with qcols[i]:
+            if st.button(label, use_container_width=True,
+                         type="primary" if kind == "primary" else "secondary"):
+                st.session_state["current_page"] = page_key
+                st.rerun()
 
     st.divider()
 
     # ── Statistiche DB ─────────────────────────────────────────────────────────
-    sb = get_supabase()
-    stats = {}
     try:
-        for tbl, label in [
-            ("analisi_rischio", "risk"), ("credit_reports", "credit"),
-            ("audit_reports", "audit")
-        ]:
-            r = sb.table(tbl).select("id", count="exact").execute()
-            stats[label] = r.count or 0
-    except:
-        stats = {"risk": 0, "credit": 0, "audit": 0}
+        sb = get_supabase()
+    except Exception:
+        sb = None
+    stats = {"risk": 0, "credit": 0, "audit": 0}
+    if sb:
+        try:
+            for tbl, label in [
+                ("analisi_rischio", "risk"), ("credit_reports", "credit"),
+                ("audit_reports", "audit")
+            ]:
+                r = sb.table(tbl).select("id", count="exact").execute()
+                stats[label] = r.count or 0
+        except Exception:
+            pass
 
     total = sum(stats.values())
 
     # ── KPI Bar ──────────────────────────────────────────────────────────────
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("📊 Analisi Totali", total)
-    col2.metric("🎯 Z-Score Calcolati", stats.get("risk", 0))
-    col3.metric("🏅 Credit Report", stats.get("credit", 0))
-    col4.metric("📄 Audit Report", stats.get("audit", 0))
+    kpi_row([
+        {"label": "Analisi totali", "value": str(total),
+         "sub": "Tutte le analisi registrate", "tone": "blue"},
+        {"label": "Z-Score calcolati", "value": str(stats.get("risk", 0)),
+         "sub": "Modelli Altman eseguiti", "tone": ""},
+        {"label": "Credit report", "value": str(stats.get("credit", 0)),
+         "sub": "Rating e readiness prodotti", "tone": ""},
+        {"label": "Audit report", "value": str(stats.get("audit", 0)),
+         "sub": "Revisioni ISA 320 completate", "tone": ""},
+    ])
 
     # ── Layout 2 colonne ────────────────────────────────────────────────────────
     col_left, col_right = st.columns([3, 2])
@@ -95,9 +97,11 @@ def render_dashboard(user: dict):
                 df = pd.DataFrame(rows).sort_values("Data", ascending=False).head(12)
                 st.dataframe(df, use_container_width=True, hide_index=True)
             else:
-                st.info("📭 Nessuna analisi ancora. Inizia con Import ERP o una nuova analisi!")
+                empty_state("📭", "Nessuna analisi ancora",
+                            "Inizia con Import ERP o chiedi al Copilot: «come sta la mia azienda?»")
         except Exception as e:
-            st.info("📭 Nessuna analisi ancora. Inizia con Import ERP o una nuova analisi!")
+            empty_state("📭", "Nessuna analisi ancora",
+                        "Inizia con Import ERP o chiedi al Copilot: «come sta la mia azienda?»")
 
         # Grafico attività nel tempo
         st.subheader("📈 Andamento Analisi")
@@ -113,7 +117,7 @@ def render_dashboard(user: dict):
                 df_dates["data"] = pd.to_datetime(df_dates["data"])
                 df_count = df_dates.groupby("data").size().reset_index(name="n")
                 fig = px.bar(df_count, x="data", y="n", title="Analisi per giorno",
-                             color_discrete_sequence=["#0D47A1"])
+                             color_discrete_sequence=["#1E376C"])
                 fig.update_layout(height=250, showlegend=False,
                                   xaxis_title="", yaxis_title="Analisi")
                 st.plotly_chart(fig, use_container_width=True)
@@ -128,7 +132,7 @@ def render_dashboard(user: dict):
                 labels=["Z-Score", "Credit", "Audit"],
                 values=[stats["risk"], stats["credit"], stats["audit"]],
                 hole=0.5,
-                marker_colors=["#0D47A1", "#00897B", "#F57C00"],
+                marker_colors=["#1E376C", "#0D9488", "#D97706"],
                 textinfo="label+percent",
             ))
             fig_pie.update_layout(height=300, showlegend=False,
@@ -147,7 +151,7 @@ def render_dashboard(user: dict):
             st.markdown(f"""
             | Voce | Valore |
             |------|--------|
-            | Ricavi | {fmt(erp_data.get('revenue'))} |
+            | Ricavi | {fmt(erp_data.get('ricavi_netti') or erp_data.get('revenue'))} |
             | EBITDA | {fmt(erp_data.get('ebitda'))} |
             | Totale Attivo | {fmt(erp_data.get('total_assets'))} |
             | Patr. Netto | {fmt(erp_data.get('equity'))} |
@@ -159,22 +163,20 @@ def render_dashboard(user: dict):
         else:
             st.info("Nessun dato ERP caricato.")
             if st.button("🔌 Importa da ERP ora", use_container_width=True, type="primary"):
-                st.session_state["nav_page"] = "🔌 Import da ERP"
+                st.session_state["current_page"] = "erp_import"
                 st.rerun()
 
         # Capacità dell'app
         st.subheader("🚀 Funzionalità NEXUS")
-        features = [
-            "✅ Import da SAP, Zucchetti, TeamSystem",
-            "✅ Altman Z-Score (3 modelli)",
-            "✅ 35+ Ratio finanziari",
-            "✅ Cash Flow con proiezioni 5 anni",
-            "✅ Covenant bancari monitor",
-            "✅ Credit Scoring + Rating",
-            "✅ Audit Report automatico",
-            "✅ Export PDF professionale",
-            "✅ Benchmark di settore",
-        ]
-        for f in features:
-            st.markdown(f"<div style='font-size:0.85rem; padding:2px 0;'>{f}</div>",
-                       unsafe_allow_html=True)
+        feature_grid([
+            {"icon": "🔌", "text": "Import da SAP, Zucchetti, TeamSystem"},
+            {"icon": "🎯", "text": "Altman Z-Score (3 modelli)"},
+            {"icon": "📊", "text": "35+ Ratio finanziari"},
+            {"icon": "💰", "text": "Cash Flow con proiezioni 5 anni"},
+            {"icon": "🛡️", "text": "Covenant bancari monitor"},
+            {"icon": "🏅", "text": "Credit Scoring + Rating"},
+            {"icon": "📄", "text": "Audit Report automatico"},
+            {"icon": "📑", "text": "Export PDF professionale"},
+            {"icon": "🧭", "text": "Benchmark di settore"},
+            {"icon": "◆", "text": "Copilot AI nativo"},
+        ])

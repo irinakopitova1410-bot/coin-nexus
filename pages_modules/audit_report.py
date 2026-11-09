@@ -136,39 +136,42 @@ def _normalize_risk(val: str) -> str:
 
 def _show_audit_result(result, company_name: str, key_suffix: str = ""):
     """Renderizza i risultati di un audit calcolato."""
+    jcolor = {"#4ADE80": "#16A34A", "#FCD34D": "#D97706",
+              "#F97316": "#EA580C", "#F87171": "#DC2626"}.get(
+                  result.judgment_color, result.judgment_color)
     st.markdown(f"""
-    <div style="background:#1E293B;border:2px solid {result.judgment_color};
+    <div style="background:#FFFFFF;border:1px solid #E6EAF2;border-left:4px solid {jcolor};box-shadow:0 1px 3px rgba(11,18,48,0.06);
          border-radius:12px;padding:20px;margin:15px 0;text-align:center;">
-        <div style="font-size:1.4rem;font-weight:700;color:{result.judgment_color};">
+        <div style="font-size:1.4rem;font-weight:700;color:{jcolor};">
             {result.judgment}
         </div>
-        <div style="color:#94A3B8;margin-top:5px;">Score Qualità: {result.score}/100</div>
-        {"<div style='color:#60A5FA;margin-top:4px;font-size:0.9rem;'>🏢 " + company_name + "</div>" if company_name else ""}
+        <div style="color:#5A6478;margin-top:5px;">Score Qualità: {result.score}/100</div>
+        {"<div style='color:#1E376C;margin-top:4px;font-size:0.9rem;'>🏢 " + company_name + "</div>" if company_name else ""}
     </div>
     """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f"""
-        <div style="background:#1E293B;border-radius:12px;padding:20px;text-align:center;">
-            <div style="color:#94A3B8;font-size:0.8rem;">SOGLIA DI MATERIALITÀ</div>
-            <div style="color:#3B82F6;font-size:1.6rem;font-weight:700;">€{result.materiality:,.2f}</div>
+        <div style="background:#FFFFFF;border:1px solid #E6EAF2;border-radius:12px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(11,18,48,0.05);">
+            <div style="color:#5A6478;font-size:0.8rem;">SOGLIA DI MATERIALITÀ</div>
+            <div style="color:#1E376C;font-size:1.6rem;font-weight:700;">€{result.materiality:,.2f}</div>
             <div style="color:#64748B;font-size:0.75rem;">5% × Utile Lordo</div>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
-        <div style="background:#1E293B;border-radius:12px;padding:20px;text-align:center;">
-            <div style="color:#94A3B8;font-size:0.8rem;">PERFORMANCE MATERIALITY</div>
-            <div style="color:#8B5CF6;font-size:1.6rem;font-weight:700;">€{result.performance_materiality:,.2f}</div>
+        <div style="background:#FFFFFF;border:1px solid #E6EAF2;border-radius:12px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(11,18,48,0.05);">
+            <div style="color:#5A6478;font-size:0.8rem;">PERFORMANCE MATERIALITY</div>
+            <div style="color:#7C3AED;font-size:1.6rem;font-weight:700;">€{result.performance_materiality:,.2f}</div>
             <div style="color:#64748B;font-size:0.75rem;">75%/80%/65% della Materialità</div>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
-        <div style="background:#1E293B;border-radius:12px;padding:20px;text-align:center;">
-            <div style="color:#94A3B8;font-size:0.8rem;">SOGLIA DI IRRILEVANZA</div>
-            <div style="color:#06B6D4;font-size:1.6rem;font-weight:700;">€{result.trivial_threshold:,.2f}</div>
+        <div style="background:#FFFFFF;border:1px solid #E6EAF2;border-radius:12px;padding:20px;text-align:center;box-shadow:0 1px 3px rgba(11,18,48,0.05);">
+            <div style="color:#5A6478;font-size:0.8rem;">SOGLIA DI IRRILEVANZA</div>
+            <div style="color:#0891B2;font-size:1.6rem;font-weight:700;">€{result.trivial_threshold:,.2f}</div>
             <div style="color:#64748B;font-size:0.75rem;">3% della Materialità</div>
         </div>
         """, unsafe_allow_html=True)

@@ -9,6 +9,18 @@ import numpy as np
 import plotly.graph_objects as go
 import io
 
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
+from utils.ui_kit import page_header
+
 
 # ─── Calcoli core ─────────────────────────────────────────────────────────────
 def calcola_zscore(ccn, ebit, utili_nd, pn, ricavi, totale_attivo, debiti_totali):
@@ -122,7 +134,7 @@ def grafico_confronto(base_kpi: dict, scenario_kpi: dict) -> go.Figure:
         height=380,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e2e8f0"),
+        font=dict(color="#0B1230"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     return fig
@@ -146,7 +158,7 @@ def grafico_waterfall_ebitda(base_ebitda, delta_ricavi, delta_materie, delta_per
         height=380,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#e2e8f0"),
+        font=dict(color="#0B1230"),
         showlegend=False
     )
     return fig
@@ -155,10 +167,13 @@ def grafico_waterfall_ebitda(base_ebitda, delta_ricavi, delta_materie, delta_per
 # ─── Parse CSV ───────────────────────────────────────────────────────────────
 def parse_csv_whatif(uploaded_file) -> dict | None:
     try:
-        content = uploaded_file.read().decode("utf-8", errors="replace")
-        uploaded_file.seek(0)
-        lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
-        df = pd.read_csv(io.StringIO("\n".join(lines)), header=0)
+        if uploaded_file.name.lower().endswith((".xlsx", ".xls")):
+            df = pd.read_excel(uploaded_file)
+        else:
+            content = uploaded_file.read().decode("utf-8", errors="replace")
+            uploaded_file.seek(0)
+            lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
+            df = pd.read_csv(io.StringIO("\n".join(lines)), header=0)
         df.columns = [str(c).strip().lower() for c in df.columns]
         val_col = "valore" if "valore" in df.columns else df.columns[1]
         data = {str(r[df.columns[0]]).strip().lower(): r[val_col]
@@ -198,15 +213,12 @@ def parse_csv_whatif(uploaded_file) -> dict | None:
 
 # ─── UI ──────────────────────────────────────────────────────────────────────
 def show_whatif_simulator():
-    st.markdown("""
-    <div style='background: linear-gradient(135deg, #0369a1, #0284c7);
-                padding: 1.5rem 2rem; border-radius: 12px; margin-bottom: 1.5rem;'>
-        <h2 style='color:white; margin:0; font-size:1.8rem;'>🔮 What-If Simulator</h2>
-        <p style='color: rgba(255,255,255,0.85); margin: 0.3rem 0 0;'>
-            Scenari interattivi · "Cosa succede se...?" · Aggiornamento istantaneo Z-Score e default
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Big Four Suite · Scenari",
+        title="What-If",
+        highlight="Simulator",
+        subtitle="«Cosa succede se…?» — muovi ricavi, costi e margini: effetto immediato su Z-Score, PD e covenant.",
+    )
 
     tab_upload, tab_manuale = st.tabs(["⚡ Carica & Simula", "📝 Inserisci Base Manualmente"])
 

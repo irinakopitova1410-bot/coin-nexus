@@ -1,14 +1,21 @@
 import streamlit as st
 import pandas as pd
 from services.db import get_all_history
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
+from utils.ui_kit import page_header
 
 def show_history():
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#134E4A,#0F766E);padding:25px;border-radius:12px;margin-bottom:25px;">
-        <h1 style="color:white;margin:0;font-size:1.8rem;">📋 Storico Analisi</h1>
-        <p style="color:#99F6E4;margin:5px 0 0 0;">Tutte le analisi salvate nel tuo Supabase</p>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Archivio · Supabase",
+        title="Storico",
+        highlight="Analisi",
+        subtitle="Z-Score, Credit Report e Audit Report — ogni analisi salvata, datata e ricercabile.",
+    )
 
     tab1, tab2, tab3 = st.tabs(["⚠️ Analisi Rischio", "💳 Credit Report", "📊 Audit Report"])
 

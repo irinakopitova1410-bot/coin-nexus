@@ -5,10 +5,10 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 import datetime
 
-# Prendi questi da Render -> Settings -> Environment Variables
-url = os.environ.get("https://ipmttldwfsxuubugiyir.supabase.co")
-key = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+# Configurazione da variabili d'ambiente (Render -> Settings -> Environment Variables)
+url = os.environ.get("SUPABASE_URL", "https://ipmttldwfsxuubugiyir.supabase.co")
+key = os.environ.get("SUPABASE_KEY", "")
+supabase: Client = create_client(url, key) if url and key else None
 
 app = FastAPI()
 
@@ -20,11 +20,14 @@ class ScoringRequest(BaseModel):
 
 @app.post("/v1/scoring/analyze")
 async def analyze(data: ScoringRequest, x_api_key: str = Header(None)):
+    if supabase is None:
+        raise HTTPException(status_code=500, detail="Supabase non configurato (SUPABASE_URL / SUPABASE_KEY)")
+
     # 1. Trova il cliente
     res = supabase.table("tenants").select("*").eq("api_key", x_api_key).execute()
     if not res.data:
         raise HTTPException(status_code=403, detail="API Key non valida")
-    
+
     tenant = res.data[0]
 
     # 2. Calcola lo Z-Score (Logica Nexus)

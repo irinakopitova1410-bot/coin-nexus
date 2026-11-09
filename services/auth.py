@@ -66,33 +66,83 @@ def require_auth():
 
 
 def login_page():
-    """Mostra la pagina di login professionale."""
-    st.markdown("""
+    """Login Aurora — light, tipografico, con reset password."""
+    _login_css = """
     <style>
-    [data-testid="stAppViewContainer"] {
-        background: linear-gradient(135deg, #0D47A1 0%, #00897B 100%);
-    }
     [data-testid="stSidebar"] { display: none; }
+    [data-testid="stApp"] {
+        background:
+            radial-gradient(1100px 500px at 82% -10%, rgba(30,55,108,0.14), transparent 60%),
+            radial-gradient(900px 460px at -10% 30%, rgba(233,241,235,0.85), transparent 55%),
+            radial-gradient(700px 400px at 60% 115%, rgba(201,162,39,0.08), transparent 60%),
+            #F6F8F6 !important;
+    }
+    [data-testid="stHeader"] { background: transparent !important; }
     footer { visibility: hidden; }
+    .lg-kicker {
+        font-family:'IBM Plex Mono', monospace; font-size:0.68rem; font-weight:600;
+        letter-spacing:0.24em; text-transform:uppercase; color:#B98A2F; margin-bottom:10px;
+    }
+    .lg-title {
+        font-family:'Playfair Display', serif; font-weight:700; line-height:1.06;
+        font-size:clamp(1.9rem, 4vw, 2.9rem); color:#0B1230; letter-spacing:-0.03em; margin:0;
+    }
+    .lg-grad {
+        background:linear-gradient(120deg,#1E376C 0%,#0034A4 48%,#B98A2F 100%);
+        -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    }
+    .lg-sub { color:#5A6478; font-size:1.02rem; margin-top:12px; }
+    .lg-chip {
+        display:inline-flex; align-items:center; gap:7px; border:1px solid #E6EAF2;
+        background:#fff; border-radius:999px; padding:6px 14px; font-size:0.8rem;
+        font-weight:600; color:#0B1230; margin-right:8px;
+    }
+    .lg-footer {
+        font-family:'IBM Plex Mono', monospace; font-size:0.6rem; letter-spacing:0.18em;
+        text-transform:uppercase; color:rgba(11,18,48,0.4); text-align:center; margin-top:2rem;
+    }
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background:#fff !important;
+        border:1px solid #E6EAF2 !important;
+        border-radius:22px !important;
+        box-shadow:0 24px 70px rgba(11,18,48,0.10) !important;
+    }
     </style>
-    """, unsafe_allow_html=True)
+    """
+    st.markdown("\n".join(l for l in _login_css.splitlines() if l.strip()), unsafe_allow_html=True)
 
-    col1, col2, col3 = st.columns([1, 1.4, 1])
-    with col2:
+    col_l, col_c, col_r = st.columns([1.1, 1.15, 1.1])
+
+    with col_l:
         st.markdown("""
-        <div style='text-align:center; padding: 2rem 0 1.5rem;'>
-            <div style='font-size:3.5rem;'>📊</div>
-            <div style='font-size:2rem; font-weight:800; color:white; letter-spacing:-0.5px;'>NEXUS Finance Pro</div>
-            <div style='font-size:1rem; color:rgba(255,255,255,0.75); margin-top:0.3rem;'>Analisi finanziaria professionale</div>
+        <div style='padding-top:14vh;'>
+            <div style='display:flex; align-items:center; gap:10px; margin-bottom:34px;'>
+                <div style='width:40px; height:40px; border-radius:12px;
+                            background:linear-gradient(135deg,#1E376C 0%,#4A6FA5 100%);
+                            display:flex; align-items:center; justify-content:center;
+                            color:white; font-weight:800; font-size:19px;
+                            font-family:Playfair Display, serif;'>N</div>
+                <div style="font-family:'Playfair Display',serif; font-weight:700; font-size:1.35rem; color:#0B1230;">NEXUS</div>
+            </div>
+            <div class='lg-kicker'>Financial Intelligence Platform</div>
+            <h1 class='lg-title'>La prossima generazione<br>di <span class='lg-grad'>analisi finanziaria.</span></h1>
+            <p class='lg-sub'>Z-Score · Credit Readiness · Early Warning CCII · Cash Flow · Copilot AI.<br>
+            Il tuo bilancio, trasformato in decisioni.</p>
+            <div style='margin-top:26px;'>
+                <span class='lg-chip'>⚡ Credit Readiness</span>
+                <span class='lg-chip'>◆ Copilot AI</span><br><br>
+                <span class='lg-chip'>🚨 Early Warning CCII</span>
+                <span class='lg-chip'>🔮 What-If</span>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
-        with st.container():
-            st.markdown("""
-            <div style='background:white; border-radius:16px; padding:2rem; box-shadow:0 20px 60px rgba(0,0,0,0.3);'>
-            """, unsafe_allow_html=True)
-
-            st.markdown("### 🔐 Accedi alla piattaforma")
+    with col_c:
+        st.markdown("<div style='height:6vh;'></div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown("<div class='lg-kicker' style='color:#5A6478;'>Area riservata</div>",
+                        unsafe_allow_html=True)
+            st.markdown("### Accedi alla piattaforma")
             email = st.text_input("Email", placeholder="la-tua-email@azienda.it", key="login_email")
             password = st.text_input("Password", type="password", placeholder="••••••••", key="login_password")
 
@@ -126,10 +176,22 @@ def login_page():
                         err = result.get("error", "Credenziali non valide")
                         st.error(f"❌ {err}")
 
-            st.markdown("</div>", unsafe_allow_html=True)
+            with st.expander("Password dimenticata?"):
+                reset_email = st.text_input("Email di recupero",
+                                            placeholder="la-tua-email@azienda.it",
+                                            key="reset_email")
+                if st.button("Invia link di reset", use_container_width=True):
+                    if not reset_email:
+                        st.warning("Inserisci la tua email.")
+                    else:
+                        try:
+                            sb = get_supabase()
+                            sb.auth.reset_password_email(reset_email.strip())
+                            st.success("📧 Email inviata: controlla la casella per reimpostare la password.")
+                        except Exception:
+                            # Risposta neutra: non rivela se l'email esiste o meno
+                            st.success("📧 Email inviata: controlla la casella per reimpostare la password.")
 
-        st.markdown("""
-        <div style='text-align:center; color:rgba(255,255,255,0.5); font-size:0.75rem; margin-top:1.5rem;'>
-        NEXUS Finance Pro v3.0 · © 2025 Irina Kopitova · Tutti i diritti riservati
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <div class='lg-footer'>NEXUS v6.0 · Aurora Edition · © 2026 Irina Kopitova · Tutti i diritti riservati</div>
+    """, unsafe_allow_html=True)

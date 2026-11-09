@@ -10,6 +10,12 @@ from engine.financial_ratios import (
     calculate_all_ratios, INDUSTRY_BENCHMARKS
 )
 from services.erp_connectors import REQUIRED_FIELDS, OPTIONAL_FIELDS
+from utils.ui_kit import page_header, action_card
+from utils.ui_kit import page_header, action_card
+from utils.ui_kit import page_header, action_card
+from utils.ui_kit import page_header, action_card
+from utils.ui_kit import page_header, action_card
+from utils.ui_kit import page_header, action_card
 from utils.pdf_export import generate_full_report
 from utils.file_parser import (
     get_ratios_template_bytes, get_ratios_template_excel, parse_ratios_file
@@ -137,21 +143,20 @@ def _show_ratio_result(result, company_name, industry):
 
 
 def render_financial_ratios():
-    st.title("Ratio Analysis — 35+ Indicatori Finanziari")
+    page_header(
+        kicker="Analisi Finanziaria · Benchmark di settore",
+        title="Ratio",
+        highlight="Analysis",
+        subtitle="35+ indicatori: liquidità, redditività, solidità patrimoniale e gestione del circolante.",
+    )
 
     erp_data = st.session_state.get("erp_data", {})
 
     # ================================================================
     # ⚡ CARICA & ANALIZZA — UPLOAD UNICO + RISULTATI ISTANTANEI
     # ================================================================
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#004D40,#00695C);padding:20px 25px;border-radius:12px;margin-bottom:16px;">
-        <h3 style="color:white;margin:0;">⚡ Carica & Analizza</h3>
-        <p style="color:#B2DFDB;margin:6px 0 0 0;font-size:0.9rem;">
-            Carica il tuo bilancio CSV o Excel → 35+ ratio istantanei senza compilare nulla
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    action_card("⚡ Carica & Analizza",
+                "Carica il tuo bilancio CSV o Excel → 35+ ratio istantanei senza compilare nulla.")
 
     col_up, col_t1, col_t2 = st.columns([3, 1, 1])
     with col_up:
