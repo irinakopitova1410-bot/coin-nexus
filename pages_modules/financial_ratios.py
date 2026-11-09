@@ -11,11 +11,6 @@ from engine.financial_ratios import (
 )
 from services.erp_connectors import REQUIRED_FIELDS, OPTIONAL_FIELDS
 from utils.ui_kit import page_header, action_card
-from utils.ui_kit import page_header, action_card
-from utils.ui_kit import page_header, action_card
-from utils.ui_kit import page_header, action_card
-from utils.ui_kit import page_header, action_card
-from utils.ui_kit import page_header, action_card
 from utils.pdf_export import generate_full_report
 from utils.file_parser import (
     get_ratios_template_bytes, get_ratios_template_excel, parse_ratios_file

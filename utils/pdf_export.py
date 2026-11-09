@@ -21,12 +21,98 @@ GRAY = (100, 100, 120)
 WHITE = (255, 255, 255)
 
 
+def clean_text(text: str) -> str:
+    """
+    Sostituisce caratteri Unicode non supportati da Helvetica (Latin-1/ISO-8859-1)
+    con equivalenti ASCII sicuri.
+    IMPORTANTE: usa latin-1 (non cp1252!) perche' Helvetica supporta solo ISO-8859-1.
+    I caratteri cp1252 nel range 0x80-0x9F (come euro=0x80, em-dash=0x97) passano
+    l'encoding cp1252 ma vengono rifiutati da Helvetica.
+    """
+    if not isinstance(text, str):
+        text = str(text)
+    replacements = {
+        # Trattini e lineette
+        "\u2014": " - ",   # em dash
+        "\u2013": " - ",   # en dash
+        "\u2012": "-",
+        "\u2015": "-",
+        # Virgolette tipografiche
+        "\u201C": '"',
+        "\u201D": '"',
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201A": "'",
+        "\u201E": '"',
+        # Ellipsis e bullet
+        "\u2026": "...",
+        "\u2022": "*",
+        "\u2023": "-",
+        "\u25CF": "*",
+        "\u25BA": ">",
+        # Frecce
+        "\u2192": "->",
+        "\u2190": "<-",
+        "\u2191": "^",
+        "\u2193": "v",
+        "\u21D2": "=>",
+        # Operatori matematici
+        "\u00D7": "x",
+        "\u00F7": "/",
+        "\u2212": "-",
+        "\u00B1": "+/-",
+        "\u2264": "<=",
+        "\u2265": ">=",
+        # Simboli valuta e speciali
+        "\u20AC": "EUR",   # Euro sign (cp1252=0x80, NON in Latin-1 -- causa crash)
+        "\u00A9": "(c)",
+        "\u00AE": "(R)",
+        "\u2122": "(TM)",
+        "\u00B0": "deg",
+        # Emoji comuni
+        "\U0001F4CA": "[Chart]",
+        "\U0001F3AF": "[Target]",
+        "\U0001F4B0": "[Money]",
+        "\U0001F4C8": "[Up]",
+        "\U0001F4C9": "[Down]",
+        "\u26A0": "[!]",
+        "\u2705": "[OK]",
+        "\u274C": "[X]",
+        "\u2714": "OK",
+        "\u2716": "X",
+        # Emoji aggiuntive usate nel motore
+        "\U0001F4E6": "[Box]",
+        "\U0001F6A8": "[Alert]",
+        "\U0001F534": "[Red]",
+        "\U0001F7E2": "[Green]",
+        "\U0001F7E1": "[Yellow]",
+        "\u23F0": "[Clock]",
+        "\u26D4": "[Stop]",
+        "\U0001F4B3": "[Card]",
+        "\U0001F4C4": "[Doc]",
+        "\u2699": "[Gear]",
+        "\U0001F465": "[People]",
+    }
+    for char, replacement in replacements.items():
+        text = text.replace(char, replacement)
+    # Fallback: usa latin-1 (ISO-8859-1) -- stesso charset di Helvetica
+    # NOTA: cp1252 non va bene perche' accetta caratteri (0x80-0x9F) che Helvetica rifiuta
+    result = ""
+    for ch in text:
+        try:
+            ch.encode("latin-1")  # FIX: era cp1252
+            result += ch
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            result += "?"
+    return result
+
+
 class NexusPDF(FPDF):
 
     def __init__(self, company_name: str = "", report_type: str = ""):
         super().__init__()
-        self.company_name = company_name
-        self.report_type = report_type
+        self.company_name = clean_text(company_name)
+        self.report_type = clean_text(report_type)
         self.set_auto_page_break(auto=True, margin=20)
 
     def header(self):

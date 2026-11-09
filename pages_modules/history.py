@@ -2,12 +2,6 @@ import streamlit as st
 import pandas as pd
 from services.db import get_all_history
 from utils.ui_kit import page_header
-from utils.ui_kit import page_header
-from utils.ui_kit import page_header
-from utils.ui_kit import page_header
-from utils.ui_kit import page_header
-from utils.ui_kit import page_header
-from utils.ui_kit import page_header
 
 def show_history():
     page_header(

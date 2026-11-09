@@ -11,6 +11,7 @@ from engine.cashflow import calculate_cashflow
 from services.erp_connectors import REQUIRED_FIELDS, OPTIONAL_FIELDS
 from utils.pdf_export import generate_full_report
 from utils.file_parser import parse_financial_file
+from utils.ui_kit import page_header
 
 
 def _run_cashflow(data: dict, company_name: str):
@@ -176,8 +177,12 @@ def _run_cashflow(data: dict, company_name: str):
 
 
 def render_cashflow_analysis():
-    st.title("💰 Cash Flow Analysis")
-    st.markdown("Rendiconto finanziario con metodo indiretto, proiezioni a 5 anni e covenant bancari.")
+    page_header(
+        kicker="Analisi finanziaria · Rendiconto finanziario",
+        title="Cash",
+        highlight="Flow",
+        subtitle="Rendiconto con metodo indiretto, proiezioni a 5 anni e covenant bancari.",
+    )
 
     erp_data = st.session_state.get("erp_data", {})
     company_name = st.session_state.get("erp_company", "")

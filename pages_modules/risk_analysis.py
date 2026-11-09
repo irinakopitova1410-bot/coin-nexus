@@ -9,13 +9,7 @@ import io
 from engine.calculations import altman_z_original, altman_z_prime, altman_z_doubleprime
 from engine.financial_ratios import calculate_all_ratios
 from services.db import save_risk_analysis
-from utils.ui_kit import action_card
-from utils.ui_kit import action_card
-from utils.ui_kit import action_card
-from utils.ui_kit import action_card
-from utils.ui_kit import action_card
-from utils.ui_kit import action_card
-from utils.ui_kit import action_card
+from utils.ui_kit import action_card, page_header
 from utils.file_parser import (
     get_zscore_template_bytes, get_zscore_template_excel, parse_zscore_file
 )
@@ -172,8 +166,12 @@ def _show_zscore_result(result, data_for_ratios, company_name, industry, access_
 
 
 def render_risk_analysis():
-    st.title("Altman Z-Score — Probabilità di Fallimento")
-    st.markdown("Tre modelli ufficiali di Altman per aziende quotate, private e di servizi.")
+    page_header(
+        kicker="Analisi finanziaria · Modelli di Altman",
+        title="Altman",
+        highlight="Z-Score",
+        subtitle="Tre modelli ufficiali per aziende quotate, private e di servizi — probabilità di fallimento in un numero.",
+    )
 
     access_token = st.session_state.get("access_token", "")
     erp_data = st.session_state.get("erp_data", {})

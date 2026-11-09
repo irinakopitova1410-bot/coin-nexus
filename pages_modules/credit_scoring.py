@@ -4,6 +4,7 @@ from engine.calculations import calculate_credit_score
 from utils.charts import radar_chart, bar_chart
 from utils.file_parser import parse_credit_file, get_credit_template_bytes, get_credit_template_excel
 from services.db import save_credit_report
+from utils.ui_kit import page_header
 
 
 def _show_credit_result(result, company_name="", access_token=""):
@@ -79,12 +80,12 @@ def _show_credit_result(result, company_name="", access_token=""):
 
 
 def show_credit_scoring():
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#1E3A8A,#1D4ED8);padding:25px;border-radius:12px;margin-bottom:25px;">
-        <h1 style="color:white;margin:0;font-size:1.8rem;">💳 Credit Scoring — Basel IV</h1>
-        <p style="color:#BFDBFE;margin:5px 0 0 0;">Analisi del merito creditizio con rating AAA–D e limite di fido stimato</p>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Analisi finanziaria · Basel IV",
+        title="Credit",
+        highlight="Scoring",
+        subtitle="Analisi del merito creditizio con rating AAA–D e limite di fido stimato.",
+    )
 
     access_token = st.session_state.get("access_token", "")
 
@@ -92,9 +93,9 @@ def show_credit_scoring():
     # ⚡ CARICA & ANALIZZA — UPLOAD UNICO + RISULTATI ISTANTANEI
     # ================================================================
     st.markdown("""
-<div style="background:linear-gradient(135deg,#0D47A1,#1565C0);padding:20px 25px;border-radius:12px;margin-bottom:16px;">
-    <h3 style="color:white;margin:0;">⚡ Carica & Analizza</h3>
-    <p style="color:#BBDEFB;margin:6px 0 0 0;font-size:0.9rem;">
+<div style="background:rgba(30,55,108,0.06);border:1px solid rgba(30,55,108,0.18);padding:20px 25px;border-radius:12px;margin-bottom:16px;">
+    <b style="color:#1E376C;">⚡ Carica & Analizza</b>
+    <p style="color:#475569;margin:6px 0 0 0;font-size:0.9rem;">
         Carica il tuo bilancio CSV o Excel → Credit Score istantaneo senza compilare nulla
     </p>
 </div>

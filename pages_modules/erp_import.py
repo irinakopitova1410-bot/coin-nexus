@@ -9,14 +9,16 @@ from services.erp_connectors import (
     parse_erp_file, get_template_df,
     REQUIRED_FIELDS, OPTIONAL_FIELDS, ERP_COLUMN_MAPS
 )
+from utils.ui_kit import page_header
 
 
 def render_erp_import():
-    st.title("🔌 Import da ERP / Bilancio")
-    st.markdown("""
-    Carica direttamente l'export del tuo gestionale. NEXUS riconosce automaticamente
-    il formato e mappa i campi senza configurazione manuale.
-    """)
+    page_header(
+        kicker="Integrazioni · SAP · Zucchetti · TeamSystem · Sage",
+        title="Import da",
+        highlight="ERP",
+        subtitle="Carica l'export del tuo gestionale: NEXUS riconosce il formato e mappa i campi senza configurazione manuale.",
+    )
 
     col1, col2 = st.columns([1, 1])
 

@@ -9,11 +9,6 @@ import pandas as pd
 import io
 from engine.credit_readiness import analyze_credit_readiness, CreditReadinessResult
 from utils.ui_kit import page_header
-from utils.ui_kit import page_header
-from utils.ui_kit import page_header
-from utils.ui_kit import page_header
-from utils.ui_kit import page_header
-from utils.ui_kit import page_header
 
 
 # ─── Helpers UI ──────────────────────────────────────────────────────────────

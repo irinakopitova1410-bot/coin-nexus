@@ -6,6 +6,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from services.auth import is_admin, get_supabase, get_supabase_url
+from utils.ui_kit import page_header
 
 EDGE_FN_URL = "https://ipmttldwfsxuubugiyir.supabase.co/functions/v1/create-user"
 
@@ -41,9 +42,12 @@ def show_admin_panel():
         st.error("⛔ Accesso negato — solo per amministratori")
         return
 
-    st.title("👑 Pannello Amministratore")
-    st.caption("Gestisci clienti, utenti e statistiche della piattaforma")
-    st.markdown("---")
+    page_header(
+        kicker="Admin · Supabase",
+        title="Pannello",
+        highlight="Amministratore",
+        subtitle="Gestisci clienti, utenti e statistiche della piattaforma.",
+    )
 
     tab1, tab2, tab3, tab4 = st.tabs(["👥 Clienti", "➕ Crea Cliente", "🔑 Reset Password", "📊 Statistiche"])
 

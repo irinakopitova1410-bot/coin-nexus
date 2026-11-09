@@ -3,6 +3,7 @@ import pandas as pd
 import io
 from engine.calculations import calculate_audit
 from services.db import save_audit_report, get_recent_analyses
+from utils.ui_kit import page_header
 
 # ─────────────────────────────────────────────────────────────
 #  CAMPI ACCETTATI DAL PARSER (CSV / Excel)
@@ -192,12 +193,12 @@ def _show_audit_result(result, company_name: str, key_suffix: str = ""):
 #  PAGINA PRINCIPALE
 # ─────────────────────────────────────────────────────────────
 def show_audit_report():
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#4C1D95,#7C3AED);padding:25px;border-radius:12px;margin-bottom:25px;">
-        <h1 style="color:white;margin:0;font-size:1.8rem;">📊 Audit Report — ISA 320</h1>
-        <p style="color:#DDD6FE;margin:5px 0 0 0;">Calcolo materialità, performance materiality e giudizio di revisione</p>
-    </div>
-    """, unsafe_allow_html=True)
+    page_header(
+        kicker="Analisi finanziaria · ISA 320",
+        title="Audit",
+        highlight="Report",
+        subtitle="Calcolo materialità, performance materiality e giudizio di revisione — procedura ISA 320 completa.",
+    )
 
     access_token = st.session_state.get("access_token", None)
 
@@ -212,10 +213,10 @@ def show_audit_report():
     # ══════════════════════════════════════════════════════════
     with tab_upload:
         st.markdown("""
-        <div style="background:linear-gradient(90deg,#4C1D95,#6D28D9);
+        <div style="background:rgba(30,55,108,0.06);border:1px solid rgba(30,55,108,0.18);
              border-radius:10px;padding:18px 22px;margin-bottom:18px;">
-            <h3 style="color:white;margin:0;">⚡ Carica il bilancio → Audit immediato</h3>
-            <p style="color:#DDD6FE;margin:6px 0 0 0;font-size:0.9rem;">
+            <b style="color:#1E376C;">⚡ Carica il bilancio → Audit immediato</b>
+            <p style="color:#475569;margin:6px 0 0 0;font-size:0.9rem;">
                 Carica un file CSV o Excel con i dati aziendali e ottieni
                 materialità, performance materiality e giudizio ISA 320 in un click.
             </p>
