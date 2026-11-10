@@ -34,7 +34,7 @@ from utils.ui_kit import inject_global_css
 inject_global_css()
 
 # ── Autenticazione ─────────────────────────────────────────────────────────────
-from services.auth import login_page, get_current_user, logout
+from services.auth import login_page, get_current_user, logout, pretty_display_name
 
 # Bypass solo per sviluppo locale (mai attivo su Streamlit Cloud)
 if not os.environ.get("NEXUS_DEV_BYPASS"):
@@ -72,7 +72,7 @@ with st.sidebar:
 
     role_label = "Admin" if user.get("role") == "admin" else "Cliente"
     company = user.get("company_name") or user.get("email", "")
-    name = user.get("full_name") or company
+    name = pretty_display_name(user.get("full_name", ""), user.get("email", ""))
     st.markdown(f"""
     <div class='nx-side-user'>
         <div style='font-size:12.5px; font-weight:700;'>{name}</div>
@@ -138,7 +138,7 @@ with st.sidebar:
 
     st.markdown("""
     <div class='nx-side-footer'>
-        NEXUS v6.0 · Aurora<br>© 2026 Irina Kopitova
+        NEXUS v6.2 · Aurora<br>© 2026 Irina Kopitova
     </div>
     """, unsafe_allow_html=True)
 

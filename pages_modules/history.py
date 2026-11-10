@@ -13,7 +13,8 @@ def show_history():
 
     tab1, tab2, tab3 = st.tabs(["⚠️ Analisi Rischio", "💳 Credit Report", "📊 Audit Report"])
 
-    data = get_all_history()
+    user = st.session_state.get("user") or {}
+    data = get_all_history(user.get("access_token"))
 
     with tab1:
         risk_data = data.get("analisi_rischio", [])

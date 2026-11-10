@@ -144,13 +144,18 @@ FIELD_MAP = {
     "debiti_finanziari": "debiti_finanziari",
     "total_debt": "debiti_finanziari",
     "debiti_totali": "debiti_finanziari",
+    "financial_debt": "debiti_finanziari",
     # patrimonio netto
     "patrimonio_netto": "patrimonio_netto",
     "equity": "patrimonio_netto",
     "total_equity": "patrimonio_netto",
+    "net_worth": "patrimonio_netto",
     # totale attivo
     "totale_attivo": "totale_attivo",
     "total_assets": "totale_attivo",
+    # passivo totale (fallback: usato come passivo corrente)
+    "total_liabilities": "passivo_corrente",
+    "totale_passivo": "passivo_corrente",
     # costo personale
     "costo_personale": "costo_personale",
     "labor_cost": "costo_personale",
@@ -187,6 +192,25 @@ DEFAULTS = {
     "oneri_finanziari": 0.0, "cash_operativo": 0.0, "cash_corrente": 0.0,
 }
 
+# Chiavi che identificano il nome azienda in formato orizzontale
+COMPANY_KEYS = {"azienda", "company", "company_name", "nome_azienda", "ragione_sociale"}
+
+
+def _to_float(val) -> float:
+    """Converte un valore in float gestendo formato italiano e simboli."""
+    if val is None:
+        return 0.0
+    s = str(val).strip().replace("\u20ac", "").replace("%", "").replace(" ", "")
+    if not s or s.lower() in ("nan", "none", "-", "\u2014", "n/a"):
+        return 0.0
+    # Formato italiano: 1.234.567,89 → 1234567.89
+    if "," in s:
+        s = s.replace(".", "").replace(",", ".")
+    try:
+        return float(s)
+    except Exception:
+        return 0.0
+
 
 def _parse_uploaded_file(uploaded_file) -> dict | None:
     """Legge CSV o Excel e restituisce dict con i valori finanziari."""
@@ -222,13 +246,26 @@ def _parse_uploaded_file(uploaded_file) -> dict | None:
         # mappa il campo
         mapped = FIELD_MAP.get(key_raw)
         if mapped:
-            try:
-                parsed[mapped] = float(str(val_raw).replace(",", ".").replace(".", "").replace(",", ".") if "," in str(val_raw) else str(val_raw).replace(",", ""))
-            except Exception:
-                try:
-                    parsed[mapped] = float(val_raw)
-                except Exception:
-                    pass
+            parsed[mapped] = _to_float(val_raw)
+
+
+    # ── Formato 2: orizzontale (header riga 1, valori riga 2) ──
+    # Attivato solo se il formato verticale non ha mappato NESSUN campo,
+    # così i file già supportati continuano a funzionare identici.
+    if all(v == 0.0 for v in parsed.values()) and len(df) >= 2:
+        try:
+            headers = [str(h).strip().lower().replace(" ", "_").replace("(€)", "")
+                       for h in df.iloc[0]]
+            values = df.iloc[1]
+            for col_idx, h in enumerate(headers):
+                if h in COMPANY_KEYS and col_idx < len(values):
+                    company_name = str(values.iloc[col_idx]).strip()
+                    continue
+                mapped = FIELD_MAP.get(h)
+                if mapped and col_idx < len(values):
+                    parsed[mapped] = _to_float(values.iloc[col_idx])
+        except Exception:
+            pass
 
     return {"data": parsed, "company_name": company_name or "Azienda"}
 
@@ -256,6 +293,33 @@ def _get_cr_template_csv() -> bytes:
         "cash_corrente,95000",
     ]
     return "\n".join(lines).encode("utf-8")
+
+
+def _save_readiness_history(result, company_name: str, d: dict):
+    """Salva automaticamente l'analisi Credit Readiness nello Storico (credit_reports).
+    Silenzioso: non blocca mai l'utente. Una sola salvataggio per file/dati."""
+    try:
+        user = st.session_state.get("user") or {}
+        token = user.get("access_token")
+        if not token:
+            return
+        from services.db import save_credit_report
+        sig = f"{company_name}|{d.get('fatturato', 0)}|{d.get('ebitda', 0)}|{result.credit_score:.0f}"
+        if st.session_state.get("cr_saved_sig") == sig:
+            return
+        ebitda_margin = (d["ebitda"] / d["fatturato"] * 100) if d.get("fatturato") else None
+        ok = save_credit_report({
+            "company_name": company_name or "N/A",
+            "score": round(result.credit_score, 1),
+            "rating": result.rating,
+            "decision": result.messaggio_principale,
+            "ebitda_margin": round(ebitda_margin, 2) if ebitda_margin is not None else None,
+            "max_credit": round(result.credito_oggi_eur, 0),
+        }, access_token=token)
+        if ok:
+            st.session_state["cr_saved_sig"] = sig
+    except Exception:
+        pass
 
 
 # ─── Render risultati (condiviso tra upload e form) ───────────────────────────
@@ -553,6 +617,7 @@ def render_credit_readiness():
 
                 st.markdown("---")
                 _render_results(result, company_name=company_name)
+                _save_readiness_history(result, company_name, d)
         else:
             st.info("👆 Carica un file CSV o Excel per vedere l'analisi Credit Readiness completa — istantanea, zero click.")
 

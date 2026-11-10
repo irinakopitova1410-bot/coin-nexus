@@ -200,7 +200,8 @@ def _respond(q: str):
 
 # ── Render ────────────────────────────────────────────────────────────────────
 def render_copilot(user: dict):
-    name = (user.get("full_name") or user.get("email", "")).split()[0] if user else ""
+    from services.auth import pretty_display_name
+    name = pretty_display_name(user.get("full_name", ""), user.get("email", "")) if user else ""
 
     page_header(
         kicker="Nexus Copilot · AI-Native Command Center",

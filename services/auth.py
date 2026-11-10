@@ -1,6 +1,34 @@
 import streamlit as st
 from supabase import create_client
 import os
+import re
+from services.db import get_auth_supabase
+
+
+def pretty_display_name(full_name: str, email: str) -> str:
+    """Nome di display amichevole: prima parola del full_name,
+    altrimenti derivata dall'email (es. 'irina.kopitova1410@...' → 'Irina')."""
+    if full_name and full_name.strip():
+        return full_name.strip().split()[0]
+    if email and "@" in email:
+        local = email.split("@")[0]
+        token = re.split(r"[._\-+]", local)[0]
+        cleaned = "".join(ch for ch in token if ch.isalpha())
+        if cleaned:
+            return cleaned.capitalize()
+    return "Utente"
+
+
+def ensure_user_profile(user_id: str, email: str, full_name: str, access_token: str):
+    """Crea la riga profilo al primo accesso (best-effort, silenzioso)."""
+    try:
+        sb = get_auth_supabase(access_token)
+        sb.table("user_profiles").upsert({
+            "id": user_id, "email": email,
+            "full_name": full_name, "role": "client",
+        }).execute()
+    except Exception:
+        pass
 
 
 SUPABASE_URL_DEFAULT = "https://ipmttldwfsxuubugiyir.supabase.co"
@@ -37,13 +65,13 @@ def logout():
         st.session_state.pop(key, None)
 
 
-def get_user_profile(user_id: str):
-    """Recupera profilo e ruolo utente da Supabase."""
+def get_user_profile(user_id: str, access_token: str = None):
+    """Recupera profilo e ruolo utente da Supabase (JWT utente per rispettare RLS)."""
     try:
-        supabase = get_supabase()
-        result = supabase.table("user_profiles").select("*").eq("id", user_id).single().execute()
+        sb = get_auth_supabase(access_token) if access_token else get_supabase()
+        result = sb.table("user_profiles").select("*").eq("id", user_id).single().execute()
         return result.data
-    except:
+    except Exception:
         return None
 
 
@@ -156,15 +184,22 @@ def login_page():
                     if result["success"]:
                         user_obj = result["user"]
                         session_obj = result["session"]
-                        profile = get_user_profile(user_obj.id)
+                        token = session_obj.access_token if session_obj else ""
+                        profile = get_user_profile(user_obj.id, token)
+                        if profile is None and token:
+                            # Primo accesso: profilo assente → crea con nome derivato
+                            derived = pretty_display_name("", user_obj.email or "")
+                            ensure_user_profile(user_obj.id, user_obj.email or "", derived, token)
+                            profile = {"full_name": derived, "role": "client", "company_name": ""}
 
                         user_data = {
                             "id": user_obj.id,
                             "email": user_obj.email,
-                            "role": profile.get("role", "client") if profile else "client",
-                            "full_name": profile.get("full_name", "") if profile else "",
-                            "company_name": profile.get("company_name", "") if profile else "",
-                            "access_token": session_obj.access_token if session_obj else "",
+                            "role": (profile or {}).get("role", "client"),
+                            "full_name": pretty_display_name(
+                                (profile or {}).get("full_name", ""), user_obj.email or ""),
+                            "company_name": (profile or {}).get("company_name", ""),
+                            "access_token": token,
                         }
 
                         st.session_state["user"] = user_data
@@ -193,5 +228,5 @@ def login_page():
                             st.success("📧 Email inviata: controlla la casella per reimpostare la password.")
 
     st.markdown("""
-    <div class='lg-footer'>NEXUS v6.0 · Aurora Edition · © 2026 Irina Kopitova · Tutti i diritti riservati</div>
+    <div class='lg-footer'>NEXUS v6.2 · Aurora Edition · © 2026 Irina Kopitova · Tutti i diritti riservati</div>
     """, unsafe_allow_html=True)

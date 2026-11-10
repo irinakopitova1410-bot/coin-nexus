@@ -342,6 +342,13 @@ _CSS = """
 
     #MainMenu { visibility: hidden; }
     footer { visibility: hidden; }
+    /* Nasconde pulsanti piattaforma (Fork) per look da prodotto */
+    [data-testid="stHeader"] [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stHeader"] button[aria-label*="Fork" i],
+    [data-testid="stHeader"] button[title*="Fork" i],
+    [data-testid="stHeader"] a[title*="epositor" i] { display: none !important; }
+    /* Fix icona collapse sidebar: carica il font Material Icons se la piattaforma non lo fa */
+    @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
     [data-testid="stStatusWidget"] { visibility: hidden; }
     /* Compatibilità hero scuri definiti nelle pagine (es. credit_readiness) */
     .cr-hero h1, .cr-hero h2, .cr-hero h3, .cr-hero p { color: #FFFFFF !important; }

@@ -7,13 +7,14 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from datetime import datetime, timedelta
-from services.db import get_supabase
+from services.db import get_supabase, get_auth_supabase
+from services.auth import pretty_display_name
 from utils.ui_kit import page_header, kpi_row, feature_grid, empty_state
 
 
 def render_dashboard(user: dict):
     role = user.get("role", "client")
-    name = user.get("full_name") or user.get("email", "Utente")
+    name = pretty_display_name(user.get("full_name", ""), user.get("email", ""))
 
     # Header Aurora
     ora = datetime.now().hour
@@ -46,8 +47,9 @@ def render_dashboard(user: dict):
     st.divider()
 
     # ── Statistiche DB ─────────────────────────────────────────────────────────
+    token = user.get("access_token") or None
     try:
-        sb = get_supabase()
+        sb = get_auth_supabase(token) if token else get_supabase()
     except Exception:
         sb = None
     stats = {"risk": 0, "credit": 0, "audit": 0}
