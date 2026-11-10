@@ -308,14 +308,23 @@ def _save_readiness_history(result, company_name: str, d: dict):
         if st.session_state.get("cr_saved_sig") == sig:
             return
         ebitda_margin = (d["ebitda"] / d["fatturato"] * 100) if d.get("fatturato") else None
-        ok = save_credit_report({
+        current_ratio = (round(d["attivo_corrente"] / d["passivo_corrente"], 3)
+                         if d.get("passivo_corrente") else None)
+        rich = {
             "company_name": company_name or "N/A",
             "score": round(result.credit_score, 1),
             "rating": result.rating,
-            "decision": result.messaggio_principale,
+            "decision": f"{result.messaggio_principale} (score {result.credit_score:.0f}/100)",
             "ebitda_margin": round(ebitda_margin, 2) if ebitda_margin is not None else None,
             "max_credit": round(result.credito_oggi_eur, 0),
-        }, access_token=token)
+            "current_ratio": current_ratio,
+        }
+        ok = save_credit_report(rich, access_token=token)
+        if not ok:
+            # Schema senza colonne nuove → payload minimale (colonne di base garantite)
+            minimal = {k: v for k, v in rich.items()
+                       if k in ("company_name", "rating", "decision", "current_ratio")}
+            ok = save_credit_report(minimal, access_token=token)
         if ok:
             st.session_state["cr_saved_sig"] = sig
     except Exception:
