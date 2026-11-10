@@ -47,6 +47,26 @@ else:
     }
 
 if not user:
+    # ── Pagine pubbliche raggiungibili pre-login ──
+    _pub = st.session_state.get("current_page", "credit_readiness")
+    if _pub == "pricing":
+        from pages_modules.pricing import render_public_pricing
+        st.markdown("<style>[data-testid='stSidebar']{display:none;}</style>",
+                    unsafe_allow_html=True)
+        render_public_pricing()
+        st.stop()
+    elif _pub == "privacy":
+        from pages_modules.privacy import render_public_privacy
+        st.markdown("<style>[data-testid='stSidebar']{display:none;}</style>",
+                    unsafe_allow_html=True)
+        render_public_privacy()
+        st.stop()
+    elif _pub == "contact":
+        from pages_modules.contact import render_public_contact
+        st.markdown("<style>[data-testid='stSidebar']{display:none;}</style>",
+                    unsafe_allow_html=True)
+        render_public_contact()
+        st.stop()
     login_page()
     st.stop()
 
@@ -124,6 +144,12 @@ with st.sidebar:
     st.markdown("<div class='nx-side-label'>🔌 Integrazioni</div>", unsafe_allow_html=True)
     nav_button("erp_import", "Import da ERP")
 
+    # ── ACCOUNT ──
+    st.markdown("<div class='nx-side-label'>💳 Account</div>", unsafe_allow_html=True)
+    nav_button("pricing", "Prezzi")
+    nav_button("contact", "Contatti")
+    nav_button("privacy", "Privacy & GDPR")
+
     # ── STORICO ──
     st.markdown("<div class='nx-side-label'>📁 Archivio</div>", unsafe_allow_html=True)
     nav_button("history", "Storico Analisi")
@@ -138,7 +164,7 @@ with st.sidebar:
 
     st.markdown("""
     <div class='nx-side-footer'>
-        NEXUS v6.2 · Aurora<br>© 2026 Irina Kopitova
+        NEXUS v6.3 · Aurora<br>© 2026 Irina Kopitova
     </div>
     """, unsafe_allow_html=True)
 
@@ -213,6 +239,19 @@ try:
     elif page_id == "variance_analysis":
         from pages_modules.variance_analysis import show_variance_analysis
         show_variance_analysis()
+
+    # ── ACCOUNT ──
+    elif page_id == "pricing":
+        from pages_modules.pricing import render_pricing
+        render_pricing()
+
+    elif page_id == "privacy":
+        from pages_modules.privacy import render_privacy
+        render_privacy()
+
+    elif page_id == "contact":
+        from pages_modules.contact import render_contact
+        render_contact()
 
     # ── ADMIN ──
     elif page_id == "admin_panel":

@@ -35,6 +35,15 @@ def _extract_user_id(access_token: str) -> Optional[str]:
 def verify_api_key(api_key: str) -> Optional[Dict]:
     try:
         sb = get_supabase()
+        # Via RPC (la tabella tenants è protetta da RLS)
+        try:
+            res = sb.rpc("verify_api_key", {"p_api_key": api_key}).execute()
+            if res.data:
+                return res.data[0] if isinstance(res.data, list) else res.data
+            return None
+        except Exception:
+            pass
+        # Fallback legacy: SELECT diretta (funziona solo senza RLS)
         res = sb.table("tenants").select("*").eq("api_key", api_key).execute()
         if res.data:
             return res.data[0]
@@ -99,14 +108,39 @@ def save_risk_analysis(data: Dict, access_token: str = None) -> bool:
         return False
 
 def save_credit_report(data: Dict, access_token: str = None) -> bool:
+    """Salva credit report — resiliente: prova il payload completo, poi senza
+    colonne opzionali, poi il minimo garantito. Usa raw_data (jsonb) per i metadati."""
     try:
         sb = get_auth_supabase(access_token) if access_token else get_supabase()
-        data["created_at"] = datetime.datetime.utcnow().isoformat()
         user_id = _extract_user_id(access_token)
+
+        raw = dict(data.get("raw_data") or {})
+        payload = {k: v for k, v in data.items() if k != "raw_data"}
+        payload["created_at"] = datetime.datetime.utcnow().isoformat()
         if user_id:
-            data["user_id"] = user_id
-        sb.table("credit_reports").insert(data).execute()
-        return True
+            payload["user_id"] = user_id
+            raw.setdefault("saved_for_user", user_id)
+        if raw:
+            payload["raw_data"] = raw
+
+        try:
+            sb.table("credit_reports").insert(payload).execute()
+            return True
+        except Exception:
+            # Schema senza user_id / raw_data → riprova senza colonne opzionali
+            payload.pop("user_id", None)
+            payload.pop("raw_data", None)
+            try:
+                sb.table("credit_reports").insert(payload).execute()
+                return True
+            except Exception:
+                minimal = {k: v for k, v in payload.items()
+                           if k in ("company_name", "rating", "decision",
+                                    "current_ratio", "created_at")}
+                if not minimal:
+                    return False
+                sb.table("credit_reports").insert(minimal).execute()
+                return True
     except Exception as e:
         st.warning(f"Salvataggio credit report non disponibile: {e}")
         return False

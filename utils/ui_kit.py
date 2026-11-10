@@ -30,6 +30,8 @@ def _esc(text) -> str:
 _CSS = """
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
     <style>
     /* ─── Variabili ─── */
     :root {
@@ -347,8 +349,8 @@ _CSS = """
     [data-testid="stHeader"] button[aria-label*="Fork" i],
     [data-testid="stHeader"] button[title*="Fork" i],
     [data-testid="stHeader"] a[title*="epositor" i] { display: none !important; }
-    /* Fix icona collapse sidebar: carica il font Material Icons se la piattaforma non lo fa */
-    @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+    /* Fix icone: se il font Material non carica, il testo-ligatura non deve mai apparire */
+    .material-icons, .material-symbols-outlined { font-display: block; }
     [data-testid="stStatusWidget"] { visibility: hidden; }
     /* Compatibilità hero scuri definiti nelle pagine (es. credit_readiness) */
     .cr-hero h1, .cr-hero h2, .cr-hero h3, .cr-hero p { color: #FFFFFF !important; }

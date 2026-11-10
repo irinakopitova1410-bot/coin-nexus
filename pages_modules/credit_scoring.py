@@ -230,14 +230,13 @@ def show_credit_scoring():
         if st.button("💾 Salva Credit Report", key="save_credit"):
             saved = save_credit_report({
                 "company_name": company_name or "N/A",
-                "score": result.score,
+                "credit_score": result.score,
                 "rating": result.rating,
                 "decision": result.decision,
                 "dscr": result.dscr,
                 "leverage": result.leverage,
-                "ebitda_margin": result.ebitda_margin,
                 "current_ratio": result.current_ratio,
-                "max_credit": result.max_credit,
+                "estimated_credit_amount": result.max_credit,
             })
             if saved:
                 st.success("✅ Credit report salvato!")

@@ -37,7 +37,7 @@ def show_history():
         credit_data = data.get("credit_reports", [])
         if credit_data:
             df = pd.DataFrame(credit_data)
-            cols_show = [c for c in ["created_at","company_name","score","rating","decision","dscr","leverage","ebitda_margin","max_credit"] if c in df.columns]
+            cols_show = [c for c in ["created_at","company_name","credit_score","rating","decision","current_ratio","dscr","leverage"] if c in df.columns]
             if cols_show:
                 df_show = df[cols_show].copy()
                 if "created_at" in df_show.columns:

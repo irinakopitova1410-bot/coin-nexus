@@ -91,7 +91,7 @@ def render_dashboard(user: dict):
                 for item in (r.data or []):
                     rows.append({
                         "Tipo": tipo,
-                        "Azienda": item.get("company_name", item.get("azienda", "—")),
+                        "Azienda": (item.get("company_name") or item.get("nome_azienda") or "—"),
                         "Data": item.get("created_at", "")[:10] if item.get("created_at") else "—",
                         "Risultato": str(item.get("z_score", item.get("score", item.get("rating", "—")))),
                     })

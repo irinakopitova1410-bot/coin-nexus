@@ -54,6 +54,26 @@ def login(email: str, password: str):
         return {"success": False, "error": str(e)}
 
 
+def register(email: str, password: str, full_name: str, company_name: str = ""):
+    """Registrazione utente — metadata passati al trigger handle_new_user (SQL)."""
+    try:
+        supabase = get_supabase()
+        response = supabase.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {"data": {"full_name": full_name, "company_name": company_name}},
+        })
+        session = getattr(response, "session", None)
+        return {
+            "success": True,
+            "needs_email_confirm": session is None,
+            "session": session,
+            "user": getattr(response, "user", None),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def logout():
     """Logout e pulizia sessione."""
     try:
@@ -170,64 +190,139 @@ def login_page():
         with st.container(border=True):
             st.markdown("<div class='lg-kicker' style='color:#5A6478;'>Area riservata</div>",
                         unsafe_allow_html=True)
-            st.markdown("### Accedi alla piattaforma")
-            email = st.text_input("Email", placeholder="la-tua-email@azienda.it", key="login_email")
-            password = st.text_input("Password", type="password", placeholder="••••••••", key="login_password")
 
-            if st.button("Accedi →", type="primary", use_container_width=True):
-                if not email or not password:
-                    st.error("Inserisci email e password.")
-                else:
-                    with st.spinner("Accesso in corso..."):
-                        result = login(email, password)
+            def _start_session(user_obj, session_obj):
+                token = session_obj.access_token if session_obj else ""
+                profile = get_user_profile(user_obj.id, token)
+                if profile is None and token:
+                    derived = pretty_display_name(
+                        (user_obj.user_metadata or {}).get("full_name", ""),
+                        user_obj.email or "")
+                    ensure_user_profile(user_obj.id, user_obj.email or "", derived, token)
+                    profile = {"full_name": derived, "role": "client", "company_name": ""}
+                user_data = {
+                    "id": user_obj.id,
+                    "email": user_obj.email,
+                    "role": (profile or {}).get("role", "client"),
+                    "full_name": pretty_display_name(
+                        (profile or {}).get("full_name", "")
+                        or (user_obj.user_metadata or {}).get("full_name", ""),
+                        user_obj.email or ""),
+                    "company_name": (profile or {}).get("company_name", ""),
+                    "access_token": token,
+                }
+                st.session_state["user"] = user_data
+                st.session_state["access_token"] = token
+                st.session_state["role"] = user_data["role"]
+                st.session_state["user_email"] = user_data["email"]
+                st.session_state["user_name"] = user_data["full_name"]
+                st.rerun()
 
-                    if result["success"]:
-                        user_obj = result["user"]
-                        session_obj = result["session"]
-                        token = session_obj.access_token if session_obj else ""
-                        profile = get_user_profile(user_obj.id, token)
-                        if profile is None and token:
-                            # Primo accesso: profilo assente → crea con nome derivato
-                            derived = pretty_display_name("", user_obj.email or "")
-                            ensure_user_profile(user_obj.id, user_obj.email or "", derived, token)
-                            profile = {"full_name": derived, "role": "client", "company_name": ""}
+            tab_login, tab_reg = st.tabs(["Accedi", "Registrati"])
 
-                        user_data = {
-                            "id": user_obj.id,
-                            "email": user_obj.email,
-                            "role": (profile or {}).get("role", "client"),
-                            "full_name": pretty_display_name(
-                                (profile or {}).get("full_name", ""), user_obj.email or ""),
-                            "company_name": (profile or {}).get("company_name", ""),
-                            "access_token": token,
-                        }
+            # ── TAB LOGIN ──
+            with tab_login:
+                email = st.text_input("Email", placeholder="la-tua-email@azienda.it", key="login_email")
+                password = st.text_input("Password", type="password", placeholder="••••••••", key="login_password")
 
-                        st.session_state["user"] = user_data
-                        st.session_state["access_token"] = token
-                        st.session_state["role"] = user_data["role"]
-                        st.session_state["user_email"] = user_data["email"]
-                        st.session_state["user_name"] = user_data["full_name"]
-                        st.rerun()
+                if st.button("Accedi →", type="primary", use_container_width=True):
+                    if not email or not password:
+                        st.error("Inserisci email e password.")
                     else:
-                        err = result.get("error", "Credenziali non valide")
-                        st.error(f"❌ {err}")
+                        with st.spinner("Accesso in corso..."):
+                            result = login(email, password)
 
-            with st.expander("Password dimenticata?"):
-                reset_email = st.text_input("Email di recupero",
-                                            placeholder="la-tua-email@azienda.it",
-                                            key="reset_email")
-                if st.button("Invia link di reset", use_container_width=True):
-                    if not reset_email:
-                        st.warning("Inserisci la tua email.")
+                        if result["success"]:
+                            _start_session(result["user"], result["session"])
+                        else:
+                            err = result.get("error", "Credenziali non valide")
+                            if "Email not confirmed" in err:
+                                st.error("📧 Email non confermata — controlla la casella e clicca il link di verifica.")
+                            else:
+                                st.error(f"❌ {err}")
+
+                with st.expander("Password dimenticata?"):
+                    reset_email = st.text_input("Email di recupero",
+                                                placeholder="la-tua-email@azienda.it",
+                                                key="reset_email")
+                    if st.button("Invia link di reset", use_container_width=True):
+                        if not reset_email:
+                            st.warning("Inserisci la tua email.")
+                        else:
+                            try:
+                                sb = get_supabase()
+                                sb.auth.reset_password_email(reset_email.strip())
+                                st.success("📧 Email inviata: controlla la casella per reimpostare la password.")
+                            except Exception:
+                                # Risposta neutra: non rivela se l'email esiste o meno
+                                st.success("📧 Email inviata: controlla la casella per reimpostare la password.")
+
+            # ── TAB REGISTRAZIONE ──
+            with tab_reg:
+                st.markdown("<div style='height:2px;'></div>", unsafe_allow_html=True)
+                reg_name = st.text_input("Nome e cognome", placeholder="Maria Rossi", key="reg_name")
+                reg_company = st.text_input("Azienda (opzionale)", placeholder="Rossi Srl", key="reg_company")
+                reg_email = st.text_input("Email", placeholder="maria@rossisrl.it", key="reg_email")
+                c1, c2 = st.columns(2)
+                reg_pass = c1.text_input("Password", type="password", placeholder="min. 8 caratteri", key="reg_pass")
+                reg_pass2 = c2.text_input("Conferma", type="password", placeholder="ripeti", key="reg_pass2")
+
+                reg_privacy = st.checkbox(
+                    "Accetto la [Privacy Policy](:#) e i termini del servizio "
+                    "(dati trattati su Supabase, server UE).", key="reg_privacy")
+
+                if st.button("Crea account gratuito →", type="primary", use_container_width=True):
+                    problems = []
+                    if not reg_name.strip():
+                        problems.append("inserisci il nome")
+                    if "@" not in reg_email or "." not in reg_email:
+                        problems.append("email non valida")
+                    if len(reg_pass) < 8:
+                        problems.append("password troppo corta (min. 8)")
+                    if reg_pass != reg_pass2:
+                        problems.append("le password non coincidono")
+                    if not reg_privacy:
+                        problems.append("serve il consenso privacy")
+                    if problems:
+                        st.error("⚠️ " + " · ".join(problems).capitalize())
                     else:
-                        try:
-                            sb = get_supabase()
-                            sb.auth.reset_password_email(reset_email.strip())
-                            st.success("📧 Email inviata: controlla la casella per reimpostare la password.")
-                        except Exception:
-                            # Risposta neutra: non rivela se l'email esiste o meno
-                            st.success("📧 Email inviata: controlla la casella per reimpostare la password.")
+                        with st.spinner("Registrazione in corso..."):
+                            result = register(reg_email.strip(), reg_pass,
+                                              reg_name.strip(), reg_company.strip())
+                        if result["success"]:
+                            if result.get("needs_email_confirm"):
+                                st.success("📧 **Account creato!** Controlla la casella "
+                                           f"**{reg_email}** e clicca il link di verifica, poi torna qui per accedere.")
+                            else:
+                                _start_session(result["user"], result["session"])
+                        else:
+                            err = result.get("error", "Registrazione non riuscita")
+                            if "Database error" in err or "500" in err:
+                                st.error("❌ Registrazione temporaneamente non disponibile "
+                                         "(configurazione database in aggiornamento). "
+                                         "Riprova tra qualche minuto.")
+                            elif "already" in err.lower() or "registr" in err.lower():
+                                st.error("📧 Questa email è già registrata — accedi direttamente.")
+                            else:
+                                st.error(f"❌ {err}")
+
+                st.caption("✅ Piano gratuito: analisi complete illimitate durante la fase pilot.")
+
+        # Link pubblici pre-login (Prezzi / Privacy)
+        lp1, lp2, lp3 = st.columns([1, 1, 1])
+        with lp1:
+            if st.button("💎 Prezzi", use_container_width=True, key="pub_pricing"):
+                st.session_state["current_page"] = "pricing"
+                st.rerun()
+        with lp2:
+            if st.button("🔒 Privacy & GDPR", use_container_width=True, key="pub_privacy"):
+                st.session_state["current_page"] = "privacy"
+                st.rerun()
+        with lp3:
+            if st.button("✉️ Contatti", use_container_width=True, key="pub_contact"):
+                st.session_state["current_page"] = "contact"
+                st.rerun()
 
     st.markdown("""
-    <div class='lg-footer'>NEXUS v6.2 · Aurora Edition · © 2026 Irina Kopitova · Tutti i diritti riservati</div>
+    <div class='lg-footer'>NEXUS v6.3 · Aurora Edition · © 2026 Irina Kopitova · Tutti i diritti riservati</div>
     """, unsafe_allow_html=True)

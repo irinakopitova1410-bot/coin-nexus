@@ -157,14 +157,36 @@ def _respond(q: str):
         return (f"Ecco il quadro dal bilancio caricato:\n\n{snap}\n\n"
                 "Vuoi il dettaglio? Aprilo in un click sotto.", "dashboard")
 
-    # 3) Credito / banca
+    # 3) Credito / banca — con NUMERI REALI dal motore Credit Readiness
     if any(k in ql for k in ["credito", "banca", "finanziam", "fido", "prestito", "mutuo", "readiness"]):
         if not has_data:
             return ("Per calcolare quanto credito puoi ottenere serve il bilancio. "
                     "Caricalo qui:", "credit_readiness")
-        return ("**Come sbloccare credito ora** — leve ordinate per impatto sul rating:\n\n"
-                f"{_azioni_creditizie(st.session_state['erp_data'])}\n\n"
-                "Il punteggio completo e il piano d'azione sono qui:", "credit_readiness")
+        d = st.session_state["erp_data"]
+        num = ""
+        try:
+            from engine.credit_readiness import analyze_credit_readiness
+            r = analyze_credit_readiness(
+                fatturato=_f(d.get("ricavi_netti") or d.get("revenue")),
+                ebitda=_f(d.get("ebitda")),
+                ebit=_f(d.get("ebit")),
+                utile_netto=_f(d.get("net_income")),
+                debiti_finanziari=_f(d.get("total_debt")),
+                patrimonio_netto=_f(d.get("equity")),
+                totale_attivo=_f(d.get("total_assets")),
+                attivo_corrente=_f(d.get("current_assets")),
+                passivo_corrente=_f(d.get("current_liabilities")),
+                oneri_finanziari=_f(d.get("interest_expense")),
+            )
+            num = (f"**Credit Score: {r.credit_score:.0f}/100 → rating {r.rating} {r.rating_emoji}**\n\n"
+                   f"- 💰 Credito ottenibile **oggi**: {_eur(r.credito_oggi_eur)}\n"
+                   f"- 🚀 Potenziale dopo ottimizzazione: {_eur(r.credito_potenziale_eur)} "
+                   f"(+{_eur(r.delta_credito_eur)})\n"
+                   f"- 📊 EBITDA attuale: {_eur(r.ebitda_attuale)}\n\n")
+        except Exception:
+            pass
+        return (f"{num}**Leve ordinate per impatto sul rating:**\n\n"
+                f"{_azioni_creditizie(d)}\n\nIl piano completo con timeline è qui:", "credit_readiness")
 
     # 4) Crisi / CCII
     if any(k in ql for k in ["crisi", "ccii", "allerta", "insolvenz", "rischio di crisi"]):
@@ -180,6 +202,47 @@ def _respond(q: str):
     if any(k in ql for k in ["cash", "flusso", "liquidit", "tesoreria", "circolante"]):
         return ("L'analisi Cash Flow ricostruisce operativa, investimenti e finanziamento "
                 "con proiezioni a 5 anni.", "cashflow")
+
+    # 6b) EBITDA / margini — risposta con numeri reali
+    if any(k in ql for k in ["ebitda", "margine operativo", "margine"]):
+        if not has_data:
+            return ("Carica il bilancio e ti mostro EBITDA, margine e confronto col "
+                    "benchmark bancario del 10% immediatamente.", "credit_readiness")
+        d = st.session_state["erp_data"]
+        ebitda = _f(d.get("ebitda"))
+        rev = _f(d.get("ricavi_netti") or d.get("revenue"))
+        if rev and ebitda:
+            pct = ebitda / rev * 100
+            if ebitda < 0:
+                verdict = ("🔴 **negativo** — la gestione operativa consuma risorse. "
+                           "Priorità assoluta: taglio costi e ristrutturazione debito "
+                           "(vedi le azioni in Credit Readiness).")
+            elif pct >= 15:
+                verdict = "🟢 ottimo, sopra i benchmark bancari (10%)."
+            elif pct >= 10:
+                verdict = "🟢 sufficiente per l'accesso al credito."
+            else:
+                verdict = "🟠 sotto la soglia bancaria del 10% — lavora su pricing e costi."
+            return (f"**EBITDA: {_eur(ebitda)}** su ricavi {_eur(rev)} "
+                    f"→ margine **{pct:.1f}%** — {verdict}", "credit_readiness")
+        return ("Nel bilancio caricato mancano EBITDA o ricavi: controlla le colonne "
+                "del file e ricaricalo.", "erp_import")
+
+    # 6c) Utile / perdita netta
+    if any(k in ql for k in ["utile", "perdita", "risultato netto", "net income"]):
+        if not has_data:
+            return ("Carica il bilancio e ti mostro utile, EBITDA e copertura del "
+                    "patrimonio netto.", "credit_readiness")
+        d = st.session_state["erp_data"]
+        ni = _f(d.get("net_income") or d.get("utile_netto"))
+        eq = _f(d.get("equity"))
+        out = f"**Risultato netto: {_eur(ni)}**"
+        if eq:
+            out += f" — patrimonio netto {_eur(eq)}"
+            if eq < 0:
+                out += (" 🔴 **negativo**: capitalizzazione necessaria per evitare "
+                        "segnalazione CCII e liquidazione giudiziale (art. 2482 c.c.).")
+        return (out, "risk_analysis")
 
     # 7) Intent per pagina (parole chiave)
     for page_id, label, keywords in INTENTS:

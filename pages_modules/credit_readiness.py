@@ -145,6 +145,9 @@ FIELD_MAP = {
     "total_debt": "debiti_finanziari",
     "debiti_totali": "debiti_finanziari",
     "financial_debt": "debiti_finanziari",
+    "debiti_finanziari_totali": "debiti_finanziari",
+    "debiti_banche": "debiti_finanziari",
+    "debiti_verso_banche": "debiti_finanziari",
     # patrimonio netto
     "patrimonio_netto": "patrimonio_netto",
     "equity": "patrimonio_netto",
@@ -156,6 +159,7 @@ FIELD_MAP = {
     # passivo totale (fallback: usato come passivo corrente)
     "total_liabilities": "passivo_corrente",
     "totale_passivo": "passivo_corrente",
+    "totale_passivita": "passivo_corrente",
     # costo personale
     "costo_personale": "costo_personale",
     "labor_cost": "costo_personale",
@@ -163,6 +167,8 @@ FIELD_MAP = {
     # costo materie
     "costo_materie": "costo_materie",
     "costo_materie_prime": "costo_materie",
+    "costi_materie": "costo_materie",
+    "costi_materie_prime": "costo_materie",
     "acquisti": "costo_materie",
     "cogs": "costo_materie",
     # costi operativi
@@ -310,18 +316,28 @@ def _save_readiness_history(result, company_name: str, d: dict):
         ebitda_margin = (d["ebitda"] / d["fatturato"] * 100) if d.get("fatturato") else None
         current_ratio = (round(d["attivo_corrente"] / d["passivo_corrente"], 3)
                          if d.get("passivo_corrente") else None)
+        # Colonne REALI della tabella credit_reports: company_name, dscr, leverage,
+        # margin, current_ratio, rating, decision, credit_score,
+        # estimated_credit_amount, risk_level, anomalies_count, raw_data (jsonb)
         rich = {
             "company_name": company_name or "N/A",
-            "score": round(result.credit_score, 1),
+            "credit_score": round(result.credit_score, 1),
             "rating": result.rating,
             "decision": f"{result.messaggio_principale} (score {result.credit_score:.0f}/100)",
-            "ebitda_margin": round(ebitda_margin, 2) if ebitda_margin is not None else None,
-            "max_credit": round(result.credito_oggi_eur, 0),
             "current_ratio": current_ratio,
+            "risk_level": result.stato,
+            "raw_data": {
+                "fonte": "credit_readiness",
+                "ebitda": d.get("ebitda"),
+                "ebitda_margin": round(ebitda_margin, 2) if ebitda_margin is not None else None,
+                "credito_oggi": round(result.credito_oggi_eur, 0),
+                "credito_potenziale": round(result.credito_potenziale_eur, 0),
+                "fatturato": d.get("fatturato"),
+            },
         }
         ok = save_credit_report(rich, access_token=token)
         if not ok:
-            # Schema senza colonne nuove → payload minimale (colonne di base garantite)
+            # Fallback: colonne di base garantite su qualsiasi schema
             minimal = {k: v for k, v in rich.items()
                        if k in ("company_name", "rating", "decision", "current_ratio")}
             ok = save_credit_report(minimal, access_token=token)
