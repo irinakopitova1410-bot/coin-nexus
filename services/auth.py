@@ -203,6 +203,7 @@ def login_page():
                         }
 
                         st.session_state["user"] = user_data
+                        st.session_state["access_token"] = token
                         st.session_state["role"] = user_data["role"]
                         st.session_state["user_email"] = user_data["email"]
                         st.session_state["user_name"] = user_data["full_name"]
