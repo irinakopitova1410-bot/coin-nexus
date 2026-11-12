@@ -586,11 +586,17 @@ def render_credit_readiness():
         if uploaded is not None:
             parsed = _parse_uploaded_file(uploaded)
             if parsed and parsed.get("missing_inputs"):
-                st.warning("Credit Readiness non calcolata né salvata: mancano dati necessari "
-                           "per liquidità corrente e DSCR: " + ", ".join(parsed["missing_inputs"]) +
-                           ". Completa i dati nella scheda Inserimento Manuale; "
-                           "i debiti entro l'esercizio successivo non rappresentano l'intero passivo corrente.")
-                show_import_preview(parsed["extracted_data"])
+                show_import_preview(parsed["extracted_data"], include_notes=False)
+                st.warning("Valutazione del credito non ancora disponibile: servono dati aggiuntivi. "
+                           "Nessun punteggio è stato calcolato o salvato.")
+                missing_labels = {
+                    "passivo_corrente": "Totale delle passività correnti",
+                    "cash_operativo": "Flusso di cassa operativo",
+                    "rimborso_debito (DSCR)": "Rimborsi e servizio del debito per il DSCR",
+                }
+                st.markdown("**Dati da integrare nella scheda «Inserisci Manualmente»:**")
+                for field in parsed["missing_inputs"]:
+                    st.write("• " + missing_labels.get(field, field.replace("_", " ")))
             elif parsed:
                 d = parsed["data"]
                 company_name = parsed["company_name"]
