@@ -65,11 +65,14 @@ def parse_number(value):
     return number
 
 
-def data_from_rows(rows):
+def data_from_rows(rows, filename=""):
     rows = [list(row) for row in rows if row and any(not is_blank(v) for v in row)]
     if not rows:
         raise ValueError("Il file è vuoto. Compila il modello prima di caricarlo.")
     header = [normalize_key(v) for v in rows[0]]
+    from utils.civil_balance import is_civil_balance_header, parse_civil_balance
+    if is_civil_balance_header(header):
+        return parse_civil_balance(rows, normalize_key, parse_number, is_blank, filename)
     pairs = []
     if "campo" in header and "valore" in header:
         ki, vi = header.index("campo"), header.index("valore")
@@ -121,7 +124,7 @@ def read_financial_data(uploaded_file):
     if str(getattr(uploaded_file, "name", "")).lower().endswith((".xlsx", ".xls")):
         import pandas as pd
         frame = pd.read_excel(io.BytesIO(raw), header=None, dtype=object, keep_default_na=False)
-        return data_from_rows(frame.values.tolist())
+        return data_from_rows(frame.values.tolist(), getattr(uploaded_file, "name", ""))
     if isinstance(raw, str):
         text = raw
     else:
@@ -155,6 +158,6 @@ def read_financial_data(uploaded_file):
         if width < 2:
             raise ValueError("Separatore CSV non riconosciuto: usa virgola, punto e virgola o tabulazione.")
     try:
-        return data_from_rows(list(csv.reader(io.StringIO(text), delimiter=delimiter, strict=True)))
+        return data_from_rows(list(csv.reader(io.StringIO(text), delimiter=delimiter, strict=True)), getattr(uploaded_file, "name", ""))
     except csv.Error as exc:
         raise ValueError("CSV non valido: controlla virgolette e separatori.") from exc

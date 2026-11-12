@@ -15,6 +15,7 @@ from utils.pdf_export import generate_full_report
 from utils.file_parser import (
     get_ratios_template_bytes, get_ratios_template_excel, parse_ratios_file
 )
+from pages_modules._file_import import show_import_warnings, show_import_preview
 
 
 def _gauge(value: float, title: str) -> go.Figure:
@@ -178,6 +179,7 @@ def render_financial_ratios():
     if uploaded:
         parsed = parse_ratios_file(uploaded)
         if parsed["success"]:
+            show_import_warnings(parsed)
             file_data = parsed
             nome = parsed.get("nome_azienda", "Azienda")
             st.success(f"✅ **{nome}** — Dati importati! Analisi qui sotto ↓")
@@ -223,6 +225,8 @@ def render_financial_ratios():
                 file_name=f"ratios_{nome}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True, key="ratios_excel_auto")
+        elif parsed.get("requires_completion"):
+            show_import_preview(parsed["extracted_data"])
         else:
             st.error(f"❌ Errore nel file: {parsed['error']}")
             st.info("💡 Scarica il **Template CSV** per il formato corretto e riprova.")

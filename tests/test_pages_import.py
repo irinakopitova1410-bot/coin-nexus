@@ -24,6 +24,99 @@ def upload(text, name="data.csv"):
     return stream
 
 
+def test_shared_upload_displays_source_warnings(monkeypatch):
+    import pages_modules._file_import as helper
+    data = {"ebitda": 10, "_import_warnings": ["Missing cash flow", "Latest year selected"]}
+    shown = []
+    monkeypatch.setattr(helper, "read_financial_data", lambda source: data)
+    monkeypatch.setattr("streamlit.warning", shown.append)
+    assert helper.read_financial_upload(upload("")) is data
+    assert shown == data["_import_warnings"]
+
+
+@pytest.mark.parametrize("module,parser", [
+    ("ai_analyst", "parse_csv_ai"),
+    ("early_warning", "parse_csv_early_warning"),
+    ("whatif_simulator", "parse_csv_whatif"),
+])
+def test_civil_data_does_not_trigger_ungrounded_risk_analysis(monkeypatch, module, parser):
+    import importlib
+    page = importlib.import_module("pages_modules." + module)
+    data = {"fatturato": 1000, "_source_format": "civil_balance"}
+    previews = []
+    monkeypatch.setattr(page, "read_financial_upload", lambda source: data)
+    monkeypatch.setattr(page, "show_import_preview", previews.append)
+    assert getattr(page, parser)(upload("")) is None
+    assert previews == [data]
+
+
+@pytest.mark.parametrize("module,parser,renderer", [
+    ("risk_analysis", "parse_zscore_file", "render_risk_analysis"),
+    ("financial_ratios", "parse_ratios_file", "render_financial_ratios"),
+    ("credit_scoring", "parse_credit_file", "show_credit_scoring"),
+    ("cashflow_analysis", "parse_financial_file", "render_cashflow_analysis"),
+])
+def test_completion_wrappers_show_preview_and_keep_manual_form(monkeypatch, module, parser, renderer):
+    import importlib
+    import streamlit as st
+    from streamlit.testing.v1 import AppTest
+    page = importlib.import_module("pages_modules." + module)
+    source = upload("")
+    source.size = 0
+    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: source)
+    monkeypatch.setattr(page, parser, lambda source: {
+        "success": False, "requires_completion": True, "error": "Missing inputs",
+        "extracted_data": {"fatturato": 1000, "_source_period": "31-01-2025",
+                           "_import_warnings": ["SOURCE LIMITATION"]},
+    })
+    app = AppTest.from_string(
+        f"from pages_modules.{module} import {renderer}\n{renderer}()"
+    ).run(timeout=30)
+    assert not app.exception
+    assert any("SOURCE LIMITATION" in item.value for item in app.warning)
+    assert any("completa i dati mancanti" in item.value for item in app.warning)
+    assert len(app.dataframe) >= 1
+    assert len(app.number_input) >= 1
+
+
+def test_readiness_never_maps_total_liabilities_to_current(monkeypatch):
+    import pages_modules.credit_readiness as page
+    for key in ("totale_passivo", "totale_passivita", "total_liabilities"):
+        assert key not in page.FIELD_MAP
+    monkeypatch.setattr(page, "read_financial_upload", lambda source: {
+        "fatturato": 1000, "totale_passivita": 500,
+        "debiti_esigibili_entro_esercizio_successivo": 200,
+        "_source_format": "civil_balance",
+    })
+    parsed = page._parse_uploaded_file(upload(""))
+    assert "passivo_corrente" not in parsed["provided_fields"]
+    assert set(parsed["missing_inputs"]) == {
+        "passivo_corrente", "cash_operativo", "rimborso_debito (DSCR)"
+    }
+
+
+def test_incomplete_civil_readiness_only_shows_preview(monkeypatch):
+    from streamlit.testing.v1 import AppTest
+    import streamlit as st
+    import pages_modules.credit_readiness as page
+
+    monkeypatch.setattr(st, "file_uploader", lambda *args, **kwargs: upload(""))
+    monkeypatch.setattr(page, "read_financial_upload", lambda source: {
+        "fatturato": 1000, "ebitda": 100, "_source_format": "civil_balance"
+    })
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Incomplete civil data must not be scored or saved")
+    monkeypatch.setattr(page, "analyze_credit_readiness", forbidden)
+    monkeypatch.setattr(page, "_save_readiness_history", forbidden)
+    app = AppTest.from_string(
+        "from pages_modules.credit_readiness import render_credit_readiness\n"
+        "render_credit_readiness()"
+    ).run(timeout=30)
+    assert not app.exception
+    assert any("non calcolata né salvata" in item.value for item in app.warning)
+    assert len(app.dataframe) >= 1
+
+
 @pytest.mark.parametrize("parser,key", [
     (_parse_uploaded_file, "ebitda"),
     (parse_csv_ai, "ebitda"),

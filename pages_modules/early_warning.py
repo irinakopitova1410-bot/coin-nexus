@@ -12,7 +12,7 @@ import io
 
 from utils.ui_kit import page_header
 from utils.file_parser import _num
-from pages_modules._file_import import read_financial_upload
+from pages_modules._file_import import read_financial_upload, show_import_preview
 
 
 
@@ -261,6 +261,9 @@ def grafico_radar_indici(indici: dict) -> go.Figure:
 def parse_csv_early_warning(uploaded_file) -> dict | None:
     try:
         data = read_financial_upload(uploaded_file)
+        if data.get("_source_format") == "civil_balance":
+            show_import_preview(data)
+            return None
 
         def g(keys, default=0.0):
             return _num(data, *keys, default=default)

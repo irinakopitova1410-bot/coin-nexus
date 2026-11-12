@@ -14,6 +14,7 @@ from utils.file_parser import (
     get_zscore_template_bytes, get_zscore_template_excel, parse_zscore_file
 )
 from services.erp_connectors import parse_erp_file
+from pages_modules._file_import import show_import_warnings, show_import_preview
 
 
 def _render_gauge(z_score: float, safe: float, grey: float) -> go.Figure:
@@ -207,6 +208,7 @@ def render_risk_analysis():
     if uploaded:
         parsed = parse_zscore_file(uploaded)
         if parsed["success"]:
+            show_import_warnings(parsed)
             file_data = parsed
             nome = parsed.get("nome_azienda", "Azienda")
             st.success(f"✅ **{nome}** — Dati importati! Analisi automatica qui sotto ↓")
@@ -239,6 +241,8 @@ def render_risk_analysis():
                 access_token=access_token,
                 key_suffix="auto",
             )
+        elif parsed.get("requires_completion"):
+            show_import_preview(parsed["extracted_data"])
         else:
             st.error(f"❌ Errore nel file: {parsed['error']}")
             st.info("💡 Scarica il **Template CSV** o **Template Excel** per il formato corretto.")

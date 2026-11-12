@@ -11,6 +11,7 @@ from engine.cashflow import calculate_cashflow
 from services.erp_connectors import REQUIRED_FIELDS, OPTIONAL_FIELDS
 from utils.pdf_export import generate_full_report
 from utils.file_parser import parse_financial_file
+from pages_modules._file_import import show_import_warnings, show_import_preview
 from utils.ui_kit import page_header
 
 
@@ -241,74 +242,79 @@ capex,350000,Investimenti
                 try:
                     parsed = parse_financial_file(uploaded_file)
 
-                    if "error" in parsed:
-                        st.error(f"❌ Errore nel parsing: {parsed['error']}")
-                        st.stop()
+                    if parsed.get("requires_completion"):
+                        show_import_preview(parsed["extracted_data"])
+                    else:
+                        if "error" in parsed:
+                            st.error(f"❌ Errore nel parsing: {parsed['error']}")
+                            st.stop()
 
-                    # Mostra anteprima campi rilevati
-                    detected_fields = {k: v for k, v in parsed.items()
-                                       if k not in ("company_name", "error") and v != 0
-                                       and isinstance(v, (int, float))}
-                    if detected_fields:
-                        with st.expander(f"✅ {len(detected_fields)} campi rilevati dal file", expanded=False):
-                            df_preview = pd.DataFrame([
-                                {"Campo": k, "Valore": f"€ {float(v):,.0f}"}
-                                for k, v in detected_fields.items()
-                            ])
-                            st.dataframe(df_preview, use_container_width=True, hide_index=True)
+                        show_import_warnings(parsed)
 
-                    # Nome azienda da file o input
-                    file_company = parsed.get("company_name", "")
-                    cn = st.text_input(
-                        "🏢 Nome Azienda",
-                        value=file_company or company_name or "",
-                        key="cf_upload_company"
-                    )
+                        # Mostra anteprima campi rilevati
+                        detected_fields = {k: v for k, v in parsed.items()
+                                           if k not in ("company_name", "error") and v != 0
+                                           and isinstance(v, (int, float))}
+                        if detected_fields:
+                            with st.expander(f"✅ {len(detected_fields)} campi rilevati dal file", expanded=False):
+                                df_preview = pd.DataFrame([
+                                    {"Campo": k, "Valore": f"€ {float(v):,.0f}"}
+                                    for k, v in detected_fields.items()
+                                ])
+                                st.dataframe(df_preview, use_container_width=True, hide_index=True)
 
-                    st.success("✅ File analizzato! Risultati Cash Flow qui sotto:")
-                    st.divider()
+                        # Nome azienda da file o input
+                        file_company = parsed.get("company_name", "")
+                        cn = st.text_input(
+                            "🏢 Nome Azienda",
+                            value=file_company or company_name or "",
+                            key="cf_upload_company"
+                        )
 
-                    # Prepara dati per il motore cashflow
-                    # Calcola campi derivati se mancanti
-                    def _num(key, default=0):
-                        """Legge un valore numerico dal parsed dict, ritorna float sicuro."""
-                        v = parsed.get(key, default)
-                        try:
-                            return float(v)
-                        except (TypeError, ValueError):
-                            return float(default)
+                        st.success("✅ File analizzato! Risultati Cash Flow qui sotto:")
+                        st.divider()
 
-                    dep = _num("depreciation")
-                    ca  = _num("current_assets")
-                    cl  = _num("current_liabilities")
-                    td  = _num("total_debt")
+                        # Prepara dati per il motore cashflow
+                        # Calcola campi derivati se mancanti
+                        def _num(key, default=0):
+                            """Legge un valore numerico dal parsed dict, ritorna float sicuro."""
+                            v = parsed.get(key, default)
+                            try:
+                                return float(v)
+                            except (TypeError, ValueError):
+                                return float(default)
 
-                    data_upload = dict(
-                        revenue=_num("revenue"),
-                        ebit=_num("ebit"),
-                        ebitda=_num("ebitda"),
-                        net_income=_num("net_income"),
-                        depreciation=dep,
-                        interest_expense=_num("interest_expense"),
-                        tax_expense=_num("tax_expense"),
-                        total_assets=_num("total_assets"),
-                        equity=_num("equity"),
-                        total_debt=td,
-                        current_assets=ca,
-                        current_liabilities=cl,
-                        accounts_receivable=_num("accounts_receivable"),
-                        accounts_payable=_num("accounts_payable"),
-                        inventory=_num("inventory"),
-                        capex=_num("capex", dep * 1.1 if dep else 0),
-                        dividends=_num("dividends"),
-                        debt_issued=_num("debt_issued"),
-                        debt_repaid=_num("debt_repaid", td * 0.1 if td else 0),
-                        prev_current_assets=_num("prev_current_assets", ca * 0.95 if ca else 0),
-                        prev_current_liabilities=_num("prev_current_liabilities", cl * 0.95 if cl else 0),
-                        prev_fixed_assets=_num("prev_fixed_assets"),
-                    )
+                        dep = _num("depreciation")
+                        ca  = _num("current_assets")
+                        cl  = _num("current_liabilities")
+                        td  = _num("total_debt")
 
-                    _run_cashflow(data_upload, cn, key_suffix="auto")
+                        data_upload = dict(
+                            revenue=_num("revenue"),
+                            ebit=_num("ebit"),
+                            ebitda=_num("ebitda"),
+                            net_income=_num("net_income"),
+                            depreciation=dep,
+                            interest_expense=_num("interest_expense"),
+                            tax_expense=_num("tax_expense"),
+                            total_assets=_num("total_assets"),
+                            equity=_num("equity"),
+                            total_debt=td,
+                            current_assets=ca,
+                            current_liabilities=cl,
+                            accounts_receivable=_num("accounts_receivable"),
+                            accounts_payable=_num("accounts_payable"),
+                            inventory=_num("inventory"),
+                            capex=_num("capex", dep * 1.1 if dep else 0),
+                            dividends=_num("dividends"),
+                            debt_issued=_num("debt_issued"),
+                            debt_repaid=_num("debt_repaid", td * 0.1 if td else 0),
+                            prev_current_assets=_num("prev_current_assets", ca * 0.95 if ca else 0),
+                            prev_current_liabilities=_num("prev_current_liabilities", cl * 0.95 if cl else 0),
+                            prev_fixed_assets=_num("prev_fixed_assets"),
+                        )
+
+                        _run_cashflow(data_upload, cn, key_suffix="auto")
 
                 except Exception as e:
                     st.error(f"❌ Errore durante l'analisi: {e}")

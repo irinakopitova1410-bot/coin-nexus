@@ -3,6 +3,7 @@ import pandas as pd
 from engine.calculations import calculate_credit_score
 from utils.charts import radar_chart, bar_chart
 from utils.file_parser import parse_credit_file, get_credit_template_bytes, get_credit_template_excel
+from pages_modules._file_import import show_import_warnings, show_import_preview
 from services.db import save_credit_report
 from utils.ui_kit import page_header
 
@@ -126,6 +127,7 @@ def show_credit_scoring():
     if uploaded:
         parsed = parse_credit_file(uploaded)
         if parsed["success"]:
+            show_import_warnings(parsed)
             file_data = parsed
             nome = parsed.get("nome_azienda", "Azienda")
             st.success(f"✅ **{nome}** — Dati importati! Credit Score qui sotto ↓")
@@ -153,6 +155,8 @@ def show_credit_scoring():
 
             st.markdown("#### 📊 Risultato Analisi Automatica")
             _show_credit_result(result_auto, nome, access_token, key_suffix="auto")
+        elif parsed.get("requires_completion"):
+            show_import_preview(parsed["extracted_data"])
         else:
             st.error(f"❌ Errore nel file: {parsed['error']}")
             st.info("💡 Scarica il **Template CSV** per il formato corretto e riprova.")

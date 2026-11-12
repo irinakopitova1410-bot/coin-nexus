@@ -10,7 +10,7 @@ import io
 from engine.credit_readiness import analyze_credit_readiness, CreditReadinessResult
 from utils.ui_kit import page_header
 from utils.file_parser import _num
-from pages_modules._file_import import read_financial_upload
+from pages_modules._file_import import read_financial_upload, show_import_preview
 
 
 # ─── Helpers UI ──────────────────────────────────────────────────────────────
@@ -159,10 +159,6 @@ FIELD_MAP = {
     # totale attivo
     "totale_attivo": "totale_attivo",
     "total_assets": "totale_attivo",
-    # passivo totale (fallback: usato come passivo corrente)
-    "total_liabilities": "passivo_corrente",
-    "totale_passivo": "passivo_corrente",
-    "totale_passivita": "passivo_corrente",
     # costo personale
     "costo_personale": "costo_personale",
     "labor_cost": "costo_personale",
@@ -217,6 +213,7 @@ def _parse_uploaded_file(uploaded_file) -> dict | None:
         parsed = dict(DEFAULTS)
         company_name = ""
         found_numeric = False
+        provided_fields = set()
         for key, value in data.items():
             key = str(key).strip().lower().replace(" ", "_").replace("(€)", "").strip("_")
             if key in COMPANY_KEYS:
@@ -228,11 +225,21 @@ def _parse_uploaded_file(uploaded_file) -> dict | None:
                 number = _num({"value": value}, "value", default=None)
                 if number is not None:
                     parsed[mapped] = number
+                    provided_fields.add(mapped)
                     found_numeric = True
         if not found_numeric:
             st.error("Nessun valore finanziario riconosciuto: usa il template CSV.")
             return None
-        return {"data": parsed, "company_name": company_name or "Azienda"}
+        missing_inputs = []
+        if data.get("_source_format") == "civil_balance":
+            missing_inputs = [field for field in ("passivo_corrente", "cash_operativo")
+                              if field not in provided_fields]
+            # The statutory statements do not establish debt service cash flows.
+            if not any(field in data for field in ("rimborso_debito", "debt_repayment")):
+                missing_inputs.append("rimborso_debito (DSCR)")
+        return {"data": parsed, "company_name": company_name or "Azienda",
+                "missing_inputs": missing_inputs, "provided_fields": sorted(provided_fields),
+                "requires_completion": bool(missing_inputs), "extracted_data": data}
     except Exception as e:
         st.error(f"Errore lettura file: {e}")
         return None
@@ -578,7 +585,13 @@ def render_credit_readiness():
 
         if uploaded is not None:
             parsed = _parse_uploaded_file(uploaded)
-            if parsed:
+            if parsed and parsed.get("missing_inputs"):
+                st.warning("Credit Readiness non calcolata né salvata: mancano dati necessari "
+                           "per liquidità corrente e DSCR: " + ", ".join(parsed["missing_inputs"]) +
+                           ". Completa i dati nella scheda Inserimento Manuale; "
+                           "i debiti entro l'esercizio successivo non rappresentano l'intero passivo corrente.")
+                show_import_preview(parsed["extracted_data"])
+            elif parsed:
                 d = parsed["data"]
                 company_name = parsed["company_name"]
 

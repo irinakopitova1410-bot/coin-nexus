@@ -90,6 +90,26 @@ def _load_model_data(uploaded_file):
     return data
 
 
+def _import_metadata(data):
+    return {key: value for key, value in data.items() if key.startswith("_")}
+
+
+def _civil_completion(data, required):
+    if data.get("_source_format") != "civil_balance":
+        return None
+    missing = [key for key in required if is_blank(data.get(key))]
+    if not missing:
+        return None
+    return {
+        "success": False,
+        "requires_completion": True,
+        "error": "Prospetto riconosciuto e importato. Per questa analisi completa i dati mancanti nel modulo manuale: " + ", ".join(missing) + ". I dati mancanti non sono zero.",
+        "missing_fields": missing,
+        "extracted_data": data,
+        **_import_metadata(data),
+    }
+
+
 def _str(data, *keys, default=""):
     for key in keys:
         val = data.get(key)
@@ -102,6 +122,9 @@ def parse_credit_file(uploaded_file):
     """Parsa file CSV/Excel per Credit Scoring. Supporta il CSV unico completo."""
     try:
         data = _load_model_data(uploaded_file)
+        completion = _civil_completion(data, ('passivo_corrente', 'rimborso_debito'))
+        if completion:
+            return completion
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
 
@@ -112,6 +135,7 @@ def parse_credit_file(uploaded_file):
 
         return {
             "success": True,
+            **_import_metadata(data),
             "nome_azienda": nome,
             "ebit": ebit,
             "depreciation": ammortamenti,
@@ -132,6 +156,9 @@ def parse_zscore_file(uploaded_file):
     """Parsa file CSV/Excel per Z-Score. Supporta il CSV unico completo."""
     try:
         data = _load_model_data(uploaded_file)
+        completion = _civil_completion(data, ('passivo_corrente',))
+        if completion:
+            return completion
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
         ebit = _num(data, "ebit", default=0.0)
@@ -149,6 +176,7 @@ def parse_zscore_file(uploaded_file):
 
         return {
             "success": True,
+            **_import_metadata(data),
             "nome_azienda": nome,
             "total_assets": _num(data, "totale_attivo", default=1.0),
             "retained_earnings": _num(data, "utili_non_distribuiti", "perdite_precedenti", default=0.0),
@@ -166,6 +194,9 @@ def parse_ratios_file(uploaded_file):
     """Parsa file CSV/Excel per Financial Ratios. Supporta il CSV unico completo."""
     try:
         data = _load_model_data(uploaded_file)
+        completion = _civil_completion(data, ('passivo_corrente',))
+        if completion:
+            return completion
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
         ebit = _num(data, "ebit", default=0.0)
@@ -174,6 +205,7 @@ def parse_ratios_file(uploaded_file):
 
         return {
             "success": True,
+            **_import_metadata(data),
             "nome_azienda": nome,
             "total_assets": _num(data, "totale_attivo", default=1.0),
             "total_equity": _num(data, "patrimonio_netto", default=0.0),
@@ -223,6 +255,7 @@ def parse_audit_file(uploaded_file):
 
         return {
             "success": True,
+            **_import_metadata(data),
             "nome_azienda": nome,
             "gross_profit": utile_lordo if utile_lordo is not None else ricavi * 0.05,
             "total_assets": totale_attivo,
@@ -240,6 +273,9 @@ def parse_credit_readiness_file(uploaded_file):
     """Parsa file CSV/Excel per Credit Readiness. Supporta il CSV unico completo."""
     try:
         data = _load_model_data(uploaded_file)
+        completion = _civil_completion(data, ('passivo_corrente', 'cash_flow_operativo', 'rimborso_debito'))
+        if completion:
+            return completion
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
         ebit = _num(data, "ebit", default=0.0)
@@ -248,6 +284,7 @@ def parse_credit_readiness_file(uploaded_file):
 
         return {
             "success": True,
+            **_import_metadata(data),
             "nome_azienda": nome,
             "fatturato": _num(data, "fatturato", "ricavi_netti", "ricavi_vendite", default=0.0),
             "ebitda": ebitda,
@@ -343,6 +380,9 @@ def parse_financial_file(uploaded_file):
     """Parsa file CSV/Excel per Cash Flow Analysis. Alias di parse_cashflow_file."""
     try:
         data = _load_model_data(uploaded_file)
+        completion = _civil_completion(data, ('cash_flow_operativo', 'capex'))
+        if completion:
+            return completion
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
         ebit = _num(data, "ebit", default=0.0)
@@ -362,6 +402,7 @@ def parse_financial_file(uploaded_file):
 
         return {
             "success": True,
+            **_import_metadata(data),
             "nome_azienda": nome,
             "ebit": ebit,
             "ebitda": ebitda,
