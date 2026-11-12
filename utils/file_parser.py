@@ -1,5 +1,6 @@
 import pandas as pd
 import io
+from utils.financial_import import read_financial_data, parse_number, is_blank
 
 # ─── Template CSV Unico Completo ────────────────────────────────────────────────
 BILANCIO_COMPLETO_TEMPLATE = """campo,valore,descrizione
@@ -62,52 +63,31 @@ ricavi_netti,,Ricavi Netti (€)
 
 
 def _parse_csv_universal(uploaded_file):
-    """
-    Parser universale: accetta CSV con 2 o 3 colonne, ignora righe che iniziano con #.
-    Restituisce un dict {campo: valore}.
-    """
+    """Compatibility wrapper for the validated shared CSV/Excel reader."""
     try:
-        raw = uploaded_file.read()
-        uploaded_file.seek(0)  # reset per eventuali riletture
-        text = raw.decode("utf-8", errors="replace")
-
-        # Filtra righe commento e righe vuote
-        lines = [l for l in text.splitlines() if l.strip() and not l.strip().startswith("#")]
-        clean_csv = "\n".join(lines)
-
-        df = pd.read_csv(io.StringIO(clean_csv))
-
-        if "campo" in df.columns and "valore" in df.columns:
-            data = dict(zip(
-                df["campo"].astype(str).str.strip().str.lower(),
-                df["valore"]
-            ))
-        elif len(df.columns) >= 2:
-            cols = list(df.columns)
-            data = dict(zip(
-                df[cols[0]].astype(str).str.strip().str.lower(),
-                df[cols[1]]
-            ))
-        else:
-            data = {col.strip().lower(): df[col].iloc[0] for col in df.columns}
-
-        # Rimuovi chiavi vuote o NaN
-        data = {k: v for k, v in data.items() if k and k != "nan"}
-        return data
-    except Exception as e:
-        return {"_parse_error": str(e)}
+        return read_financial_data(uploaded_file)
+    except (ValueError, OSError, ImportError) as exc:
+        return {"_parse_error": str(exc)}
 
 
 def _num(data, *keys, default=0.0):
-    """Prova più chiavi alias, restituisce il primo valore numerico trovato."""
+    """Missing fields may use defaults; invalid supplied amounts never do."""
     for key in keys:
-        val = data.get(key)
-        if val is not None and str(val).strip() not in ("", "nan", "None"):
+        value = data.get(key)
+        if not is_blank(value):
             try:
-                return float(str(val).replace(",", ".").replace("€", "").replace(" ", "").replace(".", "", str(val).count(".") - 1) if str(val).count(".") > 1 else str(val).replace(",", ".").replace("€", "").replace(" ", ""))
-            except:
-                continue
+                return parse_number(value)
+            except ValueError as exc:
+                raise ValueError(f"Campo '{key}': {exc}") from exc
     return default
+
+
+def _load_model_data(uploaded_file):
+    data = read_financial_data(uploaded_file)
+    metadata = {"nome_azienda", "azienda", "settore", "anno_bilancio", "anno", "rischio", "descrizione"}
+    if not any(key not in metadata and not is_blank(value) for key, value in data.items()):
+        raise ValueError("Il modello non contiene importi. Compila i valori finanziari prima di caricarlo.")
+    return data
 
 
 def _str(data, *keys, default=""):
@@ -121,16 +101,7 @@ def _str(data, *keys, default=""):
 def parse_credit_file(uploaded_file):
     """Parsa file CSV/Excel per Credit Scoring. Supporta il CSV unico completo."""
     try:
-        if uploaded_file.name.lower().endswith(".csv"):
-            data = _parse_csv_universal(uploaded_file)
-            if "_parse_error" in data:
-                return {"success": False, "error": data["_parse_error"]}
-        else:
-            df = pd.read_excel(uploaded_file)
-            if "campo" in df.columns and "valore" in df.columns:
-                data = dict(zip(df["campo"].astype(str).str.strip().str.lower(), df["valore"]))
-            else:
-                data = {col.strip().lower(): df[col].iloc[0] for col in df.columns}
+        data = _load_model_data(uploaded_file)
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
 
@@ -160,16 +131,7 @@ def parse_credit_file(uploaded_file):
 def parse_zscore_file(uploaded_file):
     """Parsa file CSV/Excel per Z-Score. Supporta il CSV unico completo."""
     try:
-        if uploaded_file.name.lower().endswith(".csv"):
-            data = _parse_csv_universal(uploaded_file)
-            if "_parse_error" in data:
-                return {"success": False, "error": data["_parse_error"]}
-        else:
-            df = pd.read_excel(uploaded_file)
-            if "campo" in df.columns and "valore" in df.columns:
-                data = dict(zip(df["campo"].astype(str).str.strip().str.lower(), df["valore"]))
-            else:
-                data = {col.strip().lower(): df[col].iloc[0] for col in df.columns}
+        data = _load_model_data(uploaded_file)
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
         ebit = _num(data, "ebit", default=0.0)
@@ -203,16 +165,7 @@ def parse_zscore_file(uploaded_file):
 def parse_ratios_file(uploaded_file):
     """Parsa file CSV/Excel per Financial Ratios. Supporta il CSV unico completo."""
     try:
-        if uploaded_file.name.lower().endswith(".csv"):
-            data = _parse_csv_universal(uploaded_file)
-            if "_parse_error" in data:
-                return {"success": False, "error": data["_parse_error"]}
-        else:
-            df = pd.read_excel(uploaded_file)
-            if "campo" in df.columns and "valore" in df.columns:
-                data = dict(zip(df["campo"].astype(str).str.strip().str.lower(), df["valore"]))
-            else:
-                data = {col.strip().lower(): df[col].iloc[0] for col in df.columns}
+        data = _load_model_data(uploaded_file)
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
         ebit = _num(data, "ebit", default=0.0)
@@ -242,16 +195,7 @@ def parse_ratios_file(uploaded_file):
 def parse_audit_file(uploaded_file):
     """Parsa file CSV/Excel per Audit Report ISA 320. Supporta il CSV unico completo."""
     try:
-        if uploaded_file.name.lower().endswith(".csv"):
-            data = _parse_csv_universal(uploaded_file)
-            if "_parse_error" in data:
-                return {"success": False, "error": data["_parse_error"]}
-        else:
-            df = pd.read_excel(uploaded_file)
-            if "campo" in df.columns and "valore" in df.columns:
-                data = dict(zip(df["campo"].astype(str).str.strip().str.lower(), df["valore"]))
-            else:
-                data = {col.strip().lower(): df[col].iloc[0] for col in df.columns}
+        data = _load_model_data(uploaded_file)
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
 
@@ -295,16 +239,7 @@ def parse_audit_file(uploaded_file):
 def parse_credit_readiness_file(uploaded_file):
     """Parsa file CSV/Excel per Credit Readiness. Supporta il CSV unico completo."""
     try:
-        if uploaded_file.name.lower().endswith(".csv"):
-            data = _parse_csv_universal(uploaded_file)
-            if "_parse_error" in data:
-                return {"success": False, "error": data["_parse_error"]}
-        else:
-            df = pd.read_excel(uploaded_file)
-            if "campo" in df.columns and "valore" in df.columns:
-                data = dict(zip(df["campo"].astype(str).str.strip().str.lower(), df["valore"]))
-            else:
-                data = {col.strip().lower(): df[col].iloc[0] for col in df.columns}
+        data = _load_model_data(uploaded_file)
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
         ebit = _num(data, "ebit", default=0.0)
@@ -407,16 +342,7 @@ def get_ratios_template_excel():
 def parse_financial_file(uploaded_file):
     """Parsa file CSV/Excel per Cash Flow Analysis. Alias di parse_cashflow_file."""
     try:
-        if uploaded_file.name.lower().endswith(".csv"):
-            data = _parse_csv_universal(uploaded_file)
-            if "_parse_error" in data:
-                return {"success": False, "error": data["_parse_error"]}
-        else:
-            df = pd.read_excel(uploaded_file)
-            if "campo" in df.columns and "valore" in df.columns:
-                data = dict(zip(df["campo"].astype(str).str.strip().str.lower(), df["valore"]))
-            else:
-                data = {col.strip().lower(): df[col].iloc[0] for col in df.columns}
+        data = _load_model_data(uploaded_file)
 
         nome = _str(data, "nome_azienda", "azienda", default="Azienda")
         ebit = _num(data, "ebit", default=0.0)

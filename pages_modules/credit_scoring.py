@@ -7,7 +7,7 @@ from services.db import save_credit_report
 from utils.ui_kit import page_header
 
 
-def _show_credit_result(result, company_name="", access_token=""):
+def _show_credit_result(result, company_name="", access_token="", key_suffix=""):
     """Mostra i risultati del credit scoring."""
     rating_colors = {
         "AAA": "#15803D", "AA": "#16A34A", "A": "#22C55E",
@@ -48,9 +48,9 @@ def _show_credit_result(result, company_name="", access_token=""):
     with col1:
         cats = list(result.components.keys())
         vals = list(result.components.values())
-        st.plotly_chart(radar_chart(cats, vals, "Profilo di Rischio"), use_container_width=True)
+        st.plotly_chart(radar_chart(cats, vals, "Profilo di Rischio"), use_container_width=True, key=f"credit_radar_{key_suffix}")
     with col2:
-        st.plotly_chart(bar_chart(cats, vals, "Score per Componente"), use_container_width=True)
+        st.plotly_chart(bar_chart(cats, vals, "Score per Componente"), use_container_width=True, key=f"credit_components_{key_suffix}")
 
     st.subheader("📏 Indicatori Chiave")
     m1, m2, m3, m4 = st.columns(4)
@@ -152,7 +152,7 @@ def show_credit_scoring():
             )
 
             st.markdown("#### 📊 Risultato Analisi Automatica")
-            _show_credit_result(result_auto, nome, access_token)
+            _show_credit_result(result_auto, nome, access_token, key_suffix="auto")
         else:
             st.error(f"❌ Errore nel file: {parsed['error']}")
             st.info("💡 Scarica il **Template CSV** per il formato corretto e riprova.")
@@ -224,7 +224,7 @@ def show_credit_scoring():
         )
 
         st.markdown("#### 📊 Risultato Analisi Manuale")
-        _show_credit_result(result, company_name, access_token)
+        _show_credit_result(result, company_name, access_token, key_suffix="manual")
 
         st.markdown("---")
         if st.button("💾 Salva Credit Report", key="save_credit"):

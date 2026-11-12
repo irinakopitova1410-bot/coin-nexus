@@ -42,7 +42,7 @@ def _status_badge(status: str) -> str:
     return {"ok": "✅ OK", "warning": "⚠️ WARN", "danger": "🔴 CRIT"}.get(status, "--")
 
 
-def _show_ratio_result(result, company_name, industry):
+def _show_ratio_result(result, company_name, industry, key_suffix=""):
     """Mostra i risultati completi dei ratio."""
     # Header Score
     col1, col2, col3, col4 = st.columns(4)
@@ -61,7 +61,7 @@ def _show_ratio_result(result, company_name, industry):
     for i, cat in enumerate(result.categories[:6]):
         with gauge_cols[i % 3]:
             st.plotly_chart(_gauge(cat.score, f"{cat.icon} {cat.name}"),
-                            use_container_width=True, key=f"gauge_auto_{i}")
+                            use_container_width=True, key=f"ratio_gauge_{key_suffix}_{i}")
 
     # Radar Chart
     st.subheader("Profilo Finanziario")
@@ -82,7 +82,7 @@ def _show_ratio_result(result, company_name, industry):
         polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
         showlegend=True, height=400
     )
-    st.plotly_chart(fig_radar, use_container_width=True)
+    st.plotly_chart(fig_radar, use_container_width=True, key=f"ratio_radar_{key_suffix}")
 
     # Dettaglio per categoria
     st.subheader("Dettaglio Indicatori")
@@ -134,7 +134,7 @@ def _show_ratio_result(result, company_name, industry):
         fig_bar.add_bar(name=f"Benchmark ({industry})", x=df_bm["Indicatore"],
                         y=df_bm["Benchmark"], marker_color="#009688", opacity=0.7)
         fig_bar.update_layout(barmode="group", height=380, xaxis_tickangle=-30)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, use_container_width=True, key=f"ratio_benchmark_{key_suffix}")
 
 
 def render_financial_ratios():
@@ -204,7 +204,7 @@ def render_financial_ratios():
 
             ratios_result = calculate_all_ratios(data_in, industry="Manifatturiero")
             st.markdown("#### 📊 Risultato Analisi Automatica")
-            _show_ratio_result(ratios_result, nome, "Manifatturiero")
+            _show_ratio_result(ratios_result, nome, "Manifatturiero", key_suffix="auto")
 
             # Export diretto
             st.divider()
@@ -222,7 +222,7 @@ def render_financial_ratios():
             st.download_button("📥 Esporta Excel risultati", data=buf.getvalue(),
                 file_name=f"ratios_{nome}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True)
+                use_container_width=True, key="ratios_excel_auto")
         else:
             st.error(f"❌ Errore nel file: {parsed['error']}")
             st.info("💡 Scarica il **Template CSV** per il formato corretto e riprova.")
@@ -268,7 +268,7 @@ def render_financial_ratios():
 
         result = calculate_all_ratios(safe_data, industry)
         st.markdown("#### 📊 Risultato Analisi Manuale")
-        _show_ratio_result(result, company_name, industry)
+        _show_ratio_result(result, company_name, industry, key_suffix="manual")
 
         # Export PDF
         st.divider()
@@ -301,4 +301,4 @@ def render_financial_ratios():
             st.download_button("📥 Esporta Excel risultati", data=buf.getvalue(),
                 file_name=f"ratios_{company_name or 'export'}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True)
+                use_container_width=True, key="ratios_excel_manual")

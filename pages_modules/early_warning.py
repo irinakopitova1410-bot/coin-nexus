@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 import io
 
 from utils.ui_kit import page_header
+from utils.file_parser import _num
+from pages_modules._file_import import read_financial_upload
 
 
 
@@ -258,40 +260,21 @@ def grafico_radar_indici(indici: dict) -> go.Figure:
 # ─── Parse CSV per Early Warning ─────────────────────────────────────────────
 def parse_csv_early_warning(uploaded_file) -> dict | None:
     try:
-        if uploaded_file.name.lower().endswith((".xlsx", ".xls")):
-            df = pd.read_excel(uploaded_file)
-        else:
-            content = uploaded_file.read().decode("utf-8", errors="replace")
-            uploaded_file.seek(0)
-            lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
-            df = pd.read_csv(io.StringIO("\n".join(lines)), header=0)
-        df.columns = [str(c).strip().lower() for c in df.columns]
-        if "campo" in df.columns and ("valore" in df.columns or df.columns[1]):
-            val_col = "valore" if "valore" in df.columns else df.columns[1]
-            data = {str(r["campo"]).strip().lower(): r[val_col] for _, r in df.iterrows()
-                    if pd.notna(r[val_col])}
-        else:
-            return None
+        data = read_financial_upload(uploaded_file)
 
         def g(keys, default=0.0):
-            for k in keys:
-                if k in data:
-                    try:
-                        return float(str(data[k]).replace(".", "").replace(",", ".").strip())
-                    except:
-                        pass
-            return default
+            return _num(data, *keys, default=default)
 
         return {
             "azienda": str(data.get("azienda", data.get("nome_azienda", "Azienda"))),
             "ebitda": g(["ebitda", "margine_operativo_lordo"]),
             "interessi_passivi": g(["interessi_passivi", "oneri_finanziari", "of"]),
-            "quota_capitale": g(["quota_capitale", "rimborso_debiti", "rata_capitale"]),
+            "quota_capitale": g(["quota_capitale", "rimborso_debiti", "rimborso_debito", "rata_capitale"]),
             "patrimonio_netto": g(["patrimonio_netto", "equity"]),
             "totale_debiti": g(["totale_debiti", "debiti_totali", "passivo_totale"]),
             "ricavi_netti": g(["ricavi_netti", "fatturato", "ricavi_vendite"]),
             "liquidita": g(["liquidita", "disponibilita_liquide", "cassa"]),
-            "attivo_corrente": g(["attivo_corrente", "capitale_circolante"]),
+            "attivo_corrente": g(["attivo_corrente", "totale_attivo_circolante", "capitale_circolante"]),
             "passivo_corrente": g(["passivo_corrente", "debiti_breve_termine"]),
             "debito_finanziario_netto": g(["debito_finanziario_netto", "pfn", "posizione_finanziaria_netta"]),
         }

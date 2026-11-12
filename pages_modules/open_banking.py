@@ -346,17 +346,31 @@ def _tab_upload_estratto():
                                 type=["csv", "xlsx"], key="banking_upload")
     if uploaded:
         try:
-            content = uploaded.read().decode("utf-8", errors="replace")
             uploaded.seek(0)
-            lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
-            df = pd.read_csv(io.StringIO("\n".join(lines)))
+            if uploaded.name.lower().endswith(".xlsx"):
+                df = pd.read_excel(uploaded, dtype=object)
+            else:
+                content = uploaded.read().decode("utf-8-sig")
+                lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
+                df = pd.read_csv(io.StringIO("\n".join(lines)), sep=None, engine="python", dtype=str)
+            uploaded.seek(0)
             df.columns = [str(c).strip().lower() for c in df.columns]
 
             if "importo" not in df.columns:
                 st.error("❌ Il CSV deve avere una colonna 'importo'")
                 return
 
-            df["importo"] = pd.to_numeric(df["importo"], errors="coerce").fillna(0)
+            from utils.file_parser import _num
+            amounts = df["importo"].map(lambda value: _num({"v": value}, "v", default=None))
+            if amounts.isna().any():
+                st.error("❌ La colonna 'importo' contiene valori mancanti o non numerici")
+                return
+            df["importo"] = amounts.astype(float)
+            if "saldo" in df.columns:
+                df["saldo"] = df["saldo"].map(lambda value: _num({"v": value}, "v", default=None))
+                if df["saldo"].isna().any():
+                    st.error("❌ La colonna 'saldo' contiene valori mancanti o non numerici")
+                    return
             if "tipo" not in df.columns:
                 df["tipo"] = df["importo"].apply(lambda x: "CREDIT" if x > 0 else "DEBIT")
             if "saldo" not in df.columns:

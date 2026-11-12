@@ -9,6 +9,8 @@ import pandas as pd
 import io
 from engine.credit_readiness import analyze_credit_readiness, CreditReadinessResult
 from utils.ui_kit import page_header
+from utils.file_parser import _num
+from pages_modules._file_import import read_financial_upload
 
 
 # ─── Helpers UI ──────────────────────────────────────────────────────────────
@@ -137,6 +139,7 @@ FIELD_MAP = {
     # attivo corrente
     "attivo_corrente": "attivo_corrente",
     "current_assets": "attivo_corrente",
+    "totale_attivo_circolante": "attivo_corrente",
     # passivo corrente
     "passivo_corrente": "passivo_corrente",
     "current_liabilities": "passivo_corrente",
@@ -203,77 +206,36 @@ COMPANY_KEYS = {"azienda", "company", "company_name", "nome_azienda", "ragione_s
 
 
 def _to_float(val) -> float:
-    """Converte un valore in float gestendo formato italiano e simboli."""
-    if val is None:
-        return 0.0
-    s = str(val).strip().replace("\u20ac", "").replace("%", "").replace(" ", "")
-    if not s or s.lower() in ("nan", "none", "-", "\u2014", "n/a"):
-        return 0.0
-    # Formato italiano: 1.234.567,89 → 1234567.89
-    if "," in s:
-        s = s.replace(".", "").replace(",", ".")
-    try:
-        return float(s)
-    except Exception:
-        return 0.0
+    """Use the same locale-aware conversion as the other financial pages."""
+    return _num({"value": val}, "value")
 
 
 def _parse_uploaded_file(uploaded_file) -> dict | None:
     """Legge CSV o Excel e restituisce dict con i valori finanziari."""
     try:
-        name = uploaded_file.name.lower()
-        if name.endswith(".csv"):
-            raw = uploaded_file.read()
-            for enc in ("utf-8", "latin-1", "cp1252"):
-                try:
-                    df = pd.read_csv(io.BytesIO(raw), encoding=enc, header=None)
-                    break
-                except Exception:
-                    continue
-        else:
-            df = pd.read_excel(io.BytesIO(uploaded_file.read()), header=None)
+        data = read_financial_upload(uploaded_file)
+        parsed = dict(DEFAULTS)
+        company_name = ""
+        found_numeric = False
+        for key, value in data.items():
+            key = str(key).strip().lower().replace(" ", "_").replace("(€)", "").strip("_")
+            if key in COMPANY_KEYS:
+                if pd.notna(value) and str(value).strip():
+                    company_name = str(value).strip()
+                continue
+            mapped = FIELD_MAP.get(key)
+            if mapped:
+                number = _num({"value": value}, "value", default=None)
+                if number is not None:
+                    parsed[mapped] = number
+                    found_numeric = True
+        if not found_numeric:
+            st.error("Nessun valore finanziario riconosciuto: usa il template CSV.")
+            return None
+        return {"data": parsed, "company_name": company_name or "Azienda"}
     except Exception as e:
         st.error(f"Errore lettura file: {e}")
         return None
-
-    # Prova a trovare struttura: colonna chiave + colonna valore
-    parsed = dict(DEFAULTS)
-    company_name = ""
-
-    for _, row in df.iterrows():
-        if len(row) < 2:
-            continue
-        key_raw = str(row.iloc[0]).strip().lower().replace(" ", "_").replace("(€)", "").replace("(", "").replace(")", "")
-        val_raw = row.iloc[1]
-        # cerca nome azienda
-        if "azienda" in key_raw or "company" in key_raw or "nome" in key_raw:
-            company_name = str(val_raw).strip()
-            continue
-        # mappa il campo
-        mapped = FIELD_MAP.get(key_raw)
-        if mapped:
-            parsed[mapped] = _to_float(val_raw)
-
-
-    # ── Formato 2: orizzontale (header riga 1, valori riga 2) ──
-    # Attivato solo se il formato verticale non ha mappato NESSUN campo,
-    # così i file già supportati continuano a funzionare identici.
-    if all(v == 0.0 for v in parsed.values()) and len(df) >= 2:
-        try:
-            headers = [str(h).strip().lower().replace(" ", "_").replace("(€)", "")
-                       for h in df.iloc[0]]
-            values = df.iloc[1]
-            for col_idx, h in enumerate(headers):
-                if h in COMPANY_KEYS and col_idx < len(values):
-                    company_name = str(values.iloc[col_idx]).strip()
-                    continue
-                mapped = FIELD_MAP.get(h)
-                if mapped and col_idx < len(values):
-                    parsed[mapped] = _to_float(values.iloc[col_idx])
-        except Exception:
-            pass
-
-    return {"data": parsed, "company_name": company_name or "Azienda"}
 
 
 def _get_cr_template_csv() -> bytes:
@@ -349,7 +311,7 @@ def _save_readiness_history(result, company_name: str, d: dict):
 
 # ─── Render risultati (condiviso tra upload e form) ───────────────────────────
 
-def _render_results(result: CreditReadinessResult, company_name: str = ""):
+def _render_results(result: CreditReadinessResult, company_name: str = "", key_prefix="cr_upload_result"):
     """Mostra tutti i risultati Credit Readiness."""
 
     status_class = f"status-{result.stato}"
@@ -405,10 +367,10 @@ def _render_results(result: CreditReadinessResult, company_name: str = ""):
     # Grafici
     col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
-        st.plotly_chart(gauge_chart(result.credit_score, result.rating), use_container_width=True)
+        st.plotly_chart(gauge_chart(result.credit_score, result.rating), use_container_width=True, key=f"{key_prefix}_gauge")
     with col2:
         st.markdown("**💰 Credito: Oggi vs Potenziale**")
-        st.plotly_chart(credit_bar_chart(result.credito_oggi_eur, result.credito_potenziale_eur), use_container_width=True)
+        st.plotly_chart(credit_bar_chart(result.credito_oggi_eur, result.credito_potenziale_eur), use_container_width=True, key=f"{key_prefix}_credit")
         st.markdown(f"""
         <div style="background:#f8fafc;border-radius:8px;padding:0.7rem 1rem;font-size:0.85rem;color:#475569;">
         📊 EBITDA attuale: <b>{fmt_eur(result.ebitda_attuale)}</b> &nbsp;→&nbsp;
@@ -418,7 +380,7 @@ def _render_results(result: CreditReadinessResult, company_name: str = ""):
         """, unsafe_allow_html=True)
     with col3:
         st.markdown("**🎯 Score Breakdown**")
-        st.plotly_chart(score_breakdown_chart(result.score_breakdown), use_container_width=True)
+        st.plotly_chart(score_breakdown_chart(result.score_breakdown), use_container_width=True, key=f"{key_prefix}_breakdown")
 
     with st.expander("📋 Dettaglio Score per dimensione"):
         max_vals = {"EBITDA Margin": 25, "Debt / EBITDA": 20, "Liquidità Corrente": 20,
@@ -529,7 +491,7 @@ def _render_results(result: CreditReadinessResult, company_name: str = ""):
     st.markdown("---")
     col1, col2 = st.columns([1, 4])
     with col1:
-        if st.button("📄 Esporta PDF", use_container_width=True, key="cr_pdf_btn"):
+        if st.button("📄 Esporta PDF", use_container_width=True, key=f"{key_prefix}_pdf_btn"):
             st.info("Export PDF disponibile nel modulo Audit Report — include il Credit Readiness completo.")
 
 
@@ -727,4 +689,4 @@ def render_credit_readiness():
                 )
 
             st.markdown("---")
-            _render_results(result)
+            _render_results(result, key_prefix="cr_manual_result")

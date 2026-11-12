@@ -4,6 +4,9 @@ import io
 from engine.calculations import calculate_audit
 from services.db import save_audit_report, get_recent_analyses
 from utils.ui_kit import page_header
+from utils.file_parser import _num
+from utils.financial_import import is_blank
+from pages_modules._file_import import read_financial_upload
 
 # ─────────────────────────────────────────────────────────────
 #  CAMPI ACCETTATI DAL PARSER (CSV / Excel)
@@ -25,6 +28,7 @@ FIELD_MAP = {
     "ricavi netti": "net_revenue", "fatturato": "net_revenue",
     "revenue": "net_revenue", "ricavi": "net_revenue",
     # pre_tax_income — accetta anche EBT, utili non distribuiti come proxy
+    "risultato_ante_imposte": "pre_tax_income",
     "reddito_ante_imposte": "pre_tax_income", "pre_tax_income": "pre_tax_income",
     "reddito ante imposte": "pre_tax_income", "ebt": "pre_tax_income",
     "utili_non_distribuiti": "pre_tax_income", "utile_netto": "pre_tax_income",
@@ -64,39 +68,18 @@ def _parse_audit_file(uploaded_file) -> dict | None:
     3. Qualsiasi file con almeno un campo riconosciuto → usa defaults per il resto
     """
     try:
-        name = uploaded_file.name.lower()
-        if name.endswith(".csv"):
-            raw = uploaded_file.read()
-            uploaded_file.seek(0)
-            text = raw.decode("utf-8", errors="replace")
-            # Filtra righe commento (#) e righe vuote PRIMA di passare a pandas
-            lines = [l for l in text.splitlines() if l.strip() and not l.strip().startswith("#")]
-            df = pd.read_csv(io.StringIO("\n".join(lines)))
-        else:
-            df = pd.read_excel(uploaded_file)
-
+        raw_data = read_financial_upload(uploaded_file)
         data = {}
-        col0 = df.columns[0].lower().strip() if len(df.columns) > 0 else ""
-
-        # Formato colonnare: prima colonna = nome campo, seconda = valore
-        # Funziona con 2 O 3+ colonne (es. campo, valore, descrizione)
-        if col0 in ("campo", "field", "key", "nome", "parametro"):
-            col_val_idx = 1  # seconda colonna = valori
-            for _, row in df.iterrows():
-                raw_key = str(row.iloc[0]).strip().lower()
-                raw_val = str(row.iloc[col_val_idx]).strip() if len(row) > 1 else ""
-                mapped = FIELD_MAP.get(raw_key)
-                if mapped and not mapped.startswith("_"):  # ignora campi con prefisso _
-                    data[mapped] = raw_val
-                elif mapped and mapped.startswith("_"):
-                    pass  # campo noto ma non usato in audit — ok, non errore
-        else:
-            # Formato riga singola: colonne = campi
-            df.columns = [c.lower().strip() for c in df.columns]
-            for col in df.columns:
-                mapped = FIELD_MAP.get(col)
-                if mapped and not mapped.startswith("_"):
-                    data[mapped] = str(df[col].iloc[0]).strip()
+        for key, value in raw_data.items():
+            mapped = FIELD_MAP.get(str(key).strip().lower())
+            if mapped and not mapped.startswith("_") and not is_blank(value):
+                if mapped in {"gross_profit", "total_assets", "net_revenue", "pre_tax_income",
+                              "internal_control_score", "error_rate"}:
+                    # Validate while still inside the upload error boundary and
+                    # preserve Excel's native numeric types (e.g. 1.234).
+                    data[mapped] = _num({mapped: value}, mapped)
+                else:
+                    data[mapped] = str(value).strip()
 
         # Se abbiamo trovato ALMENO UN campo utile → procedi con defaults per il resto
         audit_fields = {"company_name", "gross_profit", "total_assets", "net_revenue",
@@ -112,10 +95,7 @@ def _parse_audit_file(uploaded_file) -> dict | None:
 
 
 def _safe_float(val, default=0.0):
-    try:
-        return float(str(val).replace(",", ".").replace("€", "").replace(" ", ""))
-    except Exception:
-        return default
+    return _num({"value": val}, "value", default=default)
 
 
 def _safe_int(val, default=7, min_v=1, max_v=10):

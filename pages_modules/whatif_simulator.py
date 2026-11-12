@@ -10,6 +10,8 @@ import plotly.graph_objects as go
 import io
 
 from utils.ui_kit import page_header
+from utils.file_parser import _num
+from pages_modules._file_import import read_financial_upload
 
 
 
@@ -162,33 +164,18 @@ def grafico_waterfall_ebitda(base_ebitda, delta_ricavi, delta_materie, delta_per
 # ─── Parse CSV ───────────────────────────────────────────────────────────────
 def parse_csv_whatif(uploaded_file) -> dict | None:
     try:
-        if uploaded_file.name.lower().endswith((".xlsx", ".xls")):
-            df = pd.read_excel(uploaded_file)
-        else:
-            content = uploaded_file.read().decode("utf-8", errors="replace")
-            uploaded_file.seek(0)
-            lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
-            df = pd.read_csv(io.StringIO("\n".join(lines)), header=0)
-        df.columns = [str(c).strip().lower() for c in df.columns]
-        val_col = "valore" if "valore" in df.columns else df.columns[1]
-        data = {str(r[df.columns[0]]).strip().lower(): r[val_col]
-                for _, r in df.iterrows() if pd.notna(r[val_col])}
+        data = read_financial_upload(uploaded_file)
 
         def g(keys, default=0.0):
-            for k in keys:
-                if k in data:
-                    try:
-                        return float(str(data[k]).replace(".", "").replace(",", ".").strip())
-                    except:
-                        pass
-            return default
+            return _num(data, *keys, default=default)
 
         fat = g(["fatturato", "ricavi_netti", "ricavi_vendite"])
-        ebitda = g(["ebitda"])
+        ebitda = g(["ebitda"], None)
+
         return {
             "azienda": str(data.get("azienda", data.get("nome_azienda", "Azienda"))),
             "fatturato": fat,
-            "ebitda": ebitda if ebitda != 0 else fat * 0.12,
+            "ebitda": ebitda if ebitda is not None else fat * 0.12,
             "ebit": g(["ebit", "risultato_operativo"]),
             "costi_materie": g(["costi_materie", "costi_materie_prime", "acquisti"]),
             "costi_personale": g(["costi_personale", "costo_lavoro"]),
@@ -223,7 +210,7 @@ def show_whatif_simulator():
         _tab_manuale_whatif()
 
 
-def _mostra_simulatore(base: dict):
+def _mostra_simulatore(base: dict, key_prefix="whatif_upload_result"):
     """Mostra i slider What-If e aggiorna i KPI in tempo reale."""
     azienda = base.get("azienda", "Azienda")
 
@@ -276,25 +263,33 @@ def _mostra_simulatore(base: dict):
     preset_selezionato = None
     for i, (nome, shock) in enumerate(scenari_preset.items()):
         with col_pre[i]:
-            if st.button(nome, use_container_width=True, key=f"preset_{i}"):
+            if st.button(nome, use_container_width=True, key=f"{key_prefix}_preset_{i}"):
                 preset_selezionato = shock
+
+    slider_fields = ("delta_fatturato", "delta_costi_mat", "delta_costi_pers",
+                     "delta_debiti", "delta_crediti", "delta_tasso")
+    for field in slider_fields:
+        st.session_state.setdefault(f"{key_prefix}_{field}", 0)
+    if preset_selezionato is not None:
+        for field in slider_fields:
+            st.session_state[f"{key_prefix}_{field}"] = preset_selezionato.get(field, 0)
 
     # Sliders
     col_s1, col_s2 = st.columns(2)
     with col_s1:
         delta_fat  = st.slider("📈 Variazione fatturato (%)", -50, 50,
-                               preset_selezionato.get("delta_fatturato", 0) if preset_selezionato else 0)
+                               key=f"{key_prefix}_delta_fatturato")
         delta_mat  = st.slider("🏭 Variazione costi materie prime (%)", -30, 50,
-                               preset_selezionato.get("delta_costi_mat", 0) if preset_selezionato else 0)
+                               key=f"{key_prefix}_delta_costi_mat")
         delta_pers = st.slider("👥 Variazione costi personale (%)", -20, 30,
-                               preset_selezionato.get("delta_costi_pers", 0) if preset_selezionato else 0)
+                               key=f"{key_prefix}_delta_costi_pers")
     with col_s2:
         delta_deb  = st.slider("🏦 Variazione debiti (%)", -30, 50,
-                               preset_selezionato.get("delta_debiti", 0) if preset_selezionato else 0)
+                               key=f"{key_prefix}_delta_debiti")
         delta_cred = st.slider("📋 Variazione crediti clienti (%)", -40, 40,
-                               preset_selezionato.get("delta_crediti", 0) if preset_selezionato else 0)
+                               key=f"{key_prefix}_delta_crediti")
         delta_tasso= st.slider("💹 Variazione tasso interesse (pp)", -2, 5,
-                               preset_selezionato.get("delta_tasso", 0) if preset_selezionato else 0)
+                               key=f"{key_prefix}_delta_tasso")
 
     shock = {
         "delta_fatturato": delta_fat,
@@ -353,14 +348,14 @@ def _mostra_simulatore(base: dict):
             "zscore": scen["zscore"],
             "prob_default": scen["prob_default"]
         }
-        st.plotly_chart(grafico_confronto(base_kpi, scen_kpi), use_container_width=True)
+        st.plotly_chart(grafico_confronto(base_kpi, scen_kpi), use_container_width=True, key=f"{key_prefix}_comparison")
     with col_g2:
         delta_ricavi_val = scen["fatturato"] - base["fatturato"]
         delta_mat_val  = base["costi_materie"] * (delta_mat / 100)
         delta_pers_val = base["costi_personale"] * (delta_pers / 100)
         st.plotly_chart(grafico_waterfall_ebitda(
             base["ebitda"], delta_ricavi_val, delta_mat_val, delta_pers_val, scen["ebitda"]
-        ), use_container_width=True)
+        ), use_container_width=True, key=f"{key_prefix}_waterfall")
 
     # Tabella riepilogo
     with st.expander("📋 Tabella riepilogo completa"):
@@ -440,4 +435,7 @@ def _tab_manuale_whatif():
             "utili_non_distribuiti": utili_nd, "ammortamenti": ebitda * 0.28,
             "crediti_clienti": fatturato * 0.15, "tasso_interesse": 0.045,
         }
-        _mostra_simulatore(base)
+        st.session_state["whatif_manual_base"] = base
+
+    if "whatif_manual_base" in st.session_state:
+        _mostra_simulatore(st.session_state["whatif_manual_base"], key_prefix="whatif_manual_result")

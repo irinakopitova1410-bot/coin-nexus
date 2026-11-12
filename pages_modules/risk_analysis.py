@@ -56,7 +56,7 @@ def _show_zscore_result(result, data_for_ratios, company_name, industry, access_
     with col1:
         st.plotly_chart(
             _render_gauge(z, result.thresholds["safe"], result.thresholds["grey_low"]),
-            use_container_width=True
+            use_container_width=True, key=f"zscore_gauge_{key_suffix}"
         )
     with col2:
         st.markdown(f"""
@@ -89,7 +89,7 @@ def _show_zscore_result(result, data_for_ratios, company_name, industry, access_
             marker_color=["#00C853" if v > 0 else "#D50000" for v in result.variables.values()],
         ))
         fig_bar.update_layout(height=250, margin=dict(l=10, r=10, t=10, b=10), showlegend=False)
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, use_container_width=True, key=f"zscore_variables_{key_suffix}")
 
     # Proiezioni
     st.subheader("Proiezioni Z-Score (4 anni)")
@@ -107,7 +107,7 @@ def _show_zscore_result(result, data_for_ratios, company_name, industry, access_
     fig_proj.add_hline(y=result.thresholds["grey_low"], line_color="orange",
                         line_dash="dot", annotation_text="Soglia Grigia")
     fig_proj.update_layout(height=320, title="Evoluzione Z-Score - Scenari")
-    st.plotly_chart(fig_proj, use_container_width=True)
+    st.plotly_chart(fig_proj, use_container_width=True, key=f"zscore_projections_{key_suffix}")
 
     # Health Score
     ratio_result = calculate_all_ratios(data_for_ratios, industry)
@@ -150,7 +150,7 @@ def _show_zscore_result(result, data_for_ratios, company_name, industry, access_
                     )
                     st.download_button("📥 Scarica PDF", data=pdf_bytes,
                                        file_name=f"zscore_{company_name or 'report'}.pdf",
-                                       mime="application/pdf", use_container_width=True)
+                                       mime="application/pdf", use_container_width=True, key=f"zscore_pdf_download_{key_suffix}")
                 except Exception as e:
                     st.error(f"Errore PDF: {e}")
     with col2:
@@ -162,7 +162,7 @@ def _show_zscore_result(result, data_for_ratios, company_name, industry, access_
         df_csv.to_csv(buf, index=False)
         st.download_button("📥 Esporta CSV risultati", data=buf.getvalue().encode(),
                            file_name="zscore_export.csv", mime="text/csv",
-                           use_container_width=True)
+                           use_container_width=True, key=f"zscore_csv_download_{key_suffix}")
 
 
 def render_risk_analysis():

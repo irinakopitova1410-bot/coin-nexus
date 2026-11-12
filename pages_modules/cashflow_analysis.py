@@ -14,7 +14,7 @@ from utils.file_parser import parse_financial_file
 from utils.ui_kit import page_header
 
 
-def _run_cashflow(data: dict, company_name: str):
+def _run_cashflow(data: dict, company_name: str, key_suffix=""):
     """Calcola e visualizza tutti i risultati Cash Flow."""
 
     cf = calculate_cashflow(data)
@@ -113,7 +113,7 @@ def _run_cashflow(data: dict, company_name: str):
         textposition="outside",
     ))
     fig_wf.update_layout(height=420, title="Cash Flow Waterfall (€)", showlegend=False)
-    st.plotly_chart(fig_wf, use_container_width=True)
+    st.plotly_chart(fig_wf, use_container_width=True, key=f"cashflow_waterfall_{key_suffix}")
 
     # ── Proiezioni ────────────────────────────────────────────────────────────
     st.subheader("📈 Proiezioni a 5 anni")
@@ -134,7 +134,7 @@ def _run_cashflow(data: dict, company_name: str):
                                    name="OCF Base", mode="lines+markers",
                                    line=dict(color="#0D47A1", width=2)))
     fig_proj.update_layout(height=350, title="Free Cash Flow — Proiezioni 5 Anni")
-    st.plotly_chart(fig_proj, use_container_width=True)
+    st.plotly_chart(fig_proj, use_container_width=True, key=f"cashflow_projections_{key_suffix}")
 
     # ── Covenant ─────────────────────────────────────────────────────────────
     if cf.covenants:
@@ -154,7 +154,7 @@ def _run_cashflow(data: dict, company_name: str):
     st.divider()
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("📄 Genera Report PDF", type="primary", use_container_width=True, key="cf_pdf_btn"):
+        if st.button("📄 Genera Report PDF", type="primary", use_container_width=True, key=f"cf_pdf_btn_{key_suffix}"):
             with st.spinner("Generazione PDF..."):
                 try:
                     pdf_bytes = generate_full_report(
@@ -164,7 +164,7 @@ def _run_cashflow(data: dict, company_name: str):
                     )
                     st.download_button("⬇️ Scarica PDF", data=pdf_bytes,
                                        file_name=f"cashflow_{company_name or 'report'}.pdf",
-                                       mime="application/pdf", use_container_width=True)
+                                       mime="application/pdf", use_container_width=True, key=f"cashflow_pdf_download_{key_suffix}")
                     st.success("✅ PDF pronto!")
                 except Exception as e:
                     st.error(f"Errore PDF: {e}")
@@ -173,7 +173,7 @@ def _run_cashflow(data: dict, company_name: str):
         df_proj.to_csv(csv_buf, index=False)
         st.download_button("📊 Esporta Proiezioni CSV", data=csv_buf.getvalue().encode(),
                            file_name="proiezioni_cashflow.csv", mime="text/csv",
-                           use_container_width=True)
+                           use_container_width=True, key=f"cashflow_csv_download_{key_suffix}")
 
 
 def render_cashflow_analysis():
@@ -308,7 +308,7 @@ capex,350000,Investimenti
                         prev_fixed_assets=_num("prev_fixed_assets"),
                     )
 
-                    _run_cashflow(data_upload, cn)
+                    _run_cashflow(data_upload, cn, key_suffix="auto")
 
                 except Exception as e:
                     st.error(f"❌ Errore durante l'analisi: {e}")
@@ -400,4 +400,4 @@ capex,350000,Investimenti
             prev_fixed_assets=prev_fa,
         )
 
-        _run_cashflow(data_form, company_name_form)
+        _run_cashflow(data_form, company_name_form, key_suffix="manual")

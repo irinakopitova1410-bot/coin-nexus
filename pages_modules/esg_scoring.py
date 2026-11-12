@@ -313,20 +313,12 @@ rendicontazione_dnf,0
                                 type=["csv", "xlsx"], key="esg_upload")
     if uploaded:
         try:
-            content = uploaded.read().decode("utf-8", errors="replace")
-            uploaded.seek(0)
-            lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
-            df = pd.read_csv(io.StringIO("\n".join(lines)))
-            df.columns = [str(c).strip().lower() for c in df.columns]
-            val_col = "valore" if "valore" in df.columns else df.columns[1]
-            data = {str(r["campo"]).strip().lower(): r[val_col] for _, r in df.iterrows()}
+            from pages_modules._file_import import read_financial_upload
+            from utils.file_parser import _num
+            data = read_financial_upload(uploaded)
 
             def g(k, default=0):
-                v = data.get(k, default)
-                try:
-                    return float(v)
-                except:
-                    return default
+                return _num(data, k, default=default)
 
             azienda = str(data.get("azienda", "Azienda"))
             dati_e = {k: g(k, d) for (k, _, _, _, d, _) in DOMANDE_E}

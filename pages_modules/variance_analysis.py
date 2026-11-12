@@ -24,7 +24,11 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import io
+import hashlib
+import json
 from datetime import datetime
+from utils.file_parser import _num
+from pages_modules._file_import import read_financial_upload
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -161,19 +165,66 @@ def parse_variance_csv(uploaded_file):
     cogs_actual,5800000
     ...
     """
-    lines = uploaded_file.read().decode("utf-8", errors="ignore").splitlines()
-    data = {}
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        parts = line.split(",")
-        if len(parts) >= 2:
-            try:
-                data[parts[0].strip().lower()] = float(parts[1].strip().replace(".", "").replace(",", "."))
-            except ValueError:
-                pass
-    return data
+    try:
+        raw = read_financial_upload(uploaded_file)
+        data = {}
+        for key in DEFAULT_COIN:
+            value = _num(raw, key, default=None)
+            if value is not None:
+                data[key] = value
+        return data
+    except (ValueError, OSError):
+        return {}
+
+
+VAR_WIDGET_KEYS = {
+    "ricavi_budget": "vb_ricavi_b", "ricavi_actual": "vb_ricavi_a",
+    "cogs_budget": "vb_cogs_b", "cogs_actual": "vb_cogs_a",
+    "opex_budget": "vb_opex_b", "opex_actual": "vb_opex_a",
+    "ammortamenti_budget": "vb_da_b", "ammortamenti_actual": "vb_da_a",
+    "oneri_finanziari_budget": "vb_fin_b", "oneri_finanziari_actual": "vb_fin_a",
+    "imposte_budget": "vb_tax_b", "imposte_actual": "vb_tax_a",
+}
+
+
+def _apply_variance_upload(data, signature):
+    """Seed keyed widgets once per upload, before Streamlit creates them.
+
+    Changing a number_input's value argument cannot override an existing
+    widget state. Do not reseed on every rerun, so manual edits still work.
+    Missing uploaded fields are zero, never unrelated demo-company figures.
+    """
+    if st.session_state.get("var_upload_sig") == signature:
+        return
+    normalized = {key: float(data.get(key, 0.0)) for key in VAR_WIDGET_KEYS}
+    st.session_state["var_data"] = normalized
+    for key, widget in VAR_WIDGET_KEYS.items():
+        st.session_state[widget] = normalized[key]
+    st.session_state["var_upload_sig"] = signature
+    st.session_state.pop("var_pdf", None)
+
+
+def _variance_number_input(label, field, data):
+    """Use a single source for defaults; uploaded widget state wins."""
+    widget = VAR_WIDGET_KEYS[field]
+    if widget not in st.session_state:
+        st.session_state[widget] = float(data.get(field, DEFAULT_COIN[field]))
+    value = st.number_input(label, value=None, step=100_000.0, format="%.0f", key=widget)
+    if value is None:
+        st.error(f"Inserisci un valore numerico per {label}.")
+        st.stop()
+    return value
+
+
+def _invalidate_variance_pdf(company, period, data, bu_data, drivers):
+    """Invalidate every PDF input, including metadata, BU and driver edits."""
+    signature = hashlib.sha256(json.dumps(
+        [company, period, data, bu_data, drivers], sort_keys=True,
+        ensure_ascii=False, allow_nan=False,
+    ).encode("utf-8")).hexdigest()
+    if st.session_state.get("var_pdf_input_sig") != signature:
+        st.session_state.pop("var_pdf", None)
+    st.session_state["var_pdf_input_sig"] = signature
 
 def _v(data, key, default=0.0):
     return data.get(key, default)
@@ -435,10 +486,18 @@ imposte_actual,0
         if uploaded:
             raw = parse_variance_csv(uploaded)
             if raw:
-                st.session_state["var_data"] = raw
+                position = uploaded.tell()
+                uploaded.seek(0)
+                signature = hashlib.sha256(uploaded.read()).hexdigest()
+                uploaded.seek(position)
+                _apply_variance_upload(raw, signature)
                 st.success(f"✅ Caricati {len(raw)} valori dal CSV")
+                missing = set(VAR_WIDGET_KEYS) - set(raw)
+                if missing:
+                    st.warning("Campi mancanti impostati a zero: " + ", ".join(sorted(missing)))
             else:
                 st.error("❌ CSV non riconosciuto — verifica il formato")
+                return
 
     # ── TAB 2: Form Manuale ────────────────────────────────────────────────────
     with tab2:
@@ -452,25 +511,25 @@ imposte_actual,0
             company_name = st.text_input("Nome Azienda", value="COIN SPA", key="var_company")
             period = st.text_input("Periodo", value="Esercizio 2025", key="var_period")
             st.markdown("#### 💰 Ricavi")
-            ricavi_b = st.number_input("Ricavi Budget (EUR)", value=float(d.get("ricavi_budget", 195_000_000)), step=100_000.0, format="%.0f", key="vb_ricavi_b")
-            ricavi_a = st.number_input("Ricavi Actual (EUR)", value=float(d.get("ricavi_actual", 169_900_000)), step=100_000.0, format="%.0f", key="vb_ricavi_a")
+            ricavi_b = _variance_number_input("Ricavi Budget (EUR)", "ricavi_budget", d)
+            ricavi_a = _variance_number_input("Ricavi Actual (EUR)", "ricavi_actual", d)
             st.markdown("#### 🏭 COGS (Costo del Venduto)")
-            cogs_b = st.number_input("COGS Budget (EUR)", value=float(d.get("cogs_budget", 120_000_000)), step=100_000.0, format="%.0f", key="vb_cogs_b")
-            cogs_a = st.number_input("COGS Actual (EUR)", value=float(d.get("cogs_actual", 115_000_000)), step=100_000.0, format="%.0f", key="vb_cogs_a")
+            cogs_b = _variance_number_input("COGS Budget (EUR)", "cogs_budget", d)
+            cogs_a = _variance_number_input("COGS Actual (EUR)", "cogs_actual", d)
             st.markdown("#### 📉 OPEX (Costi Operativi)")
-            opex_b = st.number_input("OPEX Budget (EUR)", value=float(d.get("opex_budget", 42_000_000)), step=100_000.0, format="%.0f", key="vb_opex_b")
-            opex_a = st.number_input("OPEX Actual (EUR)", value=float(d.get("opex_actual", 54_000_000)), step=100_000.0, format="%.0f", key="vb_opex_a")
+            opex_b = _variance_number_input("OPEX Budget (EUR)", "opex_budget", d)
+            opex_a = _variance_number_input("OPEX Actual (EUR)", "opex_actual", d)
 
         with col2:
             st.markdown("#### 🔧 Ammortamenti & Svalutazioni")
-            da_b = st.number_input("Ammortamenti Budget (EUR)", value=float(d.get("ammortamenti_budget", 12_000_000)), step=100_000.0, format="%.0f", key="vb_da_b")
-            da_a = st.number_input("Ammortamenti Actual (EUR)", value=float(d.get("ammortamenti_actual", 18_500_000)), step=100_000.0, format="%.0f", key="vb_da_a")
+            da_b = _variance_number_input("Ammortamenti Budget (EUR)", "ammortamenti_budget", d)
+            da_a = _variance_number_input("Ammortamenti Actual (EUR)", "ammortamenti_actual", d)
             st.markdown("#### 🏦 Oneri Finanziari")
-            fin_b = st.number_input("Oneri Finanziari Budget (EUR)", value=float(d.get("oneri_finanziari_budget", 8_000_000)), step=100_000.0, format="%.0f", key="vb_fin_b")
-            fin_a = st.number_input("Oneri Finanziari Actual (EUR)", value=float(d.get("oneri_finanziari_actual", 12_400_000)), step=100_000.0, format="%.0f", key="vb_fin_a")
+            fin_b = _variance_number_input("Oneri Finanziari Budget (EUR)", "oneri_finanziari_budget", d)
+            fin_a = _variance_number_input("Oneri Finanziari Actual (EUR)", "oneri_finanziari_actual", d)
             st.markdown("#### 🧾 Imposte")
-            tax_b = st.number_input("Imposte Budget (EUR)", value=float(d.get("imposte_budget", 3_000_000)), step=100_000.0, format="%.0f", key="vb_tax_b")
-            tax_a = st.number_input("Imposte Actual (EUR)", value=float(d.get("imposte_actual", 0)), step=100_000.0, format="%.0f", key="vb_tax_a")
+            tax_b = _variance_number_input("Imposte Budget (EUR)", "imposte_budget", d)
+            tax_a = _variance_number_input("Imposte Actual (EUR)", "imposte_actual", d)
 
         # Assembla dati
         data_input = {
@@ -529,7 +588,7 @@ imposte_actual,0
     col_a, col_b = st.columns(2)
     with col_a:
         st.markdown("**📘 Budget**")
-        wf_labels_b = ["Budget Ricavi", "- COGS", "= Gross Margin", "- OPEX", "= EBITDA", "- Amm.ti", "= EBIT", "- Oneri Fin.", "= Ris. Netto"]
+        wf_labels_b = ["Budget Ricavi", "- COGS", "= Gross Margin", "- OPEX", "= EBITDA", "- Amm.ti", "= EBIT", "- Oneri Fin.", "- Imposte", "= Ris. Netto"]
         wf_values_b = [
             res["ricavi_b"],
             -(res["ricavi_b"] - res["gm_b"]),
@@ -539,10 +598,11 @@ imposte_actual,0
             -d_use["ammortamenti_budget"],
             res["ebit_b"],
             -d_use["oneri_finanziari_budget"],
+            -d_use["imposte_budget"],
             res["net_b"],
         ]
         # Misure corrette
-        measures_b = ["absolute", "relative", "total", "relative", "total", "relative", "total", "relative", "total"]
+        measures_b = ["absolute", "relative", "total", "relative", "total", "relative", "total", "relative", "relative", "total"]
         fig_b = go.Figure(go.Waterfall(
             measure=measures_b,
             x=wf_labels_b, y=wf_values_b,
@@ -560,7 +620,7 @@ imposte_actual,0
 
     with col_b:
         st.markdown("**📕 Actual**")
-        wf_labels_a = ["Actual Ricavi", "- COGS", "= Gross Margin", "- OPEX", "= EBITDA", "- Amm.ti", "= EBIT", "- Oneri Fin.", "= Ris. Netto"]
+        wf_labels_a = ["Actual Ricavi", "- COGS", "= Gross Margin", "- OPEX", "= EBITDA", "- Amm.ti", "= EBIT", "- Oneri Fin.", "- Imposte", "= Ris. Netto"]
         wf_values_a = [
             res["ricavi_a"],
             -(res["ricavi_a"] - res["gm_a"]),
@@ -570,9 +630,10 @@ imposte_actual,0
             -d_use["ammortamenti_actual"],
             res["ebit_a"],
             -d_use["oneri_finanziari_actual"],
+            -d_use["imposte_actual"],
             res["net_a"],
         ]
-        measures_a = ["absolute", "relative", "total", "relative", "total", "relative", "total", "relative", "total"]
+        measures_a = ["absolute", "relative", "total", "relative", "total", "relative", "total", "relative", "relative", "total"]
         fig_a = go.Figure(go.Waterfall(
             measure=measures_a,
             x=wf_labels_a, y=wf_values_a,
@@ -596,9 +657,9 @@ imposte_actual,0
     delta_fin  = -(d_use["oneri_finanziari_actual"] - d_use["oneri_finanziari_budget"])
     delta_tax  = -(d_use["imposte_actual"] - d_use["imposte_budget"])
 
-    wf_d_labels = ["Gross Margin Budget", "Delta Ricavi+Mix", "Delta OPEX", "Delta Ammortamenti", "Delta Oneri Fin.", "Delta Imposte", "Risultato Netto Actual"]
+    wf_d_labels = ["Risultato Netto Budget", "Delta Ricavi+Mix", "Delta OPEX", "Delta Ammortamenti", "Delta Oneri Fin.", "Delta Imposte", "Risultato Netto Actual"]
     wf_d_values = [
-        res["gm_b"],
+        res["net_b"],
         res["gm_a"] - res["gm_b"],
         delta_opex,
         delta_da,
@@ -740,6 +801,8 @@ imposte_actual,0
     # ── Export PDF ────────────────────────────────────────────────────────────
     st.markdown("---")
     st.markdown("### 📥 Export Report Invitalia-Ready")
+
+    _invalidate_variance_pdf(company_name, period, d_use, bu_data, driver_inputs)
 
     col_pdf1, col_pdf2 = st.columns([1, 3])
     with col_pdf1:

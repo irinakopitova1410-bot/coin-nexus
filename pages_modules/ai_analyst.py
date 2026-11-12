@@ -9,6 +9,8 @@ import io
 from datetime import datetime
 
 from utils.ui_kit import page_header
+from utils.file_parser import _num
+from pages_modules._file_import import read_financial_upload
 
 
 
@@ -194,30 +196,14 @@ def genera_relazione_gestione(dati: dict) -> dict:
 # ─── Parse CSV ───────────────────────────────────────────────────────────────
 def parse_csv_ai(uploaded_file) -> dict | None:
     try:
-        if uploaded_file.name.lower().endswith((".xlsx", ".xls")):
-            df = pd.read_excel(uploaded_file)
-        else:
-            content = uploaded_file.read().decode("utf-8", errors="replace")
-            uploaded_file.seek(0)
-            lines = [l for l in content.splitlines() if not l.strip().startswith("#") and l.strip()]
-            df = pd.read_csv(io.StringIO("\n".join(lines)), header=0)
-        df.columns = [str(c).strip().lower() for c in df.columns]
-        val_col = "valore" if "valore" in df.columns else df.columns[1]
-        data = {str(r[df.columns[0]]).strip().lower(): r[val_col]
-                for _, r in df.iterrows() if pd.notna(r[val_col])}
+        data = read_financial_upload(uploaded_file)
 
         def g(keys, default=0.0):
-            for k in keys:
-                if k in data:
-                    try:
-                        return float(str(data[k]).replace(".", "").replace(",", ".").strip())
-                    except:
-                        pass
-            return default
+            return _num(data, *keys, default=default)
 
         return {
             "azienda": str(data.get("azienda", data.get("nome_azienda", "Azienda"))),
-            "anno": int(g(["anno"], datetime.now().year)),
+            "anno": int(g(["anno", "anno_bilancio"], datetime.now().year)),
             "fatturato": g(["fatturato", "ricavi_netti", "ricavi_vendite"]),
             "ebitda": g(["ebitda", "margine_operativo_lordo"]),
             "ebit": g(["ebit", "risultato_operativo"]),
@@ -230,7 +216,7 @@ def parse_csv_ai(uploaded_file) -> dict | None:
             "giorni_pagamento_fornitori": g(["giorni_pagamento_fornitori", "dpo", "giorni_fornitori"]),
             "investimenti_capex": g(["investimenti_capex", "capex", "investimenti"]),
             "dipendenti": g(["dipendenti", "numero_dipendenti"]),
-            "zscore": g(["zscore", "z_score", "altman_zscore"], None) or None,
+            "zscore": g(["zscore", "z_score", "altman_zscore"], None),
         }
     except Exception as e:
         st.error(f"Errore parsing: {e}")
