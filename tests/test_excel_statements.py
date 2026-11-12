@@ -91,3 +91,22 @@ def test_ai_preview_is_not_followed_by_false_unrecognized_error(monkeypatch):
     assert not app.error
     assert len(app.dataframe) == 1
     assert app.info
+
+
+def test_negative_interest_is_an_expense_and_raw_value_is_preserved():
+    sheets = statements()
+    sheets["Conto Economico"].append(["Interessi e oneri finanziari", -15, -12])
+    data = read_financial_data(workbook(sheets))
+    assert data["interessi_passivi"] == 12
+    assert data["interessi_passivi_precedente"] == 15
+    assert data["_source_rows"]["interessi_passivi"]["raw_value"] == -12
+    assert any("segno negativo" in note for note in data["_import_warnings"])
+
+
+def test_reported_ebitda_does_not_override_depreciation_based_value():
+    sheets = statements()
+    sheets["Conto Economico"].append(["EBITDA (EBIT + Ammortamenti)", -25, -15])
+    data = read_financial_data(workbook(sheets))
+    assert data["ebitda"] == -20
+    assert data["_reported_ebitda"] == -15
+    assert any("EBITDA riportato" in note for note in data["_import_warnings"])

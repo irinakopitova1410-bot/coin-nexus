@@ -84,23 +84,41 @@ def read_statement_sheets(sheets, normalize, parse_number, is_blank, filename):
     periods = sorted(periods, reverse=True)
     combined = [["prospetto", "livello", "voce"] + [d.strftime("%d/%m/%Y") for d in periods]]
     origins = {}
+    signed_expenses = False
+    reported_ebitda = None
     for kind, (sheet, rows) in selected.items():
         start, columns = headers[kind]
         for row_index, row in enumerate(rows[start + 1:], start + 2):
             caption = _caption(row[0], normalize)
+            if kind == "conto_economico" and caption in ("ebitda", "ebitda_ebit_ammortamenti"):
+                raw = row[columns[periods[0]]]
+                if not is_blank(raw):
+                    reported_ebitda = parse_number(raw)
             field = CAPTIONS.get(caption)
             if field is None or (kind == "stato_patrimoniale") != (field in SP_FIELDS):
                 continue
             values = [row[columns[date]] for date in periods]
             if all(is_blank(value) for value in values):
                 continue
+            source_value = values[0]
+            # Some statements use negative signs for expenses. Downstream ratios
+            # require the positive amount of interest expense, not a revenue.
+            if field == "interessi_passivi":
+                signed_expenses = signed_expenses or any(not is_blank(v) and parse_number(v) < 0 for v in values)
+                values = [abs(parse_number(v)) if not is_blank(v) else v for v in values]
             combined.append([kind, "totale", caption] + values)
             origins[len(combined)] = {"sheet": sheet, "row": row_index,
-                                      "caption": str(row[0]), "column": columns[periods[0]] + 1}
+                                      "caption": str(row[0]), "column": columns[periods[0]] + 1,
+                                      "raw_value": source_value}
     result = parse_civil_balance(combined, normalize, parse_number, is_blank, filename)
     for origin in result.get("_source_rows", {}).values():
         if origin["row"] in origins:
             origin.update(origins[origin["row"]])
     result["_source_sheets"] = [name for name, _ in selected.values()]
     result["_import_warnings"].append("Letti i fogli SP/CE; fogli di KPI e indicatori derivati non importati. Verifica gli importi sui prospetti originali.")
+    if signed_expenses:
+        result["_import_warnings"].append("Oneri finanziari esposti con segno negativo nel prospetto: importati come importo positivo del costo. Il valore originale resta nella provenienza del dato.")
+    if reported_ebitda is not None and "ebitda" in result and abs(reported_ebitda - result["ebitda"]) > 1:
+        result["_reported_ebitda"] = reported_ebitda
+        result["_import_warnings"].append("L’EBITDA riportato nel foglio differisce da EBIT + ammortamenti materiali e immateriali. NEXUS mantiene questo calcolo separato: verificare eventuali svalutazioni o rettifiche incluse nel valore esposto.")
     return result

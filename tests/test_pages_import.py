@@ -95,7 +95,7 @@ def test_readiness_never_maps_total_liabilities_to_current(monkeypatch):
     assert "rimborso_debito (DSCR)" not in parsed["missing_inputs"]
 
 
-def test_incomplete_civil_readiness_only_shows_preview(monkeypatch):
+def test_incomplete_civil_readiness_produces_descriptive_results_without_scoring(monkeypatch):
     from streamlit.testing.v1 import AppTest
     import streamlit as st
     import pages_modules.credit_readiness as page
@@ -113,7 +113,8 @@ def test_incomplete_civil_readiness_only_shows_preview(monkeypatch):
         "render_credit_readiness()"
     ).run(timeout=30)
     assert not app.exception
-    assert any("Nessun punteggio è stato calcolato o salvato" in item.value for item in app.warning)
+    assert any("Nessun punteggio è stato calcolato o salvato" in item.value for item in app.caption)
+    assert any(item.label == "Ricavi" and item.value == "1.000 €" for item in app.metric)
     assert len(app.dataframe) >= 1
 
 

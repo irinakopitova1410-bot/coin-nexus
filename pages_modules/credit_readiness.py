@@ -10,9 +10,10 @@ import io
 import hashlib
 import json
 from engine.credit_readiness import analyze_credit_readiness, CreditReadinessResult
+from engine.balance_diagnostics import analyze_available_balance, diagnostic_text, format_amount
 from utils.ui_kit import page_header
 from utils.file_parser import _num
-from pages_modules._file_import import read_financial_upload, show_import_preview
+from pages_modules._file_import import read_financial_upload
 
 
 # ─── Helpers UI ──────────────────────────────────────────────────────────────
@@ -147,12 +148,8 @@ FIELD_MAP = {
     "current_liabilities": "passivo_corrente",
     # debiti finanziari
     "debiti_finanziari": "debiti_finanziari",
-    "total_debt": "debiti_finanziari",
-    "debiti_totali": "debiti_finanziari",
     "financial_debt": "debiti_finanziari",
     "debiti_finanziari_totali": "debiti_finanziari",
-    "debiti_banche": "debiti_finanziari",
-    "debiti_verso_banche": "debiti_finanziari",
     # patrimonio netto
     "patrimonio_netto": "patrimonio_netto",
     "equity": "patrimonio_netto",
@@ -211,6 +208,24 @@ MANUAL_KEYS = {
     "oneri_finanziari": "cr_of", "cash_operativo": "cr_cfo", "cash_corrente": "cr_liq",
 }
 
+FIELD_LABELS = {
+    "fatturato": "Ricavi", "ebitda": "EBITDA", "ebit": "Risultato operativo (EBIT)",
+    "utile_netto": "Utile / perdita netta", "fatturato_prev": "Ricavi del periodo precedente",
+    "attivo_corrente": "Attivo corrente", "passivo_corrente": "Totale delle passività correnti",
+    "debiti_finanziari": "Debiti finanziari complessivi", "patrimonio_netto": "Patrimonio netto",
+    "totale_attivo": "Totale attivo", "costo_personale": "Costo del personale",
+    "costo_materie": "Acquisti / materie prime", "costi_operativi": "Altri costi operativi generali",
+    "oneri_finanziari": "Oneri finanziari", "cash_operativo": "Flusso di cassa operativo",
+    "cash_corrente": "Disponibilità liquide",
+}
+NONNEGATIVE_FIELDS = set(DEFAULTS) - {"ebitda", "ebit", "utile_netto", "patrimonio_netto", "cash_operativo"}
+COMPLETION_HELP = {
+    "passivo_corrente": "Totale delle obbligazioni correnti coerente con l’attivo corrente. Non il totale passivo comprensivo del patrimonio netto.",
+    "debiti_finanziari": "Conferma il totale dei finanziamenti, incluse le componenti non bancarie. I soli debiti verso banche non dimostrano il totale.",
+    "costi_operativi": "Costi generali, servizi e godimento beni di terzi secondo una classificazione verificata. Non ripetere acquisti, personale, ammortamenti o interessi.",
+    "cash_operativo": "Flusso effettivo da attività operativa nel rendiconto finanziario del periodo. Non EBITDA o saldo del conto corrente.",
+}
+
 
 def _apply_readiness_upload(parsed, content):
     """Prefill before widgets are instantiated; never fill missing fields with demos."""
@@ -220,8 +235,24 @@ def _apply_readiness_upload(parsed, content):
     provided = set(parsed["provided_fields"])
     for field, key in MANUAL_KEYS.items():
         st.session_state[key] = parsed["data"][field] if field in provided else None
+        st.session_state[f"cr_extra_{field}"] = None
     st.session_state["cr_company_name"] = parsed["company_name"]
     st.session_state["cr_import_signature"] = signature
+    st.session_state["cr_confirm_balance"] = False
+    for key in ("cr_full_result", "cr_full_signature", "cr_manual_signature"):
+        st.session_state.pop(key, None)
+
+
+def _clear_readiness_upload():
+    """A removed or invalid replacement file must not leave old financial results."""
+    if not st.session_state.get("cr_import_signature"):
+        return
+    for field, key in MANUAL_KEYS.items():
+        st.session_state[key] = None
+        st.session_state.pop(f"cr_extra_{field}", None)
+    st.session_state["cr_company_name"] = ""
+    for key in ("cr_import_signature", "cr_full_result", "cr_full_signature", "cr_manual_signature"):
+        st.session_state.pop(key, None)
 
 
 def _to_float(val) -> float:
@@ -244,9 +275,16 @@ def _parse_uploaded_file(uploaded_file) -> dict | None:
                     company_name = str(value).strip()
                 continue
             mapped = FIELD_MAP.get(key)
+            # A sum of some debt captions is not proof of the entire financing scope.
+            if data.get("_source_format") == "civil_balance" and mapped == "debiti_finanziari":
+                continue
             if mapped:
                 number = _num({"value": value}, "value", default=None)
                 if number is not None:
+                    if mapped in NONNEGATIVE_FIELDS and number < 0:
+                        raise ValueError(f"{FIELD_LABELS[mapped]}: verifica il segno del valore; è richiesto un importo non negativo.")
+                    if mapped in provided_fields and parsed[mapped] != number:
+                        raise ValueError(f"Valori discordanti per {FIELD_LABELS[mapped]}: verifica le voci duplicate.")
                     parsed[mapped] = number
                     provided_fields.add(mapped)
                     found_numeric = True
@@ -262,6 +300,131 @@ def _parse_uploaded_file(uploaded_file) -> dict | None:
     except Exception as e:
         st.error(f"Errore lettura file: {e}")
         return None
+
+
+def _known_readiness_inputs(parsed):
+    values = {field: parsed["data"][field] for field in parsed["provided_fields"]}
+    for field in parsed["missing_inputs"]:
+        value = st.session_state.get(f"cr_extra_{field}")
+        if value is not None:
+            values[field] = value
+    return values
+
+
+def _input_signature(data, company):
+    return hashlib.sha256(json.dumps({"data": data, "company": company}, sort_keys=True).encode()).hexdigest()
+
+
+def _calculate_readiness(data):
+    missing = [field for field in DEFAULTS if data.get(field) is None]
+    if missing:
+        raise ValueError("Dati mancanti: " + ", ".join(FIELD_LABELS[field] for field in missing))
+    kwargs = dict(data)
+    kwargs["costo_materie_prime"] = kwargs.pop("costo_materie")
+    return analyze_credit_readiness(**kwargs)
+
+
+def _render_available_analysis(data, source, company, key_prefix):
+    report = analyze_available_balance(data, source)
+    missing = [field for field in DEFAULTS if field not in data]
+    st.subheader("Analisi del bilancio")
+    st.write(company)
+    if report["period"]:
+        st.caption("Periodo: " + report["period"] + " · Confronto: " + str(report["comparison_period"] or "non disponibile"))
+    st.caption("Analisi descrittiva sui dati disponibili: non è un rating bancario. I dati mancanti restano N/D.")
+    columns = st.columns(4)
+    for column, field in zip(columns, ("fatturato", "ebit", "patrimonio_netto", "cash_corrente")):
+        column.metric(FIELD_LABELS[field], format_amount(data.get(field), "€", digits=0))
+    if report["signals"]:
+        st.warning("**Criticità osservabili nel bilancio**\n\n" + "\n\n".join("• " + line for line in report["signals"]))
+    else:
+        st.info("Nessuna delle criticità controllate nei soli dati disponibili. Non equivale a una conferma di solvibilità.")
+    rows = [{"Indicatore": row["label"], "Valore": format_amount(row["value"], row["unit"]),
+             "Calcolo / dato necessario": row["reason"]} for row in report["ratios"]]
+    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    if report["reconciliation"]:
+        values = report["reconciliation"]
+        st.warning("EBITDA da riconciliare: calcolato da EBIT + ammortamenti "
+                   + format_amount(values["derived"]) + "; riportato nel file "
+                   + format_amount(values["reported"]) + "; differenza "
+                   + format_amount(values["difference"]) + ". I due valori non sono sostituiti l’uno all’altro.")
+    elif report["ebitda_derived"]:
+        st.caption("EBITDA derivato da EBIT + ammortamenti materiali e immateriali, senza riaggiungere automaticamente le svalutazioni.")
+    if report["actions"]:
+        with st.expander("Azioni suggerite dai dati disponibili", expanded=False):
+            for action in report["actions"]:
+                st.write("• " + action)
+    st.download_button("Scarica sintesi dell’analisi", diagnostic_text(report, company, [FIELD_LABELS[f] for f in missing]),
+                       file_name="nexus_analisi_bilancio.txt", mime="text/plain", key=f"{key_prefix}_summary_download")
+    return report
+
+
+def _render_upload_analysis(parsed):
+    """One path: observed results first, missing inputs second, credit model last."""
+    data = _known_readiness_inputs(parsed)
+    company = parsed["company_name"]
+    source = parsed["extracted_data"]
+    _render_available_analysis(data, source, company, "cr_upload")
+    st.divider()
+    st.subheader("Completa la valutazione del credito")
+    missing = [field for field in DEFAULTS if field not in data]
+    if missing:
+        st.info(f"L’analisi sopra è già disponibile. Per il modello completo mancano {len(missing)} dati: "
+                + ", ".join(FIELD_LABELS[field] for field in missing) + ".")
+        st.caption("Credit Score e credito ottenibile: N/D. Nessun punteggio è stato calcolato o salvato.")
+    if parsed["missing_inputs"]:
+        with st.form("cr_completion_form"):
+            st.caption("Integra solo i dati verificati, riferiti allo stesso periodo. Lascia vuoto ciò che non conosci; 0 significa zero effettivo.")
+            columns = st.columns(2)
+            for index, field in enumerate(parsed["missing_inputs"]):
+                with columns[index % 2]:
+                    st.number_input(FIELD_LABELS[field] + " (€)", value=None, step=1000.0, format="%.2f",
+                                    min_value=0.0 if field in NONNEGATIVE_FIELDS else None,
+                                    key=f"cr_extra_{field}", help=COMPLETION_HELP.get(field))
+            submitted = st.form_submit_button("Aggiorna analisi con i dati integrati", type="primary")
+        if submitted:
+            for field, value in data.items():
+                st.session_state[MANUAL_KEYS[field]] = value
+            if missing:
+                st.info("Dati disponibili aggiornati. Gli altri indicatori restano N/D finché non inserisci gli importi necessari.")
+            else:
+                st.success("Dati integrati. Verifica la classificazione prima di calcolare il modello completo.")
+    confirmed = False
+    if not missing:
+        confirmed = st.checkbox("Ho verificato importi, classificazione delle voci e coerenza del periodo.", key="cr_confirm_balance")
+    run_full = st.button("Calcola Credit Readiness completa", disabled=bool(missing) or not confirmed,
+                         key="cr_full_btn", type="primary")
+    signature = _input_signature(data, company)
+    if run_full:
+        try:
+            st.session_state["cr_full_result"] = _calculate_readiness(data)
+            st.session_state["cr_full_signature"] = signature
+        except ValueError as exc:
+            st.session_state.pop("cr_full_result", None)
+            st.error(str(exc))
+    if (confirmed and not missing and st.session_state.get("cr_full_signature") == signature
+            and st.session_state.get("cr_full_result") is not None):
+        result = st.session_state["cr_full_result"]
+        _render_results(result, company_name=company)
+        if st.button("Salva valutazione completa nello storico", key="cr_save_full"):
+            user = st.session_state.get("user") or {}
+            if not user.get("access_token"):
+                st.warning("Sessione non disponibile per il salvataggio. Accedi nuovamente; puoi comunque scaricare la sintesi.")
+            else:
+                if _save_readiness_history(result, company, data):
+                    st.success("Valutazione salvata nello Storico Analisi.")
+                else:
+                    st.warning("Salvataggio non riuscito. I risultati restano visibili: puoi scaricare la sintesi e riprovare.")
+    with st.expander("Dati importati e provenienza", expanded=False):
+        st.caption("I valori seguenti provengono dal file originale, prima delle integrazioni manuali.")
+        rows = [{"Voce": key.replace("_", " "), "Valore": format_amount(value)}
+                for key, value in source.items() if not key.startswith("_") and isinstance(value, (int, float)) and key != "anno_bilancio"]
+        if rows:
+            st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        origins = source.get("_source_rows", {})
+        if origins:
+            st.dataframe(pd.DataFrame([{"Voce": key.replace("_", " "), **origin} for key, origin in origins.items()]),
+                         hide_index=True, use_container_width=True)
 
 
 def _get_cr_template_csv() -> bytes:
@@ -290,19 +453,18 @@ def _get_cr_template_csv() -> bytes:
 
 
 def _save_readiness_history(result, company_name: str, d: dict):
-    """Salva automaticamente l'analisi Credit Readiness nello Storico (credit_reports).
-    Silenzioso: non blocca mai l'utente. Una sola salvataggio per file/dati."""
+    """Save only when explicitly requested; return a verified success flag."""
     try:
         user = st.session_state.get("user") or {}
         token = user.get("access_token")
         if not token:
-            return
+            return False
         from services.db import save_credit_report
         sig = hashlib.sha256(json.dumps({
             "company": company_name, "inputs": d, "user_id": user.get("id"),
         }, sort_keys=True).encode()).hexdigest()
         if st.session_state.get("cr_saved_sig") == sig:
-            return
+            return True
         ebitda_margin = (d["ebitda"] / d["fatturato"] * 100) if d.get("fatturato") else None
         current_ratio = (round(d["attivo_corrente"] / d["passivo_corrente"], 3)
                          if d.get("passivo_corrente") else None)
@@ -330,8 +492,9 @@ def _save_readiness_history(result, company_name: str, d: dict):
         ok = save_credit_report(rich, access_token=token)
         if ok:
             st.session_state["cr_saved_sig"] = sig
+        return bool(ok)
     except Exception:
-        pass
+        return False
 
 
 # ─── Render risultati (condiviso tra upload e form) ───────────────────────────
@@ -582,10 +745,11 @@ def render_credit_readiness():
     with tab_upload:
         st.markdown("""
         <div class="upload-zone">
-            <h3>⚡ Carica il bilancio — analisi immediata</h3>
-            <p>CSV o Excel con i dati aziendali → Credit Score + Azioni + Crisis Detector in un click</p>
+            <h3>Carica il bilancio e leggi subito i risultati disponibili</h3>
+            <p>CSV o Excel → indicatori e criticità → integrazione dei dati mancanti → valutazione del credito</p>
         </div>
         """, unsafe_allow_html=True)
+        st.caption("Percorso bilancio 2 · Lettura e diagnosi senza valori inventati")
 
         col_up, col_tmpl = st.columns([3, 1])
         with col_tmpl:
@@ -608,46 +772,12 @@ def render_credit_readiness():
             parsed = _parse_uploaded_file(uploaded)
             if parsed:
                 _apply_readiness_upload(parsed, uploaded.getvalue())
-            if parsed and parsed.get("missing_inputs"):
-                show_import_preview(parsed["extracted_data"], include_notes=False)
-                st.warning("Valutazione del credito non ancora disponibile: servono dati aggiuntivi. "
-                           "Nessun punteggio è stato calcolato o salvato.")
-                missing_labels = {
-                    "passivo_corrente": "Totale delle passività correnti",
-                    "cash_operativo": "Flusso di cassa operativo",
-                }
-                st.markdown("**Dati da integrare nella scheda «Inserisci Manualmente»:**")
-                for field in parsed["missing_inputs"]:
-                    st.write("• " + missing_labels.get(field, field.replace("_", " ")))
-            elif parsed:
-                d = parsed["data"]
-                company_name = parsed["company_name"]
-
-                with st.spinner("⚡ Calcolo Credit Readiness in corso…"):
-                    result: CreditReadinessResult = analyze_credit_readiness(
-                        fatturato=d["fatturato"],
-                        ebitda=d["ebitda"],
-                        ebit=d["ebit"],
-                        utile_netto=d["utile_netto"],
-                        attivo_corrente=d["attivo_corrente"],
-                        passivo_corrente=d["passivo_corrente"],
-                        debiti_finanziari=d["debiti_finanziari"],
-                        patrimonio_netto=d["patrimonio_netto"],
-                        totale_attivo=d["totale_attivo"],
-                        costo_personale=d["costo_personale"],
-                        costo_materie_prime=d["costo_materie"],
-                        costi_operativi=d["costi_operativi"],
-                        oneri_finanziari=d["oneri_finanziari"],
-                        cash_operativo=d["cash_operativo"],
-                        cash_corrente=d["cash_corrente"],
-                        fatturato_prev=d["fatturato_prev"],
-                    )
-
-                st.markdown("---")
-                _render_results(result, company_name=company_name)
-                _save_readiness_history(result, company_name, d)
+                _render_upload_analysis(parsed)
+            else:
+                _clear_readiness_upload()
         else:
-            st.info("👆 Carica un file CSV o Excel per vedere l'analisi Credit Readiness completa — istantanea, zero click.")
+            _clear_readiness_upload()
+            st.info("Carica il bilancio: visualizzi subito gli indicatori calcolabili. Se mancano dati per il credito, potrai integrarli qui senza ricopiare il bilancio.")
 
             # Mostra campi supportati
             with st.expander("📋 Campi supportati nel file"):
@@ -673,7 +803,7 @@ def render_credit_readiness():
                 """)
 
     # ════════════════════════════════════════════════════════════════════════
-    # TAB 2 — FORM MANUALE (invariato, come prima)
+    # TAB 2 — FORM MANUALE (valori importati preservati)
     # ════════════════════════════════════════════════════════════════════════
     with tab_form:
         company_name_manual = st.text_input("Ragione sociale", key="cr_company_name")
@@ -708,37 +838,26 @@ def render_credit_readiness():
                 cash_corrente = st.number_input("Disponibilità Liquide (€)", min_value=0.0, value=None, step=5_000.0, format="%.0f", key="cr_liq")
 
         analizza = st.button("⚡ ANALIZZA CREDIT READINESS", type="primary", use_container_width=True, key="cr_analizza_btn")
-
-        if not analizza:
-            st.info("👆 Inserisci i dati di bilancio e clicca **Analizza** per ottenere il tuo Credit Score e le azioni prioritarie.")
-        elif any(value is None for value in (
-            fatturato, ebitda, ebit, utile_netto, fatturato_prev, attivo_corrente,
-            passivo_corrente, debiti_finanziari, patrimonio_netto, totale_attivo,
-            costo_personale, costo_materie, costi_operativi, oneri_finanziari,
-            cash_operativo, cash_corrente,
-        )):
-            st.warning("Completa tutti i campi finanziari prima di analizzare. "
-                       "I campi vuoti non saranno sostituiti con valori di esempio o zeri.")
-        else:
-            with st.spinner("Calcolo in corso…"):
-                result: CreditReadinessResult = analyze_credit_readiness(
-                    fatturato=fatturato,
-                    ebitda=ebitda,
-                    ebit=ebit,
-                    utile_netto=utile_netto,
-                    attivo_corrente=attivo_corrente,
-                    passivo_corrente=passivo_corrente,
-                    debiti_finanziari=debiti_finanziari,
-                    patrimonio_netto=patrimonio_netto,
-                    totale_attivo=totale_attivo,
-                    costo_personale=costo_personale,
-                    costo_materie_prime=costo_materie,
-                    costi_operativi=costi_operativi,
-                    oneri_finanziari=oneri_finanziari,
-                    cash_operativo=cash_operativo,
-                    cash_corrente=cash_corrente,
-                    fatturato_prev=fatturato_prev,
-                )
-
-            st.markdown("---")
-            _render_results(result, company_name=company_name_manual or "Azienda", key_prefix="cr_manual_result")
+        manual = {field: st.session_state.get(key) for field, key in MANUAL_KEYS.items()}
+        known = {field: value for field, value in manual.items() if value is not None}
+        company = company_name_manual or "Azienda"
+        signature = _input_signature(known, company)
+        if analizza:
+            if not known:
+                st.warning("Inserisci almeno un dato finanziario verificato. I campi vuoti non saranno sostituiti con valori di esempio o zeri.")
+                st.session_state.pop("cr_manual_signature", None)
+            else:
+                st.session_state["cr_manual_signature"] = signature
+        if known and st.session_state.get("cr_manual_signature") == signature:
+            _render_available_analysis(known, {}, company, "cr_manual")
+            if len(known) == len(DEFAULTS):
+                try:
+                    result = _calculate_readiness(known)
+                    _render_results(result, company_name=company, key_prefix="cr_manual_result")
+                except ValueError as exc:
+                    st.error(str(exc))
+            else:
+                st.info("Analisi dei dati disponibili completata. Per il Credit Score integra: "
+                        + ", ".join(FIELD_LABELS[field] for field in DEFAULTS if field not in known) + ".")
+        elif not analizza:
+            st.caption("Inserisci o aggiorna i dati e premi Analizza. Il modello completo richiede tutte le voci; l’analisi descrittiva funziona anche con dati parziali.")

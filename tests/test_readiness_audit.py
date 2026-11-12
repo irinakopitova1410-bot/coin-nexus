@@ -45,7 +45,7 @@ def test_manual_readiness_does_not_use_demo_numbers(monkeypatch):
     assert all(widget.value is None for widget in app.number_input)
     app.button(key="cr_analizza_btn").click().run()
     assert not app.exception
-    assert any("Completa tutti i campi" in item.value for item in app.warning)
+    assert any("Inserisci almeno un dato" in item.value for item in app.warning)
 
 
 def test_civil_upload_prefills_manual_form_without_scoring(monkeypatch):
