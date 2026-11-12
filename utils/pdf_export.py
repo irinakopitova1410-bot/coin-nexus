@@ -109,6 +109,10 @@ def clean_text(text: str) -> str:
 
 class NexusPDF(FPDF):
 
+    def normalize_text(self, text):
+        """Normalize every dynamic value and footer for Helvetica core fonts."""
+        return super().normalize_text(clean_text(text))
+
     def __init__(self, company_name: str = "", report_type: str = ""):
         super().__init__()
         self.company_name = clean_text(company_name)
@@ -203,7 +207,7 @@ class NexusPDF(FPDF):
         self.set_fill_color(c[0], c[1], c[2])
         self.set_text_color(*WHITE)
         self.set_font("Helvetica", "B", 9)
-        self.multi_cell(0, 6, f"  {text}", fill=True)
+        self.multi_cell(0, 6, f"  {text}", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.ln(1)
 
 
@@ -289,11 +293,11 @@ def generate_full_report(
 
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*GRAY)
-        pdf.multi_cell(0, 5, f"Modello: {altman_result.model} | Rating: {altman_result.rating}")
+        pdf.multi_cell(0, 5, f"Modello: {altman_result.model} | Rating: {altman_result.rating}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.set_text_color(*DARK_TEXT)
         pdf.ln(2)
         pdf.set_font("Helvetica", "I", 9)
-        pdf.multi_cell(0, 5, f"Raccomandazione: {altman_result.recommendation}")
+        pdf.multi_cell(0, 5, f"Raccomandazione: {altman_result.recommendation}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(3)
 
     # ── RATIO ANALYSIS ─────────────────────────────────────────────────────
@@ -361,7 +365,7 @@ def generate_full_report(
         "• I dati sono quelli inseriti dall'utente — verificare sempre la fonte dei bilanci",
     ]
     for note in notes:
-        pdf.multi_cell(0, 6, note)
+        pdf.multi_cell(0, 6, note, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(5)
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_text_color(*PRIMARY)

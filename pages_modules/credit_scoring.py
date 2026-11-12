@@ -217,6 +217,8 @@ def show_credit_scoring():
         current_liabilities = st.number_input("Passivo Corrente (€)", min_value=0.0, value=pos("current_liabilities"), step=10000.0, format="%.0f")
 
     st.markdown("---")
+    input_signature = (company_name, ebit, depreciation, interest_expense, debt_repayment,
+                       total_debt, ebitda, net_revenue, current_assets, current_liabilities, total_equity)
     if st.button("💳 CALCOLA CREDIT SCORE", type="primary", use_container_width=True):
         eq_safe = total_equity if abs(total_equity) >= 1 else 1
         rev_safe = net_revenue if abs(net_revenue) >= 1 else 1
@@ -226,7 +228,11 @@ def show_credit_scoring():
             ebit, depreciation, interest_expense, debt_repayment,
             total_debt, ebitda, rev_safe, current_assets, cl_safe, eq_safe
         )
+        st.session_state["credit_manual_result"] = (input_signature, result)
 
+    stored = st.session_state.get("credit_manual_result")
+    if stored and stored[0] == input_signature:
+        result = stored[1]
         st.markdown("#### 📊 Risultato Analisi Manuale")
         _show_credit_result(result, company_name, access_token, key_suffix="manual")
 
@@ -241,6 +247,6 @@ def show_credit_scoring():
                 "leverage": result.leverage,
                 "current_ratio": result.current_ratio,
                 "estimated_credit_amount": result.max_credit,
-            })
+            }, access_token=access_token)
             if saved:
                 st.success("✅ Credit report salvato!")

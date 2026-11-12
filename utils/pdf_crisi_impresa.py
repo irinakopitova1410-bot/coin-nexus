@@ -1,255 +1,153 @@
-"""
-NEXUS Finance Pro — Report "Crisi d'Impresa" (D.Lgs. 14/2019 CCII)
-Documento legalmente rilevante: calcola gli indici di allerta CNDCEC,
-DSCR, patrimonio netto e PFN/EBITDA secondo le soglie di legge.
+"""Informational financial indicators, not a legal diagnosis or certification.
 
-Riferimenti normativi:
-  - D.Lgs. 14/2019 - Codice della Crisi d'Impresa e dell'Insolvenza (CCII)
-  - D.Lgs. 83/2022 - Aggiornamento CCII (recepimento Direttiva UE 2019/1023)
-  - D.L. 118/2021 - Composizione Negoziata della Crisi
-  - CNDCEC - Indici di allerta (luglio 2019)
-  - OIC 6 - Ristrutturazione del debito
+Thresholds are internal screening conventions, not universal statutory limits.
+Missing inputs are not estimates and do not imply a healthy financial position.
 """
-from fpdf import FPDF, XPos, YPos
 import datetime
-import io
-from typing import Dict, Optional
-from utils.pdf_export import clean_text, NexusPDF, PRIMARY, ACCENT, DANGER, WARNING, SUCCESS, GRAY, WHITE, DARK_TEXT, LIGHT_BG
+import math
+
+from fpdf import XPos, YPos
+from utils.pdf_export import (
+    clean_text, NexusPDF, PRIMARY, DANGER, WARNING, SUCCESS, GRAY, DARK_TEXT,
+)
 
 
-# ─── Soglie legali CNDCEC per settore ────────────────────────────────────────
-# (Oneri Finanziari / Ricavi) massima tolleranza per settore
+# Internal screening assumptions, not statutory sector thresholds.
 SOGLIE_OF_RICAVI = {
-    "agricoltura":      0.06,
-    "commercio":        0.04,
-    "costruzioni":      0.07,
-    "manifatturiero":   0.05,
-    "servizi":          0.06,
-    "holding":          0.04,
-    "altro":            0.06,
+    "agricoltura": 0.06, "commercio": 0.04, "costruzioni": 0.07,
+    "manifatturiero": 0.05, "servizi": 0.06, "holding": 0.04, "altro": 0.06,
 }
 
 
 def calcola_indici_ccii(data: dict, settore: str = "altro") -> dict:
+    """Calculate screening ratios using supplied, finite inputs only.
+
+    DSCR requires operating_cashflow and debt_service for the same period;
+    EBITDA is not cash flow and debt principal cannot be inferred from balances.
+    ``None``/``unavailable`` denotes an undefined or missing ratio.
     """
-    Calcola tutti gli indici di allerta richiesti dal CCII / CNDCEC.
+    def number(*keys):
+        for key in keys:
+            if data.get(key) is not None:
+                try:
+                    value = float(data[key])
+                except (TypeError, ValueError, OverflowError):
+                    return None
+                return value if math.isfinite(value) else None
+        return None
 
-    Input `data` (valori in euro):
-        total_assets, equity, current_assets, current_liabilities,
-        revenue, ebitda, ebit, net_income, interest_expense,
-        total_debt, depreciation, working_capital,
-        operating_cashflow (opzionale), debt_service (opzionale)
+    def ratio(numerator, denominator):
+        if numerator is None or denominator is None or denominator <= 0:
+            return None
+        value = numerator / denominator
+        return value if math.isfinite(value) else None
 
-    Returns: dict con ogni indice, valore, soglia, stato (ok/warning/danger)
-    """
-    g = lambda k, d=0.0: float(data.get(k) or d)
-
-    total_assets       = g("total_assets",       g("totale_attivo"))
-    equity             = g("equity",             g("patrimonio_netto"))
-    current_assets     = g("current_assets",     g("attivo_corrente"))
-    current_liabilities= g("current_liabilities",g("passivo_corrente"))
-    revenue            = g("revenue",            g("ricavi_netti", g("fatturato")))
-    ebitda             = g("ebitda")
-    ebit               = g("ebit")
-    net_income         = g("net_income",         g("utile_netto"))
-    interest_expense   = g("interest_expense",   g("oneri_finanziari"))
-    total_debt         = g("total_debt",         g("debiti_finanziari", g("totale_debiti")))
-    depreciation       = g("depreciation",       g("ammortamenti"))
-    working_capital    = g("working_capital",    current_assets - current_liabilities)
-    operating_cf       = g("operating_cashflow", ebitda * 0.8)  # stima se non disponibile
-    debt_service       = g("debt_service",       interest_expense + total_debt * 0.10)  # stima
-
-    # Calcola EBITDA se mancante
-    if ebitda == 0.0 and ebit != 0.0:
-        ebitda = ebit + depreciation
-
+    assets = number("total_assets", "totale_attivo")
+    equity = number("equity", "patrimonio_netto")
+    current_assets = number("current_assets", "attivo_corrente")
+    current_liabilities = number("current_liabilities", "passivo_corrente")
+    revenue = number("revenue", "ricavi_netti", "fatturato")
+    interest = number("interest_expense", "oneri_finanziari")
+    debt = number("total_debt", "debiti_finanziari", "totale_debiti")
+    ebitda = number("ebitda")
+    # Preserve an explicitly reported zero; derive only genuinely absent EBITDA.
+    if data.get("ebitda") is None:
+        ebit = number("ebit")
+        depreciation = number("depreciation", "ammortamenti")
+        if ebit is not None and depreciation is not None:
+            ebitda = ebit + depreciation
+    operating_cf = number("operating_cashflow")
+    debt_service = number("debt_service")
     results = {}
 
-    # ── 1. DSCR (Debt Service Coverage Ratio) ─────────────────────────────
-    # Soglia legale: DSCR >= 1.0
-    if debt_service > 0:
-        dscr = operating_cf / debt_service
-    else:
-        dscr = 999.0  # nessun debito = nessun rischio
-    results["dscr"] = {
-        "nome": "DSCR (Debt Service Coverage Ratio)",
-        "formula": "Cash Flow Operativo / Servizio del Debito",
-        "valore": round(dscr, 3),
-        "soglia": ">= 1.0",
-        "stato": "ok" if dscr >= 1.0 else ("warning" if dscr >= 0.8 else "danger"),
-        "note": (
-            "DSCR adeguato: l'azienda genera cassa sufficiente a servire il debito."
-            if dscr >= 1.0 else
-            f"ALERT: DSCR {dscr:.2f} < 1.0 — potenziale incapacita' a rimborsare il debito (art. 13 CCII)"
-        ),
-        "riferimento": "Art. 13 D.Lgs. 14/2019; D.L. 118/2021"
-    }
+    def add(key, name, formula, value, threshold, status, note, percent=False):
+        item = {
+            "nome": name, "formula": formula,
+            "valore": round(value, 4) if value is not None else None,
+            "soglia": threshold, "stato": status if value is not None else "unavailable",
+            "note": note if value is not None else (
+                "N/D: dati mancanti, non finiti o denominatore non positivo. "
+                "Nessuna stima sostitutiva; verificare i dati e il periodo di riferimento."
+            ),
+            "riferimento": "Criterio interno di analisi finanziaria; non soglia di legge",
+        }
+        if percent:
+            item["valore_pct"] = f"{value * 100:.2f}%" if value is not None else "N/D"
+        results[key] = item
 
-    # ── 2. Oneri Finanziari / Ricavi ──────────────────────────────────────
-    # Soglia settoriale CNDCEC (luglio 2019)
-    soglia_of = SOGLIE_OF_RICAVI.get(settore.lower(), 0.06)
-    of_ricavi = (interest_expense / revenue) if revenue > 0 else 0.0
-    results["of_ricavi"] = {
-        "nome": "Sostenibilita' Oneri Finanziari (OF/Ricavi)",
-        "formula": "Oneri Finanziari / Ricavi netti",
-        "valore": round(of_ricavi, 4),
-        "valore_pct": f"{of_ricavi * 100:.2f}%",
-        "soglia": f"<= {soglia_of * 100:.0f}% (settore: {settore})",
-        "stato": "ok" if of_ricavi <= soglia_of else ("warning" if of_ricavi <= soglia_of * 1.5 else "danger"),
-        "note": (
-            "Oneri finanziari sostenibili rispetto ai ricavi."
-            if of_ricavi <= soglia_of else
-            f"ALERT: OF/Ricavi {of_ricavi*100:.1f}% supera soglia CNDCEC {soglia_of*100:.0f}%"
-        ),
-        "riferimento": "CNDCEC - Indici di allerta, luglio 2019"
-    }
-
-    # ── 3. Adeguatezza Patrimoniale (PN/Totale Attivo) ───────────────────
-    # Soglia: >= 8% (equity ratio minimo)
-    eq_ratio = (equity / total_assets) if total_assets > 0 else 0.0
-    pn_negativo = equity < 0
-    results["adeguatezza_patrimoniale"] = {
-        "nome": "Adeguatezza Patrimoniale (PN/Attivo)",
-        "formula": "Patrimonio Netto / Totale Attivo",
-        "valore": round(eq_ratio, 4),
-        "valore_pct": f"{eq_ratio * 100:.2f}%",
-        "soglia": ">= 8%",
-        "stato": "danger" if pn_negativo else ("ok" if eq_ratio >= 0.08 else "warning"),
-        "note": (
-            "ALLERTA CRITICA: Patrimonio netto negativo — perdita superiore al capitale sociale (art. 2447 c.c.)"
-            if pn_negativo else
-            (f"Patrimonio adeguato ({eq_ratio*100:.1f}%)." if eq_ratio >= 0.08
-             else f"ALERT: Equity ratio {eq_ratio*100:.1f}% sotto soglia minima 8%")
-        ),
-        "riferimento": "Art. 2447 c.c.; Art. 2482-ter c.c.; Art. 13 CCII"
-    }
-
-    # ── 4. Ritorno Liquido dell'Attivo (CF Operativo / Totale Attivo) ────
-    # Soglia: >= 0% (deve essere positivo)
-    rla = (operating_cf / total_assets) if total_assets > 0 else 0.0
-    results["ritorno_liquido_attivo"] = {
-        "nome": "Ritorno Liquido dell'Attivo",
-        "formula": "Cash Flow Operativo / Totale Attivo",
-        "valore": round(rla, 4),
-        "valore_pct": f"{rla * 100:.2f}%",
-        "soglia": ">= 0%",
-        "stato": "ok" if rla >= 0 else ("warning" if rla >= -0.05 else "danger"),
-        "note": (
-            f"Attivo genera liquidita' operativa ({rla*100:.1f}%)."
-            if rla >= 0 else
-            f"ALERT: Ritorno liquido negativo {rla*100:.1f}% — l'attivo non genera cassa sufficiente"
-        ),
-        "riferimento": "CNDCEC - Indici di allerta, luglio 2019"
-    }
-
-    # ── 5. Liquidita' (Current Ratio) ─────────────────────────────────────
-    # Soglia: >= 1.0
-    if current_liabilities > 0:
-        current_ratio = current_assets / current_liabilities
-    else:
-        current_ratio = 999.0
-    results["liquidita"] = {
-        "nome": "Indice di Liquidita' (Current Ratio)",
-        "formula": "Attivo Corrente / Passivo Corrente",
-        "valore": round(current_ratio, 3),
-        "soglia": ">= 1.0",
-        "stato": "ok" if current_ratio >= 1.0 else ("warning" if current_ratio >= 0.8 else "danger"),
-        "note": (
-            f"Liquidita' adeguata (ratio: {current_ratio:.2f})."
-            if current_ratio >= 1.0 else
-            f"ALERT: Illiquidita' a breve termine — passivo corrente supera attivo corrente (ratio: {current_ratio:.2f})"
-        ),
-        "riferimento": "Art. 13 CCII; OIC 12"
-    }
-
-    # ── 6. PFN / EBITDA (Leverage) ────────────────────────────────────────
-    # Soglia: <= 6x (critico), <= 4x (attenzione)
-    if ebitda > 0:
-        pfn_ebitda = total_debt / ebitda
-    elif ebitda < 0:
-        pfn_ebitda = 999.0  # EBITDA negativo = situazione critica
-    else:
-        pfn_ebitda = 0.0
-    results["pfn_ebitda"] = {
-        "nome": "Leva Finanziaria (PFN/EBITDA)",
-        "formula": "Posizione Finanziaria Netta / EBITDA",
-        "valore": round(pfn_ebitda, 2),
-        "soglia": "<= 4x (attenzione); <= 6x (limite critico)",
-        "stato": "ok" if pfn_ebitda <= 4 else ("warning" if pfn_ebitda <= 6 else "danger"),
-        "note": (
-            f"Leverage sostenibile (PFN/EBITDA: {pfn_ebitda:.1f}x)."
-            if pfn_ebitda <= 4 else
-            (f"ATTENZIONE: leverage elevato {pfn_ebitda:.1f}x (soglia bancaria 4x)" if pfn_ebitda <= 6
-             else f"ALLERTA CRITICA: leverage {pfn_ebitda:.1f}x — insostenibile, rischio insolvenza")
-        ),
-        "riferimento": "Prassi bancaria CRD IV; Linee guida BCE crediti deteriorati"
-    }
-
-    # ── 7. Coverage Oneri Finanziari (EBITDA / OF) ───────────────────────
-    # Soglia: >= 2x (minimo accettabile)
-    if interest_expense > 0:
-        interest_coverage = ebitda / interest_expense
-    else:
-        interest_coverage = 999.0
-    results["interest_coverage"] = {
-        "nome": "Coverage Oneri Finanziari (EBITDA/OF)",
-        "formula": "EBITDA / Oneri Finanziari",
-        "valore": round(interest_coverage, 2),
-        "soglia": ">= 2x",
-        "stato": "ok" if interest_coverage >= 2 else ("warning" if interest_coverage >= 1 else "danger"),
-        "note": (
-            f"Coverage adeguato ({interest_coverage:.1f}x)."
-            if interest_coverage >= 2 else
-            (f"ATTENZIONE: coverage basso {interest_coverage:.1f}x" if interest_coverage >= 1
-             else f"ALLERTA: EBITDA non copre gli oneri finanziari (coverage: {interest_coverage:.1f}x)")
-        ),
-        "riferimento": "Prassi bancaria italiana; EBA Guidelines on Loan Origination"
-    }
-
-    # ── Conteggio alert ───────────────────────────────────────────────────
-    danger_count  = sum(1 for v in results.values() if v["stato"] == "danger")
-    warning_count = sum(1 for v in results.values() if v["stato"] == "warning")
-    ok_count      = sum(1 for v in results.values() if v["stato"] == "ok")
-
-    # Giudizio complessivo
-    if danger_count >= 3 or pn_negativo:
-        giudizio = "CRISI CONCLAMATA"
-        giudizio_desc = (
-            "Situazione di crisi d'impresa conclamata. Obbligo di attivare "
-            "immediatamente la procedura di Composizione Negoziata ex D.L. 118/2021 "
-            "o altra procedura concorsuale. L'organo amministrativo e' tenuto ad "
-            "adottare misure idonee ai sensi dell'art. 2086 c.c."
+    def lower_status(value, good, caution):
+        return "unavailable" if value is None else (
+            "ok" if value >= good else "warning" if value >= caution else "danger"
         )
-        giudizio_stato = "danger"
-    elif danger_count >= 1 or warning_count >= 3:
-        giudizio = "SEGNALI DI ALLERTA"
-        giudizio_desc = (
-            "Rilevati segnali di allerta ex art. 13 CCII. L'organo di controllo "
-            "e' tenuto a segnalare tempestivamente all'organo amministrativo. "
-            "Valutare l'attivazione volontaria della Composizione Negoziata o "
-            "piani di risanamento ex art. 56 CCII."
-        )
-        giudizio_stato = "warning"
-    else:
-        giudizio = "EQUILIBRIO FINANZIARIO"
-        giudizio_desc = (
-            "Gli indici di allerta non evidenziano segnali di crisi ai sensi del CCII. "
-            "Si raccomanda il monitoraggio trimestrale degli indicatori e il mantenimento "
-            "di adeguati assetti organizzativi, amministrativi e contabili ex art. 2086 c.c."
-        )
-        giudizio_stato = "ok"
 
+    def upper_status(value, good, caution):
+        return "unavailable" if value is None else (
+            "ok" if value <= good else "warning" if value <= caution else "danger"
+        )
+
+    dscr = ratio(operating_cf, debt_service)
+    add("dscr", "DSCR (Debt Service Coverage Ratio)",
+        "Cash Flow Operativo / Servizio del Debito dello stesso periodo", dscr,
+        ">= 1.0", lower_status(dscr, 1, 0.8),
+        "Confronto tra cassa operativa e servizio del debito forniti. "
+        "Verificare disponibilita' della cassa per il debito e coerenza temporale; non e' una previsione.")
+    of = ratio(interest, revenue)
+    limit = SOGLIE_OF_RICAVI.get(settore.lower(), 0.06)
+    add("of_ricavi", "Oneri Finanziari / Ricavi", "Oneri Finanziari / Ricavi netti",
+        of, f"<= {limit * 100:.0f}% (ipotesi interna, settore: {settore})",
+        upper_status(of, limit, limit * 1.5), "Incidenza degli oneri sui ricavi dichiarati.", True)
+    eq = ratio(equity, assets)
+    add("adeguatezza_patrimoniale", "Patrimonio Netto / Attivo",
+        "Patrimonio Netto / Totale Attivo", eq, ">= 8%",
+        "danger" if equity is not None and equity < 0 else lower_status(eq, 0.08, 0),
+        "Indicatore patrimoniale; eventuali perdite richiedono una valutazione professionale specifica.", True)
+    cash_return = ratio(operating_cf, assets)
+    add("ritorno_liquido_attivo", "Ritorno Liquido dell'Attivo",
+        "Cash Flow Operativo / Totale Attivo", cash_return, ">= 0%",
+        lower_status(cash_return, 0, -0.05), "Rendimento di cassa sui valori forniti.", True)
+    liquidity = ratio(current_assets, current_liabilities)
+    add("liquidita", "Indice di Liquidita' (Current Ratio)",
+        "Attivo Corrente / Passivo Corrente", liquidity, ">= 1.0",
+        lower_status(liquidity, 1, 0.8), "Rapporto contabile; non prova la liquidabilita' degli attivi.")
+    # Keep the legacy dictionary key for callers; total_debt is NOT net debt (PFN).
+    leverage = ratio(debt, ebitda)
+    add("pfn_ebitda", "Debito dichiarato / EBITDA", "Debito dichiarato / EBITDA",
+        leverage, "<= 4x (attenzione fino a 6x)", upper_status(leverage, 4, 6),
+        "Il debito fornito non e' automaticamente PFN: non viene sottratta cassa non dichiarata.")
+    if debt is not None and debt > 0 and ebitda is not None and ebitda <= 0:
+        # Undefined multiple, but a known adverse operating/debt combination.
+        results["pfn_ebitda"]["stato"] = "danger"
+        results["pfn_ebitda"]["note"] = (
+            "N/D: multiplo non significativo con EBITDA non positivo e debito positivo. "
+            "Condizione finanziaria da approfondire; non diagnosi di insolvenza."
+        )
+    coverage = ratio(ebitda, interest)
+    add("interest_coverage", "Coverage Oneri Finanziari (EBITDA/OF)",
+        "EBITDA / Oneri Finanziari", coverage, ">= 2x", lower_status(coverage, 2, 1),
+        "Copertura economica degli interessi, distinta dalla copertura monetaria del debito.")
+
+    counts = {status: sum(v["stato"] == status for v in results.values())
+              for status in ("ok", "warning", "danger", "unavailable")}
+    if counts["danger"] >= 3 or (equity is not None and equity < 0):
+        judgement, state = "INDICATORI FINANZIARI CRITICI", "danger"
+    elif counts["danger"] or counts["warning"] >= 3:
+        judgement, state = "INDICATORI DA APPROFONDIRE", "warning"
+    elif counts["unavailable"]:
+        judgement, state = "ANALISI PARZIALE - DATI INCOMPLETI", "warning"
+    else:
+        judgement, state = "INDICATORI ENTRO LE SOGLIE INTERNE", "ok"
     results["_meta"] = {
-        "giudizio": giudizio,
-        "giudizio_desc": giudizio_desc,
-        "giudizio_stato": giudizio_stato,
-        "danger_count": danger_count,
-        "warning_count": warning_count,
-        "ok_count": ok_count,
+        "giudizio": judgement, "giudizio_stato": state,
+        "giudizio_desc": (
+            "Screening finanziario su soglie interne, non diagnosi di crisi o insolvenza. "
+            "I dati mancanti non indicano assenza di rischio. Il risultato non determina "
+            "obblighi, procedure o termini legali e richiede verifica di un professionista abilitato."
+        ),
+        "danger_count": counts["danger"], "warning_count": counts["warning"],
+        "ok_count": counts["ok"], "unavailable_count": counts["unavailable"],
         "settore": settore,
         "data_analisi": datetime.datetime.now().strftime("%d/%m/%Y %H:%M"),
     }
-
     return results
 
 
@@ -260,226 +158,49 @@ def generate_crisi_impresa_report(
     revisore: str = "",
     user_name: str = "NEXUS Finance Pro",
 ) -> bytes:
-    """
-    Genera il PDF "Relazione sugli Indici di Allerta" conforme D.Lgs. 14/2019.
-    Restituisce bytes pronti per download o allegato.
-    """
+    """Generate an informational financial screening PDF; no certification."""
     indici = calcola_indici_ccii(data, settore)
-    meta   = indici.pop("_meta")
-
-    pdf = NexusPDF(company_name=company_name, report_type="Crisi d'Impresa CCII")
+    meta = indici.pop("_meta")
+    pdf = NexusPDF(company_name=company_name, report_type="Indicatori finanziari")
     pdf.add_page()
+    colors = {"ok": SUCCESS, "warning": WARNING, "danger": DANGER, "unavailable": GRAY}
 
-    # ── INTESTAZIONE LEGALE ────────────────────────────────────────────────
-    # Banner rosso/giallo in base al giudizio
-    banner_colors = {"danger": (183, 28, 28), "warning": (245, 127, 23), "ok": (46, 125, 50)}
-    bc = banner_colors[meta["giudizio_stato"]]
-    pdf.set_fill_color(*bc)
-    pdf.rect(0, 18, 210, 60, "F")
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 9)
-    pdf.set_xy(10, 20)
-    pdf.cell(190, 5, "RELAZIONE SUGLI INDICI DI ALLERTA DELLA CRISI D'IMPRESA", align="C")
-    pdf.set_font("Helvetica", "", 8)
-    pdf.set_xy(10, 26)
-    pdf.cell(190, 5, "D.Lgs. 14/2019 (CCII) - D.Lgs. 83/2022 - D.L. 118/2021 - CNDCEC 2019", align="C")
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.set_xy(10, 34)
-    pdf.cell(190, 12, clean_text(company_name.upper()), align="C")
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.set_xy(10, 50)
-    pdf.cell(190, 10, clean_text(meta["giudizio"]), align="C")
-    pdf.set_font("Helvetica", "", 9)
-    pdf.set_xy(10, 62)
-    pdf.cell(190, 5, clean_text(f"Analisi del {meta['data_analisi']} | Settore: {settore.title()} | Elaborata da: {user_name}"), align="C")
-    pdf.ln(52)
-
-    # ── RIEPILOGO ALERT ────────────────────────────────────────────────────
-    pdf.set_text_color(*DARK_TEXT)
-    pdf.set_font("Helvetica", "B", 11)
-    colw = 60
-    # tre box affiancati
-    boxes = [
-        (meta["danger_count"],  "ALLERTE CRITICHE",  (183, 28, 28)),
-        (meta["warning_count"], "SEGNALI ATTENZIONE",(245, 127, 23)),
-        (meta["ok_count"],      "INDICI OK",         (46, 125, 50)),
-    ]
-    pdf.set_xy(10, pdf.get_y() + 2)
-    for val, label, color in boxes:
-        pdf.set_fill_color(*color)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Helvetica", "B", 22)
-        pdf.cell(colw, 14, str(val), fill=True, align="C")
-        pdf.set_x(pdf.get_x())
-    pdf.ln(14)
-    pdf.set_x(10)
-    for val, label, color in boxes:
-        pdf.set_fill_color(*color)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Helvetica", "", 8)
-        pdf.cell(colw, 6, clean_text(label), fill=True, align="C")
-    pdf.ln(8)
-
-    # ── GIUDIZIO COMPLESSIVO ───────────────────────────────────────────────
-    pdf.section_title("GIUDIZIO COMPLESSIVO AI SENSI DEL CCII")
-    gc = banner_colors[meta["giudizio_stato"]]
-    pdf.set_fill_color(*gc)
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.multi_cell(0, 7, clean_text(f"  {meta['giudizio_desc']}"), fill=True)
-    pdf.ln(3)
-
-    # ── INDICI DI ALLERTA CCII ─────────────────────────────────────────────
-    pdf.section_title("INDICI DI ALLERTA - ANALISI DETTAGLIATA (CNDCEC 2019)")
-
-    stato_labels = {"ok": "OK", "warning": "ATTENZIONE", "danger": "ALLERTA"}
-    stato_colors = {"ok": SUCCESS, "warning": WARNING, "danger": DANGER}
-
-    for key, indice in indici.items():
-        if key.startswith("_"):
-            continue
-        sc = stato_colors[indice["stato"]]
-        pdf.set_fill_color(*sc)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(0, 7, clean_text(f"  [{stato_labels[indice['stato']]}]  {indice['nome']}"),
-                 fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-
-        # Tabella indice
-        rows = [
-            ("Formula di calcolo",   indice["formula"]),
-            ("Valore calcolato",      indice.get("valore_pct", str(indice["valore"]))),
-            ("Soglia normativa",      indice["soglia"]),
-            ("Riferimento normativo", indice["riferimento"]),
-        ]
+    def paragraph(text, bold=False):
+        pdf.set_font("Helvetica", "B" if bold else "", 9)
         pdf.set_text_color(*DARK_TEXT)
-        fill = False
-        pdf.set_font("Helvetica", "", 8)
-        for label, val in rows:
-            pdf.set_fill_color(240, 248, 255) if fill else pdf.set_fill_color(255, 255, 255)
-            pdf.cell(80, 5, clean_text(label), fill=True, border=1)
-            pdf.cell(110, 5, clean_text(str(val)), fill=True, border=1,
-                     new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            fill = not fill
-
-        # Nota sintetica
-        pdf.set_font("Helvetica", "I", 8)
-        pdf.set_fill_color(*sc)
-        pdf.set_text_color(255, 255, 255)
-        pdf.multi_cell(0, 5, clean_text(f"  => {indice['note']}"), fill=True)
-        pdf.ln(3)
-
-    # ── OBBLIGHI LEGALI ────────────────────────────────────────────────────
-    pdf.add_page()
-    pdf.section_title("OBBLIGHI LEGALI E ADEMPIMENTI")
-    pdf.set_text_color(*DARK_TEXT)
-    pdf.set_font("Helvetica", "", 9)
-
-    obblighi = [
-        ("Art. 2086 c.c.",
-         "L'organo amministrativo deve istituire assetti organizzativi, amministrativi e "
-         "contabili adeguati alla natura e dimensioni dell'impresa, con funzione di rilevazione "
-         "tempestiva della crisi."),
-        ("Art. 25-octies CCII (ex art. 13)",
-         "Gli indici di allerta pubblicati dal CNDCEC costituiscono presupposto per "
-         "l'emersione anticipata della crisi. Il superamento delle soglie impone "
-         "segnalazione all'organo di controllo entro 30 giorni."),
-        ("D.L. 118/2021 - Composizione Negoziata",
-         "L'imprenditore in condizioni di squilibrio patrimoniale o economico-finanziario "
-         "che rendano probabile la crisi o l'insolvenza puo' richiedere la nomina di un "
-         "esperto indipendente alla Camera di Commercio."),
-        ("Art. 56 CCII - Piano Attestato di Risanamento",
-         "Piano di risanamento idoneo a consentire il risanamento dell'esposizione "
-         "debitoria e il riequilibrio della situazione finanziaria, attestato da un "
-         "professionista indipendente."),
-        ("Art. 84 CCII - Concordato Preventivo",
-         "Procedura concorsuale che permette all'imprenditore in stato di crisi o "
-         "insolvenza di proporre ai creditori un piano di soddisfazione dei loro crediti."),
-    ]
-    for norma, testo in obblighi:
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.set_text_color(*PRIMARY)
-        pdf.cell(0, 6, clean_text(norma), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 8)
-        pdf.set_text_color(*DARK_TEXT)
-        pdf.multi_cell(0, 5, clean_text(testo))
+        pdf.multi_cell(0, 5, clean_text(text), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(2)
 
-    # ── TIMELINE RACCOMANDAZIONI ───────────────────────────────────────────
-    pdf.section_title("PIANO D'AZIONE CONSIGLIATO")
-    pdf.set_text_color(*DARK_TEXT)
-
-    if meta["giudizio_stato"] == "danger":
-        azioni = [
-            ("IMMEDIATO (0-30 giorni)",   "danger",
-             "Convocare CdA straordinario. Redigere piano di risanamento urgente. "
-             "Valutare Composizione Negoziata ex D.L. 118/2021. Informare i soci delle perdite."),
-            ("BREVE TERMINE (1-3 mesi)",  "danger",
-             "Nominare advisor finanziario. Avviare trattative con istituti di credito "
-             "per ristrutturazione del debito. Identificare asset non strategici da dismettere."),
-            ("MEDIO TERMINE (3-12 mesi)", "warning",
-             "Implementare piano industriale di rilancio. Monitorare KPI mensili. "
-             "Verificare compliance CCII con revisore legale."),
-        ]
-    elif meta["giudizio_stato"] == "warning":
-        azioni = [
-            ("BREVE TERMINE (0-60 giorni)", "warning",
-             "Analizzare cause del deterioramento. Predisporre piano di miglioramento. "
-             "Rafforzare flusso di cassa operativo."),
-            ("MEDIO TERMINE (2-6 mesi)", "warning",
-             "Rinegoziare condizioni bancarie. Ottimizzare capitale circolante. "
-             "Valutare operazioni straordinarie (aumento capitale, cessione rami d'azienda)."),
-            ("LUNGO TERMINE (6-18 mesi)", "ok",
-             "Raggiungere equilibrio finanziario sostenibile. Monitoraggio continuo "
-             "con NEXUS Finance Pro."),
-        ]
-    else:
-        azioni = [
-            ("MONITORAGGIO CONTINUO", "ok",
-             "Mantenere monitoraggio trimestrale degli indici CCII con NEXUS Finance Pro. "
-             "Aggiornare l'analisi ad ogni chiusura di periodo."),
-            ("OTTIMIZZAZIONE", "ok",
-             "Esplorare opportunita' di crescita. Valutare investimenti e fabbisogno "
-             "finanziario in ottica bancaria."),
-        ]
-
-    for timing, stato, testo in azioni:
-        sc = stato_colors[stato]
-        pdf.set_fill_color(*sc)
+    pdf.section_title("SCREENING DEGLI INDICATORI FINANZIARI")
+    paragraph(company_name, True)
+    paragraph(f"Analisi del {meta['data_analisi']} | Settore: {settore} | Elaborata da: {user_name}")
+    paragraph(meta["giudizio"], True)
+    paragraph(meta["giudizio_desc"])
+    paragraph(f"Indicatori critici: {meta['danger_count']} | Da approfondire: {meta['warning_count']} | "
+              f"Entro soglie: {meta['ok_count']} | N/D: {meta['unavailable_count']}")
+    paragraph("Le soglie riportate sono ipotesi interne di screening, non limiti normativi universali. "
+              "La loro appropriatezza dipende da settore, scadenze, contratti e situazione aziendale.")
+    for indice in indici.values():
+        if pdf.get_y() > 225:
+            pdf.add_page()
+        pdf.set_fill_color(*colors[indice["stato"]])
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(0, 6, clean_text(f"  {timing}"), fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 8)
-        pdf.multi_cell(0, 5, clean_text(f"  {testo}"), fill=True)
-        pdf.ln(2)
+        pdf.multi_cell(0, 6, clean_text(indice["nome"]), fill=True,
+                       new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        value = "N/D" if indice["valore"] is None else indice.get("valore_pct", str(indice["valore"]))
+        paragraph(f"Formula: {indice['formula']}\nValore: {value}\nSoglia interna: {indice['soglia']}")
+        paragraph(indice["note"])
 
-    # ── DISCLAIMER LEGALE ─────────────────────────────────────────────────
-    pdf.ln(4)
-    pdf.set_draw_color(*GRAY)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(3)
-    pdf.set_font("Helvetica", "I", 7)
-    pdf.set_text_color(*GRAY)
-    disclaimer = (
-        "AVVERTENZA LEGALE: Il presente documento e' elaborato da NEXUS Finance Pro su dati "
-        "forniti dall'utente e ha finalita' informative e di supporto decisionale. Non costituisce "
-        "parere legale, consulenza professionale ai sensi del D.Lgs. 139/2005, ne' attestazione "
-        "professionale ai sensi dell'art. 56 CCII. Per la predisposizione di piani di risanamento "
-        "attestati, concordati preventivi o domande di Composizione Negoziata, e' necessario "
-        "rivolgersi a professionisti abilitati (Dottori Commercialisti, Avvocati). "
-        "Il report puo' essere allegato a pratiche bancarie, relazioni al CdA e all'organo di "
-        "controllo come documento di supporto all'analisi finanziaria aziendale."
-    )
-    pdf.multi_cell(0, 4, clean_text(disclaimer))
-
+    pdf.section_title("LIMITI E VERIFICA PROFESSIONALE")
+    paragraph("Documento informativo basato sui dati forniti dall'utente, non verificati. "
+              "Non costituisce parere legale, attestazione, revisione o certificazione. "
+              "Non accerta crisi o insolvenza e non prescrive l'accesso a procedure. "
+              "La verifica di eventuali obblighi e strumenti applicabili spetta a professionisti "
+              "abilitati sulla base della normativa vigente e del caso concreto.")
+    paragraph("Approfondimenti suggeriti: riconciliare i dati con il bilancio e le scadenze; "
+              "acquisire flussi di cassa e servizio del debito coerenti per periodo; "
+              "valutare con un professionista continuita' aziendale, liquidita' prospettica e sostenibilita' del debito.")
     if revisore:
-        pdf.ln(6)
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.set_text_color(*DARK_TEXT)
-        pdf.cell(90, 6, "Elaborato da:", new_x=XPos.RIGHT, new_y=YPos.TOP)
-        pdf.cell(90, 6, "Firma e timbro:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_font("Helvetica", "", 9)
-        pdf.cell(90, 6, clean_text(revisore), new_x=XPos.RIGHT, new_y=YPos.TOP)
-        pdf.cell(90, 6, "_" * 30, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-
+        paragraph(f"Referente indicato dall'utente (non attestazione): {revisore}")
     return bytes(pdf.output())

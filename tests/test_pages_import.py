@@ -29,9 +29,9 @@ def test_shared_upload_displays_source_warnings(monkeypatch):
     data = {"ebitda": 10, "_import_warnings": ["Missing cash flow", "Latest year selected"]}
     shown = []
     monkeypatch.setattr(helper, "read_financial_data", lambda source: data)
-    monkeypatch.setattr("streamlit.warning", shown.append)
+    monkeypatch.setattr("streamlit.write", shown.append)
     assert helper.read_financial_upload(upload("")) is data
-    assert shown == data["_import_warnings"]
+    assert shown == ["• " + note for note in data["_import_warnings"]]
 
 
 @pytest.mark.parametrize("module,parser", [
@@ -73,8 +73,9 @@ def test_completion_wrappers_show_preview_and_keep_manual_form(monkeypatch, modu
         f"from pages_modules.{module} import {renderer}\n{renderer}()"
     ).run(timeout=30)
     assert not app.exception
-    assert any("SOURCE LIMITATION" in item.value for item in app.warning)
-    assert any("completa i dati mancanti" in item.value for item in app.warning)
+    assert any("SOURCE LIMITATION" in item.value for item in app.markdown)
+    assert any("integra i dati mancanti" in item.value for item in app.info)
+    assert any("Dettagli di lettura" in item.label for item in app.expander)
     assert len(app.dataframe) >= 1
     assert len(app.number_input) >= 1
 
@@ -90,9 +91,8 @@ def test_readiness_never_maps_total_liabilities_to_current(monkeypatch):
     })
     parsed = page._parse_uploaded_file(upload(""))
     assert "passivo_corrente" not in parsed["provided_fields"]
-    assert set(parsed["missing_inputs"]) == {
-        "passivo_corrente", "cash_operativo", "rimborso_debito (DSCR)"
-    }
+    assert {"passivo_corrente", "cash_operativo"}.issubset(parsed["missing_inputs"])
+    assert "rimborso_debito (DSCR)" not in parsed["missing_inputs"]
 
 
 def test_incomplete_civil_readiness_only_shows_preview(monkeypatch):
@@ -113,7 +113,7 @@ def test_incomplete_civil_readiness_only_shows_preview(monkeypatch):
         "render_credit_readiness()"
     ).run(timeout=30)
     assert not app.exception
-    assert any("non calcolata né salvata" in item.value for item in app.warning)
+    assert any("Nessun punteggio è stato calcolato o salvato" in item.value for item in app.warning)
     assert len(app.dataframe) >= 1
 
 

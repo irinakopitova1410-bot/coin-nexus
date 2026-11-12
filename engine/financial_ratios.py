@@ -6,6 +6,7 @@ Calcolo istantaneo, benchmark di settore inclusi.
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 import math
+from ._validation import validate_numeric_mapping
 
 # ─── Benchmark di settore (valori medi italiani) ──────────────────────────────
 INDUSTRY_BENCHMARKS = {
@@ -110,7 +111,8 @@ def _safe_div(a, b, default=None):
     try:
         if b == 0 or b is None:
             return default
-        return a / b
+        result = a / b
+        return result if math.isfinite(result) else default
     except Exception:
         return default
 
@@ -118,7 +120,7 @@ def _safe_div(a, b, default=None):
 def _status(value, good_min=None, good_max=None, bad_min=None, bad_max=None,
              higher_is_better=True) -> str:
     """Determina lo stato di un ratio."""
-    if value is None:
+    if value is None or not math.isfinite(value):
         return "warning"
     if higher_is_better:
         if good_min is not None and value >= good_min:
@@ -139,6 +141,7 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
     Calcola tutti i ratio finanziari dai dati in input.
     data: dizionario con chiavi standard NEXUS (total_assets, revenue, ebit, ecc.)
     """
+    validate_numeric_mapping(data)
     bm = INDUSTRY_BENCHMARKS.get(industry, INDUSTRY_BENCHMARKS["Manifatturiero"])
     alerts = []
     strengths = []
@@ -148,11 +151,11 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
     total_liabilities = data.get("total_liabilities", 0)
     revenue = data.get("revenue", 0)
     ebit = data.get("ebit", 0)
-    ebitda = data.get("ebitda", ebit * 1.15)  # stima se mancante
+    ebitda = data.get("ebitda", ebit + data.get("depreciation", 0))
     net_income = data.get("net_income", 0)
-    equity = data.get("equity", max(total_assets - total_liabilities, 1))
+    equity = data.get("equity", data.get("total_equity", total_assets - total_liabilities))
     current_assets = data.get("current_assets", 0)
-    current_liabilities = data.get("current_liabilities", 1)
+    current_liabilities = data.get("current_liabilities", 0)
     inventory = data.get("inventory", 0)
     accounts_receivable = data.get("accounts_receivable", 0)
     accounts_payable = data.get("accounts_payable", 0)
@@ -165,7 +168,9 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
     # ─── 1. LIQUIDITÀ ────────────────────────────────────────────────────────
     current_ratio = _safe_div(current_assets, current_liabilities)
     quick_ratio = _safe_div(current_assets - inventory, current_liabilities)
-    cash_ratio = _safe_div(current_assets - inventory - accounts_receivable, current_liabilities)
+    cash = data.get("cash", data.get("cash_and_equivalents"))
+    cash_ratio = _safe_div(cash if cash is not None else current_assets - inventory - accounts_receivable,
+                           current_liabilities)
 
     liq_ratios = [
         Ratio("Current Ratio", current_ratio or 0, bm.get("current_ratio"),
@@ -178,10 +183,10 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
               "(Attivo Corrente − Magazzino) / Passivo Corrente", "x"),
         Ratio("Cash Ratio", cash_ratio or 0, bm.get("cash_ratio"),
               _status(cash_ratio, 0.2, None, 0.1),
-              "Solo liquidità immediata vs passività correnti",
-              "Disponibilità Liquide / Passivo Corrente", "x"),
+              "Solo liquidità immediata vs passività correnti" if cash is not None else "Stima residuale: può includere altre attività correnti non liquide",
+              "Disponibilità Liquide / Passivo Corrente" if cash is not None else "(Attivo Corrente − Magazzino − Crediti) / Passivo Corrente (stima)", "x"),
     ]
-    if current_ratio and current_ratio < 1.0:
+    if current_ratio is not None and current_ratio < 1.0:
         alerts.append("⚠️ Current Ratio < 1: rischio liquidità a breve termine")
     if current_ratio and current_ratio > 2.5:
         strengths.append("✅ Eccellente liquidità corrente")
@@ -198,7 +203,7 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
 
     solid_ratios = [
         Ratio("Debt/Equity", debt_equity or 0, bm.get("debt_equity"),
-              _status(debt_equity, None, 1.5, None, 3.0, higher_is_better=False),
+              _status(debt_equity, None, 1.5, None, 3.0, higher_is_better=False) if equity > 0 else "danger",
               "Rapporto tra capitale di terzi e capitale proprio",
               "Totale Passivo / Patrimonio Netto", "x"),
         Ratio("Debt/Assets", debt_assets or 0, bm.get("debt_assets"),
@@ -206,7 +211,7 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
               "Percentuale delle attività finanziata da debito",
               "Totale Passivo / Totale Attivo", "%"),
         Ratio("Equity Multiplier", equity_multiplier or 0, None,
-              _status(equity_multiplier, None, 2.5, None, 4.0, higher_is_better=False),
+              _status(equity_multiplier, None, 2.5, None, 4.0, higher_is_better=False) if equity > 0 else "danger",
               "Leva finanziaria totale dell'azienda",
               "Totale Attivo / Patrimonio Netto", "x"),
         Ratio("Interest Coverage", interest_coverage or 0, bm.get("interest_coverage"),
@@ -214,13 +219,15 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
               "Quante volte l'EBIT copre gli oneri finanziari",
               "EBIT / Oneri Finanziari", "x"),
         Ratio("Debt/EBITDA", debt_ebitda or 0, None,
-              _status(debt_ebitda, None, 3.0, None, 5.0, higher_is_better=False) if debt_ebitda else "warning",
+              _status(debt_ebitda, None, 3.0, None, 5.0, higher_is_better=False) if debt_ebitda is not None else ("danger" if total_debt > 0 else "warning"),
               "Anni necessari per ripagare il debito con l'EBITDA",
               "Debiti Finanziari / EBITDA", "x"),
     ]
     if debt_equity and debt_equity > 3.0:
         alerts.append("🔴 Debt/Equity > 3: eccessiva dipendenza dal debito")
-    if interest_coverage and interest_coverage > 8:
+    if equity <= 0:
+        alerts.append("🔴 Patrimonio netto non positivo: leva e ROE non indicano solidità patrimoniale")
+    if interest_expense > 0 and interest_coverage and interest_coverage > 8:
         strengths.append("✅ Copertura degli interessi eccellente")
 
     cat_solid = RatioCategory("Solidità Patrimoniale", "🏦", solid_ratios)
@@ -238,7 +245,7 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
 
     red_ratios = [
         Ratio("ROE", roe or 0, bm.get("roe"),
-              _status(roe, 0.06, None, 0.0),
+              _status(roe, 0.06, None, 0.0) if equity > 0 else "danger",
               "Rendimento del capitale proprio per gli azionisti",
               "Utile Netto / Patrimonio Netto", "%"),
         Ratio("ROA", roa or 0, bm.get("roa"),
@@ -268,9 +275,15 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
     # ─── 4. EFFICIENZA OPERATIVA ─────────────────────────────────────────────
     asset_turnover = _safe_div(revenue, total_assets)
     days = 365
-    dso = _safe_div(accounts_receivable * days, revenue) if accounts_receivable > 0 else None
-    dpo = _safe_div(accounts_payable * days, revenue) if accounts_payable > 0 else None
-    dio = _safe_div(inventory * days, revenue) if inventory > 0 else None
+    # Inventory turns against cost of goods sold, not sales revenue. Purchases
+    # are preferable for payables; COGS is an explicitly labelled approximation.
+    cogs = data.get("cogs", data.get("cost_of_goods_sold"))
+    purchases = data.get("purchases", cogs)
+    dso = _safe_div(accounts_receivable * days, revenue) if revenue > 0 else None
+    dpo = _safe_div(accounts_payable * days, purchases) if purchases is not None and purchases > 0 else None
+    dio = _safe_div(inventory * days, cogs) if cogs is not None and cogs > 0 else None
+    if (accounts_payable > 0 and dpo is None) or (inventory > 0 and dio is None):
+        alerts.append("⚠️ DPO/DIO non disponibili: servono acquisti/costo del venduto, non ricavi")
     ccc = None
     if dso is not None and dpo is not None and dio is not None:
         ccc = dso + dio - dpo  # Cash Conversion Cycle
@@ -290,12 +303,12 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
         eff_ratios.append(Ratio("DPO — Giorni Debito", dpo, bm.get("dpo"),
                                 _status(dpo, bm.get("dpo", 40) * 0.8, None, None, None),
                                 "Giorni medi per pagare i fornitori",
-                                "(Debiti Commerciali / Ricavi) × 365", "giorni"))
+                                "(Debiti Commerciali / Acquisti) × 365" if "purchases" in data else "(Debiti Commerciali / Costo del Venduto) × 365 (stima)", "giorni"))
     if dio is not None:
         eff_ratios.append(Ratio("DIO — Giorni Magazzino", dio, bm.get("dio"),
                                 _status(dio, None, bm.get("dio", 45), None, bm.get("dio", 45) * 1.5, higher_is_better=False),
                                 "Giorni medi di giacenza del magazzino",
-                                "(Magazzino / Ricavi) × 365", "giorni"))
+                                "(Magazzino / Costo del Venduto) × 365", "giorni"))
     if ccc is not None:
         eff_ratios.append(Ratio("CCC — Cash Conversion Cycle", ccc, None,
                                 _status(ccc, None, 60, None, 120, higher_is_better=False),
@@ -311,11 +324,13 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
 
     # ─── 5. COPERTURA E FLUSSI ───────────────────────────────────────────────
     # Stima operating cash flow se non disponibile
+    if "operating_cashflow" not in data:
+        alerts.append("⚠️ Cash flow operativo stimato da EBITDA e imposte: non include variazioni del circolante")
     op_cashflow = data.get("operating_cashflow", ebitda - data.get("tax_expense", net_income * 0.28))
     capex = data.get("capex", depreciation * 1.1)
-    free_cashflow = op_cashflow - capex if op_cashflow else None
+    free_cashflow = op_cashflow - capex
 
-    fcf_yield = _safe_div(free_cashflow, total_assets) if free_cashflow else None
+    fcf_yield = _safe_div(free_cashflow, total_assets)
     cashflow_coverage = _safe_div(op_cashflow, total_debt) if total_debt > 0 else None
     debt_service = _safe_div(ebitda, (interest_expense + data.get("debt_repayment", 0))) if (interest_expense + data.get("debt_repayment", 0)) > 0 else None
 
@@ -386,6 +401,7 @@ def calculate_all_ratios(data: Dict[str, float], industry: str = "Manifatturiero
         industry=industry,
         health_label=health_label,
         health_color=health_color,
-        key_alerts=alerts[:5],
+        # Keep estimation/data-quality warnings visible alongside risk alerts.
+        key_alerts=alerts,
         strengths=strengths[:3],
     )

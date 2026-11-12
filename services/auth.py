@@ -2,7 +2,7 @@ import streamlit as st
 from supabase import create_client
 import os
 import re
-from services.db import get_auth_supabase
+from services.db import get_auth_supabase, get_supabase_config
 
 
 def pretty_display_name(full_name: str, email: str) -> str:
@@ -26,7 +26,7 @@ def ensure_user_profile(user_id: str, email: str, full_name: str, access_token: 
         sb.table("user_profiles").upsert({
             "id": user_id, "email": email,
             "full_name": full_name, "role": "client",
-        }).execute()
+        }, on_conflict="id", ignore_duplicates=True).execute()
     except Exception:
         pass
 
@@ -35,13 +35,12 @@ SUPABASE_URL_DEFAULT = "https://ipmttldwfsxuubugiyir.supabase.co"
 SUPABASE_KEY_DEFAULT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQxNzEsImV4cCI6MjA5MTY3MDE3MX0.HRFDqEKVCygVSKByVupgK3XGIkkpxxCyO7PH4LucPZg"
 
 def get_supabase():
-    url = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", SUPABASE_URL_DEFAULT))
-    key = st.secrets.get("SUPABASE_KEY", os.getenv("SUPABASE_KEY", SUPABASE_KEY_DEFAULT))
+    url, key = get_supabase_config()
     return create_client(url, key)
 
 
 def get_supabase_url() -> str:
-    return st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL", SUPABASE_URL_DEFAULT))
+    return get_supabase_config()[0]
 
 
 def login(email: str, password: str):
@@ -81,7 +80,9 @@ def logout():
         supabase.auth.sign_out()
     except:
         pass
-    for key in ["user", "session", "role", "user_email", "user_name"]:
+    # Uploaded balances, admin caches, tokens and computed reports must not
+    # survive when another person signs in using the same browser session.
+    for key in list(st.session_state):
         st.session_state.pop(key, None)
 
 
@@ -194,6 +195,9 @@ def login_page():
             def _start_session(user_obj, session_obj):
                 token = session_obj.access_token if session_obj else ""
                 profile = get_user_profile(user_obj.id, token)
+                if profile and profile.get("is_active") is False:
+                    st.error("Account disattivato. Contatta l’amministratore.")
+                    return
                 if profile is None and token:
                     derived = pretty_display_name(
                         (user_obj.user_metadata or {}).get("full_name", ""),

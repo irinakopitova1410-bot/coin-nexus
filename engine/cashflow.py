@@ -5,6 +5,7 @@ Metodo indiretto, proiezioni, analisi covenant, stress test.
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 import math
+from ._validation import validate_numeric_mapping
 
 
 @dataclass
@@ -47,11 +48,12 @@ def calculate_cashflow(data: Dict[str, float]) -> CashFlowStatement:
     """
     Calcola il rendiconto finanziario con metodo indiretto.
     """
+    validate_numeric_mapping(data)
     net_income = data.get("net_income", 0)
     depreciation = data.get("depreciation", 0)
     ebit = data.get("ebit", 0)
     ebitda = data.get("ebitda", ebit + depreciation)
-    revenue = data.get("revenue", 1)
+    revenue = data.get("revenue", 0)
     total_debt = data.get("total_debt", 0)
     interest_expense = data.get("interest_expense", 0)
     tax_expense = data.get("tax_expense", net_income * 0.28)
@@ -59,15 +61,15 @@ def calculate_cashflow(data: Dict[str, float]) -> CashFlowStatement:
     # Working capital
     current_assets = data.get("current_assets", 0)
     current_liabilities = data.get("current_liabilities", 0)
-    prev_current_assets = data.get("prev_current_assets", current_assets * 0.95)
-    prev_current_liabilities = data.get("prev_current_liabilities", current_liabilities * 0.95)
+    prev_current_assets = data.get("prev_current_assets", current_assets)
+    prev_current_liabilities = data.get("prev_current_liabilities", current_liabilities)
     delta_ca = current_assets - prev_current_assets
     delta_cl = current_liabilities - prev_current_liabilities
     delta_wc = -(delta_ca - delta_cl)  # Aumento WC = assorbimento cassa
 
     # CapEx
     fixed_assets = data.get("fixed_assets", 0)
-    prev_fixed_assets = data.get("prev_fixed_assets", fixed_assets * 0.9)
+    prev_fixed_assets = data.get("prev_fixed_assets", fixed_assets)
     capex = max(0, fixed_assets - prev_fixed_assets + depreciation)
     if "capex" in data:
         capex = data["capex"]
@@ -77,8 +79,8 @@ def calculate_cashflow(data: Dict[str, float]) -> CashFlowStatement:
 
     # Finanziamento
     debt_issued = data.get("debt_issued", 0)
-    debt_repaid = data.get("debt_repaid", total_debt * 0.1)
-    dividends = data.get("dividends", max(0, net_income * 0.3) if net_income > 0 else 0)
+    debt_repaid = data.get("debt_repaid", data.get("debt_repayment", 0))
+    dividends = data.get("dividends", 0)
 
     # Calcoli
     operating_cf = net_income + depreciation + delta_wc + data.get("other_operating", 0)
@@ -99,8 +101,9 @@ def calculate_cashflow(data: Dict[str, float]) -> CashFlowStatement:
     base_growth = 0.05
     stress_growth = -0.03
     for y in range(1, 6):
-        base_ocf = operating_cf * ((1 + base_growth) ** y)
-        stress_ocf = operating_cf * ((1 + stress_growth) ** y)
+        # A stress scenario must not improve an already negative cash flow.
+        base_ocf = operating_cf + abs(operating_cf) * ((1 + base_growth) ** y - 1)
+        stress_ocf = operating_cf - abs(operating_cf) * (1 - (1 + stress_growth) ** y)
         base_capex = capex * ((1 + 0.03) ** y)
         projections.append({
             "Anno": f"+{y}",
@@ -113,14 +116,20 @@ def calculate_cashflow(data: Dict[str, float]) -> CashFlowStatement:
     # Covenant check
     covenants = []
     if total_debt > 0 and ebitda > 0:
-        net_debt_ebitda = total_debt / ebitda
+        cash = data.get("cash", data.get("cash_and_equivalents"))
+        net_debt_ebitda = (total_debt - cash if cash is not None else total_debt) / ebitda
         covenants.append({
-            "Covenant": "Net Debt / EBITDA",
+            "Covenant": "Net Debt / EBITDA" if cash is not None else "Debt / EBITDA (lordo)",
             "Valore": round(net_debt_ebitda, 2),
             "Limite tipico": "≤ 3.5x",
             "Status": "✅ OK" if net_debt_ebitda <= 3.5 else "🔴 VIOLATO",
         })
-    if interest_expense > 0 and ebit > 0:
+    elif total_debt > 0:
+        covenants.append({
+            "Covenant": "Debt / EBITDA (lordo)", "Valore": "N/D (EBITDA ≤ 0)",
+            "Limite tipico": "≤ 3.5x", "Status": "🔴 VIOLATO",
+        })
+    if interest_expense > 0:
         icr = ebit / interest_expense
         covenants.append({
             "Covenant": "Interest Coverage (EBIT/Interessi)",
@@ -128,17 +137,29 @@ def calculate_cashflow(data: Dict[str, float]) -> CashFlowStatement:
             "Limite tipico": "≥ 2.5x",
             "Status": "✅ OK" if icr >= 2.5 else "🔴 VIOLATO",
         })
-    if total_debt > 0 and (total_debt + data.get("equity", 1)) > 0:
-        lev = total_debt / (total_debt + data.get("equity", 1))
+    equity = data.get("equity", data.get("total_equity"))
+    if total_debt > 0 and equity is not None:
+        capital = total_debt + equity
+        lev = total_debt / capital if capital > 0 else None
         covenants.append({
             "Covenant": "Leverage Ratio (Debt/Capital)",
-            "Valore": round(lev, 2),
+            "Valore": round(lev, 2) if lev is not None else "N/D (capitale ≤ 0)",
             "Limite tipico": "≤ 0.65",
-            "Status": "✅ OK" if lev <= 0.65 else "🔴 VIOLATO",
+            "Status": "✅ OK" if lev is not None and lev <= 0.65 else "🔴 VIOLATO",
         })
 
     # Alert
     alerts = []
+    alerts.append("ℹ️ Proiezioni illustrative a tassi fissi, non previsioni validate.")
+    if "prev_current_assets" not in data or "prev_current_liabilities" not in data:
+        alerts.append("⚠️ Dati storici del circolante mancanti: variazioni non disponibili assunte nulle.")
+    if "capex" not in data:
+        alerts.append("⚠️ CapEx stimato da cespiti e ammortamenti; dismissioni e acquisizioni non riconciliate.")
+    if "debt_repaid" not in data and "debt_repayment" not in data:
+        alerts.append("⚠️ Rimborsi del debito non disponibili: assunti nulli.")
+    if "dividends" not in data:
+        alerts.append("⚠️ Dividendi non disponibili: assunti nulli.")
+    alerts.append("ℹ️ Variazione circolante basata su attivo/passivo correnti: escludere cassa e debiti finanziari per un rendiconto operativo esatto.")
     if free_cf < 0:
         alerts.append("🔴 Free Cash Flow negativo: l'azienda brucia cassa")
     if ccr < 0.5 and net_income > 0:

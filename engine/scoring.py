@@ -1,8 +1,13 @@
+from ._validation import require_finite, require_nonnegative
+
+
 def calculate_metrics(data):
     rev = float(data.get('revenue', 0))
     ebitda = float(data.get('ebitda', 0))
     debt = float(data.get('debt', 0))
     short_debt = float(data.get('short_debt', 0))
+    require_finite(revenue=rev, ebitda=ebitda)
+    require_nonnegative(debt=debt, short_debt=short_debt)
 
     annual_service = (debt * 0.20) + (debt * 0.05)
     dscr = ebitda / annual_service if annual_service > 0 else (10.0 if ebitda > 0 else 0.0)

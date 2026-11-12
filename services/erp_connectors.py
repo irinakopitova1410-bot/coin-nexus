@@ -155,8 +155,18 @@ def _clean_number(val) -> Optional[float]:
 def _detect_erp_type(columns: List[str]) -> str:
     """Riconosce il tipo di ERP dai nomi delle colonne."""
     col_set = set(columns)
+    standard_names = {name.replace("_", " ").casefold()
+                      for name in (*REQUIRED_FIELDS, *OPTIONAL_FIELDS)}
     best_match = ("GENERIC", 0)
     for erp_name, mapping in ERP_COLUMN_MAPS.items():
+        # EBIT/EBITDA and other standard labels do not identify a vendor.
+        # Require at least one vendor-specific key, not a key shared by ERPs.
+        other_keys = set().union(*(set(other) for name, other in ERP_COLUMN_MAPS.items()
+                                   if name != erp_name))
+        distinctive = {key for key in mapping if key not in other_keys
+                       and key.replace("_", " ").casefold() not in standard_names}
+        if not col_set.intersection(distinctive):
+            continue
         matches = len(col_set.intersection(mapping.keys()))
         if matches > best_match[1]:
             best_match = (erp_name, matches)
@@ -167,17 +177,10 @@ def _apply_mapping(df: pd.DataFrame, erp_type: str) -> Dict[str, float]:
     """Applica il mapping colonne ERP → standard NEXUS."""
     mapping = ERP_COLUMN_MAPS.get(erp_type, {})
     result = {}
-
-    # Prima passa con il mapping esatto
-    for erp_col, nexus_col in mapping.items():
-        if erp_col in df.columns:
-            # Prendi la riga con il valore più recente (ultimo anno)
-            series = df[erp_col].apply(_clean_number).dropna()
-            if not series.empty:
-                result[nexus_col] = series.iloc[-1]
+    column_mapping = {col: mapping[col] for col in df.columns if col in mapping}
 
     # Fallback: cerca per nome simile (case-insensitive)
-    if erp_type == "GENERIC":
+    if not df.empty:  # Standard columns remain valid in mixed vendor files too.
         generic_map = {
             # Italiano
             "totale attivo": "total_assets", "totale_attivo": "total_assets",
@@ -224,13 +227,30 @@ def _apply_mapping(df: pd.DataFrame, erp_type: str) -> Dict[str, float]:
             "working capital": "working_capital",
             "year": "year", "fiscal year": "year",
         }
+        generic_map.update({name.replace("_", " "): name
+                            for name in (*REQUIRED_FIELDS, *OPTIONAL_FIELDS)})
         for col in df.columns:
             key = col.strip().lower().replace("_", " ")
-            if key in generic_map:
-                nexus_col = generic_map[key]
-                series = df[col].apply(_clean_number).dropna()
-                if not series.empty and nexus_col not in result:
-                    result[nexus_col] = series.iloc[-1]
+            if key in generic_map and col not in column_mapping:
+                column_mapping[col] = generic_map[key]
+
+    # Select ONE fiscal row for every metric. Never backfill missing latest-year
+    # values from older years, which would create a fictitious mixed balance sheet.
+    if not df.empty:
+        row_position = len(df) - 1
+        year_column = next((col for col, target in column_mapping.items()
+                            if target == "year"), None)
+        if year_column is not None:
+            years = [_clean_number(value) for value in df[year_column]]
+            valid_years = [(year, position) for position, year in enumerate(years)
+                           if year is not None and np.isfinite(year)]
+            if valid_years:
+                row_position = max(valid_years)[1]
+        row = df.iloc[row_position]
+        for col, nexus_col in column_mapping.items():
+            value = _clean_number(row[col])
+            if value is not None and np.isfinite(value) and nexus_col not in result:
+                result[nexus_col] = value
 
     # Calcola campi derivati se mancanti
     if "working_capital" not in result and "current_assets" in result and "current_liabilities" in result:

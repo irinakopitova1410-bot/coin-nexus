@@ -256,7 +256,7 @@ def show_ai_analyst():
         _tab_manuale_ai()
 
 
-def _mostra_relazione(relazione: dict):
+def _mostra_relazione(relazione: dict, key_prefix="ai_upload_result"):
     """Renderizza la relazione completa in modo professionale."""
     azienda = relazione["azienda"]
     anno    = relazione["anno"]
@@ -306,7 +306,7 @@ def _mostra_relazione(relazione: dict):
 
     st.download_button("📥 Scarica Relazione (TXT)", testo_completo,
                       f"Relazione_{azienda.replace(' ','_')}_{anno}.txt", "text/plain",
-                      use_container_width=True)
+                      use_container_width=True, key=f"{key_prefix}_txt")
 
 
 def _tab_upload_ai():
@@ -376,4 +376,4 @@ def _tab_manuale_ai():
         }
         with st.spinner("🤖 AI Analyst sta elaborando la relazione..."):
             relazione = genera_relazione_gestione(dati)
-        _mostra_relazione(relazione)
+        _mostra_relazione(relazione, key_prefix="ai_manual_result")

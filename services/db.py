@@ -3,20 +3,29 @@ from supabase import create_client, Client
 from typing import Optional, Dict, List
 import datetime
 import jwt as pyjwt
+import os
 
 _SUPABASE_URL = "https://ipmttldwfsxuubugiyir.supabase.co"
 _SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwbXR0bGR3ZnN4dXVidWdpeWlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwOTQxNzEsImV4cCI6MjA5MTY3MDE3MX0.HRFDqEKVCygVSKByVupgK3XGIkkpxxCyO7PH4LucPZg"
 
-@st.cache_resource
+def get_supabase_config():
+    """Allow environment-only deployments even when secrets.toml is absent."""
+    def setting(name, default):
+        try:
+            value = st.secrets.get(name)
+        except (FileNotFoundError, KeyError):
+            value = None
+        return value or os.getenv(name) or default
+    return setting("SUPABASE_URL", _SUPABASE_URL), setting("SUPABASE_KEY", _SUPABASE_KEY)
+
+
 def get_supabase() -> Client:
-    url = st.secrets.get("SUPABASE_URL", _SUPABASE_URL)
-    key = st.secrets.get("SUPABASE_KEY", _SUPABASE_KEY)
+    url, key = get_supabase_config()
     return create_client(url, key)
 
 def get_auth_supabase(access_token: str = None) -> Client:
     """Client Supabase con JWT utente — necessario per RLS."""
-    url = st.secrets.get("SUPABASE_URL", _SUPABASE_URL)
-    key = st.secrets.get("SUPABASE_KEY", _SUPABASE_KEY)
+    url, key = get_supabase_config()
     client = create_client(url, key)
     if access_token:
         client.postgrest.auth(access_token)
@@ -70,6 +79,8 @@ def get_dashboard_stats(tenant_id: str) -> Dict:
     return stats
 
 def get_recent_analyses(table: str, limit: int = 5, access_token: str = None) -> List[Dict]:
+    if not access_token or table not in {"analisi_rischio", "credit_reports", "audit_reports"}:
+        return []
     try:
         sb = get_auth_supabase(access_token) if access_token else get_supabase()
         res = sb.table(table).select("*").order("created_at", desc=True).limit(limit).execute()
@@ -79,9 +90,13 @@ def get_recent_analyses(table: str, limit: int = 5, access_token: str = None) ->
 
 def save_risk_analysis(data: Dict, access_token: str = None) -> bool:
     """Salva analisi rischio. Mappa i campi sul formato corretto della tabella."""
+    if not access_token:
+        return False
     try:
         sb = get_auth_supabase(access_token) if access_token else get_supabase()
         user_id = _extract_user_id(access_token)
+        if not user_id:
+            return False
 
         # Mappa campi: la tabella usa 'nome_azienda' (NOT NULL) non 'company_name'
         row = {
@@ -96,7 +111,7 @@ def save_risk_analysis(data: Dict, access_token: str = None) -> bool:
             "revenue": data.get("revenue"),
             "ebit": data.get("ebit"),
             "ebitda": data.get("ebitda"),
-            "created_at": datetime.datetime.utcnow().isoformat(),
+            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
         if user_id:
             row["user_id"] = user_id
@@ -110,13 +125,17 @@ def save_risk_analysis(data: Dict, access_token: str = None) -> bool:
 def save_credit_report(data: Dict, access_token: str = None) -> bool:
     """Salva credit report — resiliente: prova il payload completo, poi senza
     colonne opzionali, poi il minimo garantito. Usa raw_data (jsonb) per i metadati."""
+    if not access_token:
+        return False
     try:
         sb = get_auth_supabase(access_token) if access_token else get_supabase()
         user_id = _extract_user_id(access_token)
+        if not user_id:
+            return False
 
         raw = dict(data.get("raw_data") or {})
         payload = {k: v for k, v in data.items() if k != "raw_data"}
-        payload["created_at"] = datetime.datetime.utcnow().isoformat()
+        payload["created_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         if user_id:
             payload["user_id"] = user_id
             raw.setdefault("saved_for_user", user_id)
@@ -127,29 +146,24 @@ def save_credit_report(data: Dict, access_token: str = None) -> bool:
             sb.table("credit_reports").insert(payload).execute()
             return True
         except Exception:
-            # Schema senza user_id / raw_data → riprova senza colonne opzionali
-            payload.pop("user_id", None)
-            payload.pop("raw_data", None)
-            try:
-                sb.table("credit_reports").insert(payload).execute()
-                return True
-            except Exception:
-                minimal = {k: v for k, v in payload.items()
-                           if k in ("company_name", "rating", "decision",
-                                    "current_ratio", "created_at")}
-                if not minimal:
-                    return False
-                sb.table("credit_reports").insert(minimal).execute()
-                return True
+            # Never retry by stripping ownership or financial evidence.
+            # The current database contains both user_id and raw_data.
+            st.warning("Report non salvato. Verifica schema, permessi e sessione; nessun dato di proprietà è stato rimosso.")
+            return False
     except Exception as e:
         st.warning(f"Salvataggio credit report non disponibile: {e}")
         return False
 
 def save_audit_report(data: Dict, access_token: str = None) -> bool:
+    if not access_token:
+        return False
     try:
+        data = dict(data)
         sb = get_auth_supabase(access_token) if access_token else get_supabase()
-        data["created_at"] = datetime.datetime.utcnow().isoformat()
+        data["created_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         user_id = _extract_user_id(access_token)
+        if not user_id:
+            return False
         if user_id:
             data["user_id"] = user_id
         sb.table("audit_reports").insert(data).execute()

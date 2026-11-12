@@ -260,6 +260,7 @@ def render_financial_ratios():
             with cols[i % 3]:
                 data[key] = st.number_input(label, value=default, format="%.2f", key=f"ra_{key}")
 
+    input_signature = (company_name, industry, tuple(sorted(data.items())))
     if st.button("📊 CALCOLA TUTTI I RATIO", type="primary", use_container_width=True):
         # Safe values per calcolo
         safe_data = data.copy()
@@ -271,6 +272,11 @@ def render_financial_ratios():
             safe_data["revenue"] = 1
 
         result = calculate_all_ratios(safe_data, industry)
+        st.session_state["ratios_manual_result"] = (input_signature, result)
+
+    stored = st.session_state.get("ratios_manual_result")
+    if stored and stored[0] == input_signature:
+        result = stored[1]
         st.markdown("#### 📊 Risultato Analisi Manuale")
         _show_ratio_result(result, company_name, industry, key_suffix="manual")
 

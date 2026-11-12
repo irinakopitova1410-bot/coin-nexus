@@ -8,9 +8,6 @@ import pandas as pd
 from services.auth import is_admin, get_supabase, get_supabase_url
 from utils.ui_kit import page_header
 
-EDGE_FN_URL = "https://ipmttldwfsxuubugiyir.supabase.co/functions/v1/create-user"
-
-
 def _get_token() -> str:
     """Ritorna il JWT dell'admin loggato."""
     user = st.session_state.get("user", {})
@@ -23,8 +20,9 @@ def _call_edge(action: str, body: dict) -> dict:
     if not token:
         return {"error": "Sessione scaduta — rieffettua il login"}
     try:
+        edge_url = get_supabase_url().rstrip("/") + "/functions/v1/create-user"
         r = requests.post(
-            f"{EDGE_FN_URL}?action={action}",
+            f"{edge_url}?action={action}",
             json=body,
             headers={
                 "Authorization": f"Bearer {token}",
@@ -281,7 +279,7 @@ Password: {new_pwd}
             n_admins = sum(1 for u in all_users if u.get("role") == "admin")
 
             analyses_res = supabase.table("analisi_rischio").select("id", count="exact").execute()
-            credits_res = supabase.table("credit_analyses").select("id", count="exact").execute()
+            credits_res = supabase.table("credit_reports").select("id", count="exact").execute()
             audit_res = supabase.table("audit_reports").select("id", count="exact").execute()
 
             col1, col2, col3, col4, col5 = st.columns(5)

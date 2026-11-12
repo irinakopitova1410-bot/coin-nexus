@@ -59,9 +59,9 @@ def calcola_score_pillar(risposte: dict, domande: list) -> dict:
         val = risposte.get(chiave, default)
         if tipo == "bool":
             norm = 100.0 if val else 0.0
-        elif tipo == "%" and chiave == "emissioni_co2":
+        elif chiave == "emissioni_co2":
             # Inverso: meno emissioni → punteggio più alto
-            norm = (1 - (val - min_v) / (max_v - min_v)) * 100 if max_v > min_v else 50
+            norm = 100.0 - normalizza(val, min_v, max_v)
         else:
             norm = normalizza(val, min_v, max_v, tipo)
         punteggi.append({"label": label, "score": round(norm, 1)})
@@ -172,22 +172,21 @@ def grafico_benchmark(score: float) -> go.Figure:
 # ─── UI ──────────────────────────────────────────────────────────────────────
 def show_esg_scoring():
     page_header(
-        kicker="Big Four Suite · EBA Guidelines 2026",
+        kicker="Sostenibilità · Questionario gestionale",
         title="ESG",
         highlight="Scoring",
-        subtitle="Environmental · Social · Governance — il rating che le banche valutano per accesso al credito e Green Loan.",
+        subtitle="Environmental · Social · Governance — autovalutazione orientativa, non certificazione o rating bancario.",
     )
 
-    with st.expander("ℹ️ Perché l'ESG è cruciale per il credito nel 2026?", expanded=False):
+    st.caption("Pesi e soglie del punteggio sono interni a NEXUS e non sono prescritti o validati dall’EBA. "
+               "Il risultato non attesta conformità CSRD, Tassonomia UE o idoneità a finanziamenti.")
+    with st.expander("ℹ️ Come interpretare questo punteggio ESG", expanded=False):
         st.markdown("""
-        **Dal 2026, le banche devono valutare il rischio ESG nei prestiti** (EBA Guidelines on Loan Origination):
-        
-        - 🏦 **Rating ESG alto** → tasso d'interesse più basso + accesso a **Green Loan** e **Sustainability-Linked Loan**
-        - 📉 **Rating ESG basso** → rischio "stranded asset" → le banche possono rifiutare il credito
-        - ⚖️ **CSRD** (Corporate Sustainability Reporting Directive): obbligo rendicontazione ESG per PMI dal 2026-2028
-        - 🌿 **Tassonomia UE**: solo investimenti "verdi" ottengono fondi agevolati BEI/CDP
+        **Il punteggio organizza le risposte al questionario e aiuta a individuare aree da approfondire.**
 
-        Il tuo **ESG Score Nexus** mostra alle banche: "questa azienda è un investimento sicuro nel lungo termine".
+        - Un punteggio elevato non garantisce credito, tassi migliori o accesso a prodotti green.
+        - Gli obblighi di rendicontazione dipendono da impresa, dimensioni, ambito e norme applicabili.
+        - Per attestazioni, requisiti di finanziamento e conformità occorrono documenti verificati e una valutazione professionale.
         """)
 
     tab_upload, tab_manuale = st.tabs(["⚡ Carica & Analizza", "📝 Questionario ESG"])
@@ -198,7 +197,7 @@ def show_esg_scoring():
         _tab_manuale_esg()
 
 
-def _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda="Azienda"):
+def _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda="Azienda", key_prefix="esg_upload_result"):
     risultati = calcola_esg_totale(dati_e, dati_s, dati_g)
     score_tot = risultati["totale"]
     rating = risultati["rating"]
@@ -219,11 +218,11 @@ def _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda="Azienda"):
         </div>
         """, unsafe_allow_html=True)
     with col_e:
-        st.plotly_chart(grafico_gauge_esg(risultati["E"]["score"], "🌍 Environmental"), use_container_width=True)
+        st.plotly_chart(grafico_gauge_esg(risultati["E"]["score"], "🌍 Environmental"), use_container_width=True, key=f"{key_prefix}_e")
     with col_s:
-        st.plotly_chart(grafico_gauge_esg(risultati["S"]["score"], "👥 Social"), use_container_width=True)
+        st.plotly_chart(grafico_gauge_esg(risultati["S"]["score"], "👥 Social"), use_container_width=True, key=f"{key_prefix}_s")
     with col_g:
-        st.plotly_chart(grafico_gauge_esg(risultati["G"]["score"], "⚖️ Governance"), use_container_width=True)
+        st.plotly_chart(grafico_gauge_esg(risultati["G"]["score"], "⚖️ Governance"), use_container_width=True, key=f"{key_prefix}_g")
 
     # Impatto credito
     impatto_color = "#16A34A" if score_tot >= 55 else "#D97706" if score_tot >= 40 else "#ef4444"
@@ -239,9 +238,9 @@ def _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda="Azienda"):
     # Grafici
     col_g1, col_g2 = st.columns([1, 1])
     with col_g1:
-        st.plotly_chart(grafico_radar_esg(risultati), use_container_width=True)
+        st.plotly_chart(grafico_radar_esg(risultati), use_container_width=True, key=f"{key_prefix}_radar")
     with col_g2:
-        st.plotly_chart(grafico_benchmark(score_tot), use_container_width=True)
+        st.plotly_chart(grafico_benchmark(score_tot), use_container_width=True, key=f"{key_prefix}_benchmark")
 
     # Raccomandazioni
     st.markdown("### 💡 Piano di Miglioramento ESG")
@@ -274,7 +273,7 @@ def _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda="Azienda"):
     csv_out = pd.DataFrame(export_data).to_csv(index=False)
     st.download_button("📥 Scarica Report ESG (CSV)", csv_out,
                       f"ESG_{azienda.replace(' ','_')}.csv", "text/csv",
-                      use_container_width=True)
+                      use_container_width=True, key=f"{key_prefix}_csv")
 
 
 def _tab_upload_esg():
@@ -374,4 +373,4 @@ def _tab_manuale_esg():
         submitted = st.form_submit_button("🌿 Calcola ESG Score", use_container_width=True, type="primary")
 
     if submitted:
-        _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda)
+        _esegui_analisi_esg(dati_e, dati_s, dati_g, azienda, key_prefix="esg_manual_result")

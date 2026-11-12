@@ -11,7 +11,7 @@ from utils.ui_kit import page_header, chip_row, kpi_row, pill, empty_state, mono
 
 # ── Motore di intent (regole, italiano) ───────────────────────────────────────
 INTENTS = [
-    ("readiness",    "Credit Readiness",     ["credito", "banca", "readiness", "finanziab", "ottenere credito", "fido", "prestito", "mutuo"]),
+    ("credit_readiness",    "Credit Readiness",     ["credito", "banca", "readiness", "finanziab", "ottenere credito", "fido", "prestito", "mutuo"]),
     ("risk_analysis","Z-Score Altman",       ["z-score", "zscore", "altman", "zona di rischio", "fallimentare", "insolvenza statistica"]),
     ("whatif_simulator", "What-If Simulator",["simula", "scenario", "what-if", "what if", "e se", "ipotizzo"]),
     ("cashflow",     "Cash Flow",            ["cash flow", "flusso", "liquidit", "tesoreria", "ccn", "circolante"]),

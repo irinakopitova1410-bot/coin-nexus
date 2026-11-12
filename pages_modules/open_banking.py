@@ -56,14 +56,17 @@ def genera_movimenti_demo(saldo_iniziale: float = 50000, giorni: int = 90) -> pd
                     "saldo": round(saldo, 2)
                 })
 
-    return pd.DataFrame(movimenti).sort_values("data", ascending=False)
+    return pd.DataFrame(movimenti).sort_values("data", ascending=False, kind="stable")
 
 
 def analisi_flussi(df: pd.DataFrame) -> dict:
     """Analizza i flussi bancari per previsione e alerting."""
     entrate = df[df["importo"] > 0]["importo"].sum()
     uscite = abs(df[df["importo"] < 0]["importo"].sum())
-    saldo_attuale = df.iloc[0]["saldo"] if len(df) > 0 else 0
+    # CSV statements commonly arrive oldest first. Never use the opening row
+    # as today's balance; stable sorting preserves same-day transaction order.
+    chronological = df.assign(_date=pd.to_datetime(df["data"], errors="raise")).sort_values("_date", kind="stable")
+    saldo_attuale = chronological.iloc[-1]["saldo"] if len(df) > 0 else 0
     flusso_netto = entrate - uscite
     giorni = (pd.to_datetime(df["data"].max()) - pd.to_datetime(df["data"].min())).days + 1
     burn_rate_giornaliero = uscite / giorni if giorni > 0 else 0
@@ -374,6 +377,8 @@ def _tab_upload_estratto():
             if "tipo" not in df.columns:
                 df["tipo"] = df["importo"].apply(lambda x: "CREDIT" if x > 0 else "DEBIT")
             if "saldo" not in df.columns:
+                if "data" in df.columns:
+                    df = df.assign(_date=pd.to_datetime(df["data"], errors="raise")).sort_values("_date", kind="stable").drop(columns="_date")
                 df["saldo"] = df["importo"].cumsum()
             if "data" not in df.columns:
                 df["data"] = pd.date_range(end=datetime.now(), periods=len(df)).strftime("%Y-%m-%d")

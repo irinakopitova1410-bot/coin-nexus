@@ -258,8 +258,9 @@ def show_audit_report():
                 st.markdown("### 📊 Risultati Audit ISA 320")
                 _show_audit_result(result, company_name, key_suffix="upload")
 
-                # Auto-salvataggio
-                saved = save_audit_report({
+                # Persist only on an explicit action, not upload/widget reruns.
+                if st.button("💾 Salva Audit Report", key="audit_save_upload"):
+                    saved = save_audit_report({
                     "company_name": company_name,
                     "gross_profit": gross_profit,
                     "total_assets": total_assets,
@@ -275,12 +276,12 @@ def show_audit_report():
                     "risk_level": risk_level,
                     "internal_control_score": internal_control_score,
                     "error_rate": error_rate,
-                }, access_token=access_token)
+                    }, access_token=access_token)
 
-                if saved:
-                    st.toast("💾 Audit report salvato su Supabase!", icon="✅")
-                else:
-                    st.warning("⚠️ Calcolato ma non salvato — effettua il login per salvare.")
+                    if saved:
+                        st.toast("💾 Audit report salvato su Supabase!", icon="✅")
+                    else:
+                        st.warning("⚠️ Calcolato ma non salvato — effettua il login per salvare.")
 
     # ══════════════════════════════════════════════════════════
     #  TAB 2 — FORM MANUALE

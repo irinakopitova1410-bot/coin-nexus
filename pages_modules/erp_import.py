@@ -5,6 +5,7 @@ Import da SAP, Zucchetti, TeamSystem, Sage, MS Dynamics, CSV generico.
 import streamlit as st
 import pandas as pd
 import io
+import hashlib
 from services.erp_connectors import (
     parse_erp_file, get_template_df,
     REQUIRED_FIELDS, OPTIONAL_FIELDS, ERP_COLUMN_MAPS
@@ -65,7 +66,7 @@ def render_erp_import():
 
     if uploaded:
         with st.spinner("⚙️ Analisi del file in corso..."):
-            file_bytes = uploaded.read()
+            file_bytes = uploaded.getvalue()
             result = parse_erp_file(file_bytes, uploaded.name)
 
         if not result.success:
@@ -93,6 +94,11 @@ def render_erp_import():
         st.subheader("✏️ Verifica e correggi i dati")
 
         all_fields = {**REQUIRED_FIELDS, **OPTIONAL_FIELDS}
+        signature = hashlib.sha256(file_bytes).hexdigest()
+        if st.session_state.get("erp_upload_sig") != signature:
+            for field in all_fields:
+                st.session_state[f"erp_{field}"] = float(result.data.get(field, 0.0))
+            st.session_state["erp_upload_sig"] = signature
         edited_data = {}
 
         cols = st.columns(3)

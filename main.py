@@ -1,58 +1,23 @@
-
-import os
+"""Legacy API entry point; financial scoring requires a validated full model."""
 from fastapi import FastAPI, HTTPException, Header
-from pydantic import BaseModel
-from supabase import create_client, Client
-import datetime
-
-# Configurazione da variabili d'ambiente (Render -> Settings -> Environment Variables)
-url = os.environ.get("SUPABASE_URL", "https://ipmttldwfsxuubugiyir.supabase.co")
-key = os.environ.get("SUPABASE_KEY", "")
-supabase: Client = create_client(url, key) if url and key else None
+from pydantic import BaseModel, ConfigDict, Field
 
 app = FastAPI()
 
+
 class ScoringRequest(BaseModel):
-    company_name: str
-    revenue: float
+    model_config = ConfigDict(allow_inf_nan=False)
+    company_name: str = Field(min_length=1, max_length=250)
+    revenue: float = Field(ge=0)
     ebitda: float
-    total_debt: float
+    total_debt: float = Field(ge=0)
+
 
 @app.post("/v1/scoring/analyze")
 async def analyze(data: ScoringRequest, x_api_key: str = Header(None)):
-    if supabase is None:
-        raise HTTPException(status_code=500, detail="Supabase non configurato (SUPABASE_URL / SUPABASE_KEY)")
-
-    # 1. Trova il cliente
-    res = supabase.table("tenants").select("*").eq("api_key", x_api_key).execute()
-    if not res.data:
-        raise HTTPException(status_code=403, detail="API Key non valida")
-
-    tenant = res.data[0]
-
-    # 2. Calcola lo Z-Score (Logica Nexus)
-    # Esempio semplificato:
-    z = (1.2 * (data.revenue * 0.1 / data.total_debt)) + (3.3 * (data.ebitda / data.total_debt))
-    pd = 1 / (1 + (z**2.5))
-
-    # 3. SCRIVI NELLA TABELLA CHE STAI GUARDANDO (analysis_logs)
-    supabase.table("analysis_logs").insert({
-        "tenant_id": tenant['id'],
-        "company_name": data.company_name,
-        "z_score": round(z, 2),
-        "pd_rate": round(pd * 100, 2),
-        "status_code": 200
-    }).execute()
-
-    # 4. SCALA IL CREDITO
-    new_balance = tenant['credit_balance'] - 1
-    supabase.table("tenants").update({"credit_balance": new_balance}).eq("id", tenant['id']).execute()
-
-    return {
-        "status": "success",
-        "results": {
-            "score": round(z, 2),
-            "rating": "SOLIDO" if z > 2.6 else "VULNERABILE",
-            "credits_left": new_balance
-        }
-    }
+    # The previous three-field approximation was not an Altman Z-Score or
+    # validated PD. Never persist or charge for its results.
+    raise HTTPException(status_code=503, detail=(
+        "Endpoint legacy sospeso: modello non validato. "
+        "Usare il flusso di analisi completo; nessun credito è stato addebitato."
+    ))

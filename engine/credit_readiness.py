@@ -3,9 +3,10 @@ NEXUS Finance Pro — Credit Readiness Engine
 Motore unificato: da bilancio → Credit Score → Credito ottenibile → Azioni prioritarie → Crisi detector
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import List, Dict, Optional, Tuple
 import math
+from ._validation import require_finite, require_nonnegative
 
 
 # ─── Costanti bancarie italiane ──────────────────────────────────────────────
@@ -144,6 +145,10 @@ class CreditReadinessResult:
 class CreditReadinessEngine:
     
     def __init__(self, data: BalanceInput):
+        require_finite(**vars(data))
+        require_nonnegative(fatturato=data.fatturato,
+                            debiti_finanziari=data.debiti_finanziari,
+                            passivo_corrente=data.passivo_corrente)
         self.d = data
         self._safe_fatturato = max(data.fatturato, 1.0)  # evita div/0
     
@@ -171,7 +176,9 @@ class CreditReadinessEngine:
         ebitda_potenziale = ebitda + ebitda_boost
         
         # 6. Credito potenziale (score dopo miglioramento)
-        score_potenziale = min(100, score + len(azioni) * 4)
+        # Re-score the improved financials; an action is not itself creditworthiness.
+        improved = CreditReadinessEngine(replace(self.d, ebitda=ebitda_potenziale))
+        score_potenziale = min(100, sum(improved._compute_score_breakdown().values()))
         rating_pot, _, _ = self._score_to_rating(score_potenziale)
         multiplo_pot = BANK_EBITDA_MULTIPLES.get(rating_pot, 2.0)
         credito_potenziale = max(0, ebitda_potenziale * multiplo_pot - self.d.debiti_finanziari)
@@ -209,7 +216,8 @@ class CreditReadinessEngine:
             mesi_alla_crisi=mesi_crisi,
             rischio_default_pct=rischio_default,
             stato=stato,
-            messaggio_principale=msg,
+            messaggio_principale=(msg + " Stima indicativa, non delibera bancaria. "
+                                  "Probabilità e tempi di crisi sono euristiche non validate."),
         )
     
     # ── Score breakdown ───────────────────────────────────────────────────────
@@ -301,7 +309,7 @@ class CreditReadinessEngine:
     
     def _score_to_rating(self, score: float) -> Tuple[str, str, str]:
         for (lo, hi), (rating, emoji, label) in SCORE_THRESHOLDS.items():
-            if lo <= score <= hi:
+            if lo <= score <= 100:
                 return rating, emoji, label
         return "D", "⛔", "Non finanziabile"
     
@@ -394,8 +402,9 @@ class CreditReadinessEngine:
                     costo_attuale_pct=pct,
                     benchmark_pct=bench,
                     taglio_consigliato_pct=taglio_pct,
-                    impatto_ebitda_eur=impatto_ebitda,
-                    impatto_credito_eur=impatto_ebitda * multiplo,
+                    # Interest is below EBITDA: refinancing cannot improve it.
+                    impatto_ebitda_eur=0.0,
+                    impatto_credito_eur=0.0,
                     priorita=4,
                     difficolta="Media",
                     timeline_mesi=4,

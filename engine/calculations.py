@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Dict, List
+from ._validation import require_finite, require_nonnegative
 
 # ══════════════════════════════════════════════════
 # ALTMAN Z-SCORE
@@ -32,13 +33,14 @@ def _prob_from_z(z: float, safe_min: float, grey_min: float) -> float:
 
 def _projections(z: float) -> List[Dict]:
     return [
-        {"Anno": f"+{y}", "Scenario Base": round(z * (1 + g), 3), "Scenario Stress": round(z * (1 - s), 3)}
+        {"Anno": f"+{y}", "Scenario Base": round(z + abs(z) * g, 3), "Scenario Stress": round(z - abs(z) * s, 3)}
         for y, g, s in [(1, 0.12, 0.08), (2, 0.26, 0.15), (3, 0.42, 0.22), (4, 0.60, 0.28)]
     ]
 
 def altman_z_original(working_capital, total_assets, retained_earnings, ebit,
                        market_cap, total_liabilities, revenue) -> AltmanResult:
     """Z-Score 1968 — Quotate manifatturiere"""
+    _validate_altman(locals())
     x1 = working_capital / total_assets
     x2 = retained_earnings / total_assets
     x3 = ebit / total_assets
@@ -64,6 +66,7 @@ def altman_z_original(working_capital, total_assets, retained_earnings, ebit,
 def altman_z_prime(working_capital, total_assets, retained_earnings, ebit,
                     book_equity, total_liabilities, revenue) -> AltmanResult:
     """Z'-Score 1983 — Aziende private"""
+    _validate_altman(locals())
     x1 = working_capital / total_assets
     x2 = retained_earnings / total_assets
     x3 = ebit / total_assets
@@ -89,6 +92,7 @@ def altman_z_prime(working_capital, total_assets, retained_earnings, ebit,
 def altman_z_doubleprime(working_capital, total_assets, retained_earnings, ebit,
                           book_equity, total_liabilities) -> AltmanResult:
     """Z''-Score 1995 — Non manifatturiere/Servizi"""
+    _validate_altman(locals())
     x1 = working_capital / total_assets
     x2 = retained_earnings / total_assets
     x3 = ebit / total_assets
@@ -109,12 +113,21 @@ def altman_z_doubleprime(working_capital, total_assets, retained_earnings, ebit,
         thresholds={"safe": 2.6, "grey_low": 1.1}
     )
 
+def _validate_altman(values):
+    require_finite(**values)
+    for name in ("total_assets", "total_liabilities"):
+        if values[name] <= 0:
+            raise ValueError(f"{name} must be positive for the Altman model")
+
+
 def _rec(zone: str) -> str:
-    return {
+    recommendation = {
         "safe": "✅ Struttura finanziaria solida. L'azienda non presenta segnali di crisi. Monitoraggio ordinario annuale.",
         "grey": "⚠️ Attenzione: l'azienda si trova nella zona grigia. Raccomandato monitoraggio trimestrale e revisione del piano finanziario.",
         "distress": "🚨 URGENTE: l'azienda è in zona di pericolo. Intervento immediato: ristrutturazione del debito, aumento del capitale, riduzione dei costi."
     }[zone]
+    return (recommendation + " Le percentuali di fallimento, i rating e gli scenari mostrati "
+            "sono euristiche illustrative non calibrate, non probabilità o previsioni validate.")
 
 
 # ══════════════════════════════════════════════════
@@ -169,10 +182,13 @@ def _score_cr(v):
 def calculate_credit_score(ebit, depreciation, interest_expense, debt_repayment,
                             total_debt, ebitda, net_revenue, current_assets,
                             current_liabilities, total_equity) -> CreditResult:
-    dscr = (ebit+depreciation)/(interest_expense+debt_repayment) if (interest_expense+debt_repayment) > 0 else 5.0
+    require_finite(**locals())
+    require_nonnegative(interest_expense=interest_expense, debt_repayment=debt_repayment,
+                        total_debt=total_debt, current_liabilities=current_liabilities)
+    dscr = (ebit+depreciation)/(interest_expense+debt_repayment) if (interest_expense+debt_repayment) > 0 else (5.0 if ebit+depreciation > 0 else 0.0)
     leverage = total_debt/total_equity if total_equity > 0 else 10.0
     ebitda_margin = (ebitda/net_revenue*100) if net_revenue > 0 else 0
-    current_ratio = current_assets/current_liabilities if current_liabilities > 0 else 3.0
+    current_ratio = current_assets/current_liabilities if current_liabilities > 0 else (3.0 if current_assets > 0 else 0.0)
 
     ds = _score_dscr(dscr)
     ls = _score_leverage(leverage)
@@ -195,6 +211,8 @@ def calculate_credit_score(ebit, depreciation, interest_expense, debt_repayment,
     if ebitda_margin < 10: recs.append("⚠️ Margine EBITDA basso: ottimizzare i costi operativi")
     if current_ratio < 1.2: recs.append("⚠️ Liquidità corrente insufficiente: gestire il capitale circolante")
     if not recs: recs.append("✅ Profilo finanziario eccellente. Mantenere la struttura attuale.")
+    recs.append("Score, decisione e credito massimo sono stime euristiche, non una delibera bancaria. "
+                "Il DSCR qui usa EBITDA come proxy dei flussi disponibili al servizio del debito.")
 
     return CreditResult(
         score=round(score,1), rating=rating, decision=decision,
@@ -223,6 +241,11 @@ class AuditResult:
 
 def calculate_audit(gross_profit, total_assets, net_revenue, pre_tax_income,
                     internal_control_score, error_rate, risk_level) -> AuditResult:
+    require_finite(gross_profit=gross_profit, total_assets=total_assets,
+                   net_revenue=net_revenue, pre_tax_income=pre_tax_income,
+                   internal_control_score=internal_control_score, error_rate=error_rate)
+    if not 0 <= internal_control_score <= 10 or not 0 <= error_rate <= 100:
+        raise ValueError("Control score must be 0–10 and error rate 0–100")
     opts = {}
     if abs(gross_profit) > 0: opts["profit"] = abs(gross_profit)*0.05
     if total_assets > 0: opts["assets"] = total_assets*0.01
@@ -262,9 +285,11 @@ def calculate_audit(gross_profit, total_assets, net_revenue, pre_tax_income,
     if error_rate > 2: recs.append("Implementare riconciliazioni mensili e quadrature sistematiche")
     if risk_level == "high": recs.append("Aumentare le procedure di audit nei cicli ad alto rischio")
     if not recs: recs.append("Mantenere l'attuale struttura di controllo interno")
+    recs.append("Simulazione orientativa: ISA 320 riguarda la significatività. Questi dati non "
+                "consentono di emettere un giudizio di revisione né di attestare l'assenza di rischi.")
 
     return AuditResult(
         materiality=round(materiality,2), performance_materiality=round(perf_mat,2),
-        trivial_threshold=round(trivial,2), score=score, judgment=judgment,
+        trivial_threshold=round(trivial,2), score=score, judgment="SIMULAZIONE — " + judgment,
         judgment_color=jcolor, risks=risks, recommendations=recs
     )

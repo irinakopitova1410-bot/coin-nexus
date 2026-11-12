@@ -26,7 +26,7 @@ DSCR_SOGLIA_ALLERTA = 1.1      # Zona di attenzione
 DSCR_SOGLIA_SICURA  = 1.25     # Zona sicura
 INDICI_CCII = {
     "DSCR": "Debt Service Coverage Ratio (≥1.0 obbligatorio per legge)",
-    "Patrimonio netto / Totale debiti": "≥ 8% → allerta CCII",
+    "Patrimonio netto / Totale debiti": "< 8% → attenzione secondo criterio interno",
     "Oneri finanziari / Ricavi": "≤ 3% → OK; >3% allerta",
     "EBITDA / Debito finanziario netto": "≥ 1.0 → sostenibile",
     "Liquidità corrente": "≥ 1.0 → equilibrio finanziario",
@@ -86,7 +86,7 @@ def calcola_indici_ccii(dati: dict) -> dict:
         "allerta": dscr < DSCR_SOGLIA_ALLERTA,
         "critico": dscr < DSCR_SOGLIA_CRITICA,
         "unita": "x",
-        "descrizione": f"{'🔴 ALLERTA CCII' if dscr < 1.0 else '🟡 Attenzione' if dscr < 1.1 else '🟢 OK'}",
+        "descrizione": f"{'🔴 ALLERTA GESTIONALE' if dscr < 1.0 else '🟡 Attenzione' if dscr < 1.1 else '🟢 OK'}",
         "legge": "Art. 3 D.Lgs. 14/2019 — soglia legale ≥ 1.0"
     }
 
@@ -155,11 +155,11 @@ def genera_narrative_allerta(indici: dict, dscr_df: pd.DataFrame) -> list[str]:
 
     if indici["DSCR"]["critico"]:
         allerte.append({
-            "livello": "🚨 CRITICO — Obbligo CCII",
+            "livello": "🚨 CRITICO — Verifica professionale",
             "messaggio": f"DSCR = {indici['DSCR']['valore']}x — SOTTO LA SOGLIA LEGALE (1.0x). "
                         "L'organo di controllo DEVE segnalare la crisi. "
                         "Obbligo di adottare misure entro 30 giorni.",
-            "azione": "Convocare CDA straordinario + piano di risanamento ex art. 56 CCII"
+            "azione": "Sottoporre tempestivamente i dati agli organi aziendali e ai professionisti per valutare le azioni appropriate"
         })
 
     if indici["PN/Debiti"]["critico"]:
@@ -184,13 +184,13 @@ def genera_narrative_allerta(indici: dict, dscr_df: pd.DataFrame) -> list[str]:
         allerte.append({
             "livello": "⚠️ ALLERTA — Oneri finanziari eccessivi",
             "messaggio": f"Oneri finanziari/Ricavi = {indici['Oneri/Ricavi']['valore']}% "
-                        "(soglia CCII: 3%). Il costo del debito erode i margini.",
+                        "(soglia interna: 3%). Il costo del debito erode i margini.",
             "azione": "Rinegoziare tassi o estinguere anticipatamente i debiti più costosi"
         })
 
     if not allerte:
         allerte.append({
-            "livello": "✅ NESSUNA ALLERTA CCII",
+            "livello": "✅ NESSUNA ALLERTA GESTIONALE",
             "messaggio": "Tutti gli indici di allerta sono nei range di sicurezza. "
                         "L'azienda non è soggetta a obblighi di segnalazione.",
             "azione": "Continuare monitoraggio trimestrale"
@@ -212,7 +212,7 @@ def grafico_dscr_proiezione(df: pd.DataFrame) -> go.Figure:
         textposition="outside"
     ))
     fig.add_hline(y=DSCR_SOGLIA_CRITICA, line_dash="dash", line_color="#ef4444",
-                  annotation_text="⚠️ Soglia CCII (1.0)")
+                  annotation_text="⚠️ Soglia interna (1.0)")
     fig.add_hline(y=DSCR_SOGLIA_ALLERTA, line_dash="dot", line_color="#f59e0b",
                   annotation_text="Attenzione (1.1)")
     fig.add_hline(y=DSCR_SOGLIA_SICURA, line_dash="dot", line_color="#22c55e",
@@ -292,26 +292,22 @@ def show_early_warning():
         kicker="Big Four Suite · CCII — D.Lgs. 14/2019",
         title="Early Warning",
         highlight="System",
-        subtitle="DSCR monitoring a 12 mesi · indici di allerta obbligatori per legge · rilevazione tempestiva dello stato di crisi.",
+        subtitle="Monitoraggio orientativo della sostenibilità del debito e degli indicatori finanziari.",
     )
 
     # Info normativa
-    with st.expander("ℹ️ Cos'è il DSCR e perché è obbligatorio?", expanded=False):
+    st.caption("Indicatori e soglie interne di monitoraggio: non certificano lo stato di crisi né determinano "
+               "automaticamente obblighi legali. Richiedono verifica professionale e dati prospettici completi.")
+    with st.expander("ℹ️ Come interpretare la copertura del debito", expanded=False):
         st.markdown("""
-        **D.Lgs. 14/2019 — Codice della Crisi d'Impresa e dell'Insolvenza (CCII)**
+        **Il DSCR finanziario confronta i flussi di cassa disponibili per il debito con il servizio del debito dello stesso periodo.**
 
-        Dal 15 luglio 2022, le imprese italiane sono obbligate ad adottare **"assetti organizzativi, 
-        amministrativi e contabili"** per rilevare tempestivamente lo stato di crisi.
+        Questa sezione usa **EBITDA / (interessi + rimborsi)** come indicatore semplificato: l’EBITDA non è cassa disponibile.
+        Non sostituisce un DSCR fondato su un piano di tesoreria prospettico.
 
-        L'indicatore principale previsto dall'art. 3 CCII è il **DSCR (Debt Service Coverage Ratio)**:
-
-        > **DSCR = EBITDA prospettico / Servizio del debito (interessi + quota capitale)**
-
-        - **DSCR < 1.0** → L'azienda NON genera abbastanza cash per pagare i debiti → **obbligo di segnalazione**
-        - **DSCR 1.0–1.1** → Zona di attenzione → monitoraggio intensificato
-        - **DSCR ≥ 1.25** → Zona sicura
-
-        L'organo di controllo (sindaco/revisore) che non segnala la crisi rischia **responsabilità civile e penale**.
+        Valori inferiori a 1 indicano una copertura insufficiente secondo questa proxy; valori superiori non garantiscono solvibilità.
+        Le soglie visualizzate sono criteri interni di attenzione, non soglie normative universali.
+        La valutazione degli adeguati assetti, dei segnali di crisi e degli obblighi applicabili compete ai professionisti e agli organi aziendali.
         """)
 
     tab_upload, tab_manuale = st.tabs(["⚡ Carica & Analizza", "📝 Inserisci Manualmente"])
@@ -323,7 +319,7 @@ def show_early_warning():
         _tab_manuale_early_warning()
 
 
-def _esegui_analisi_early_warning(dati: dict, crescita_ebitda: float = 0.0, crescita_debito: float = 0.0):
+def _esegui_analisi_early_warning(dati: dict, crescita_ebitda: float = 0.0, crescita_debito: float = 0.0, key_prefix="ew_upload_result"):
     """Esegue e mostra l'analisi completa Early Warning."""
     azienda = dati.get("azienda", "Azienda")
 
@@ -373,14 +369,14 @@ def _esegui_analisi_early_warning(dati: dict, crescita_ebitda: float = 0.0, cres
     # Grafici
     col_g1, col_g2 = st.columns([2, 1])
     with col_g1:
-        st.plotly_chart(grafico_dscr_proiezione(dscr_df), use_container_width=True)
+        st.plotly_chart(grafico_dscr_proiezione(dscr_df), use_container_width=True, key=f"{key_prefix}_projection")
     with col_g2:
-        st.plotly_chart(grafico_radar_indici(indici), use_container_width=True)
+        st.plotly_chart(grafico_radar_indici(indici), use_container_width=True, key=f"{key_prefix}_radar")
 
     # Tabella DSCR mensile
     with st.expander("📋 Dettaglio DSCR mese per mese"):
         st.dataframe(
-            dscr_df[["Mese", "DSCR", "Status"]].style.applymap(
+            dscr_df[["Mese", "DSCR", "Status"]].style.map(
                 lambda v: "color: #ef4444" if isinstance(v, str) and "Crisi" in v
                 else "color: #f59e0b" if isinstance(v, str) and "Allerta" in v
                 else "color: #22c55e" if isinstance(v, str) and "Sicuro" in v else "",
@@ -397,7 +393,7 @@ def _esegui_analisi_early_warning(dati: dict, crescita_ebitda: float = 0.0, cres
             "Indice": nome.replace("_", " "),
             "Valore": f"{ind['valore']}{ind['unita']}",
             "Status": ind["descrizione"],
-            "Riferimento normativo": ind["legge"]
+            "Riferimento da verificare": ind["legge"]
         })
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
@@ -408,9 +404,9 @@ def _esegui_analisi_early_warning(dati: dict, crescita_ebitda: float = 0.0, cres
         csv_out = dscr_df.to_csv(index=False)
         st.download_button("📥 Scarica proiezione DSCR (CSV)", csv_out,
                           f"DSCR_{azienda.replace(' ','_')}.csv", "text/csv",
-                          use_container_width=True)
+                          use_container_width=True, key=f"{key_prefix}_csv")
     with col_e2:
-        st.info("📄 Report PDF CCII completo disponibile dalla sezione Audit Report ISA 320")
+        st.info("La stampa di questa schermata non costituisce una certificazione CCII. Il report Audit riguarda una diversa analisi.")
 
 
 def _tab_upload_early_warning():
@@ -418,7 +414,7 @@ def _tab_upload_early_warning():
     <div style='background: rgba(220,38,38,0.1); border: 1px solid rgba(220,38,38,0.3);
                 border-radius: 10px; padding: 1rem; margin-bottom: 1rem;'>
         <b>⚡ Carica il bilancio</b> — il sistema analizza automaticamente DSCR e tutti 
-        gli indici di allerta CCII obbligatori per legge.
+        indicatori gestionali orientativi, da validare con un professionista.
     </div>
     """, unsafe_allow_html=True)
 
@@ -504,4 +500,4 @@ def _tab_manuale_early_warning():
             "passivo_corrente": pass_corr,
             "debito_finanziario_netto": debiti * 0.6,
         }
-        _esegui_analisi_early_warning(dati, crescita_ebitda, crescita_debito)
+        _esegui_analisi_early_warning(dati, crescita_ebitda, crescita_debito, key_prefix="ew_manual_result")

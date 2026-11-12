@@ -7,6 +7,11 @@ Confronto con benchmark PMI italiani per settore.
 """
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
+from ._validation import require_finite, require_nonnegative
+
+
+# Interest and depreciation are not deducted in EBITDA.
+NON_EBITDA_COSTS = {"finance", "depreciation"}
 
 
 # ─── Benchmark PMI Italiane (% sui ricavi) ────────────────────────────────────
@@ -168,7 +173,7 @@ class CostOptimizerResult:
     items: List[CostItem]              # ordinati per priorità
     total_savings_eur: float           # risparmio totale potenziale
     ebitda_after_fix: float            # EBITDA % dopo fix
-    top_problem: CostItem              # il problema principale
+    top_problem: Optional[CostItem]    # il problema principale
     quick_wins: List[CostItem]         # top 3 fix rapidi
     risk_level: str                    # "alto" | "medio" | "basso"
     summary: str                       # testo sintetico
@@ -190,11 +195,18 @@ def analyze_costs(
     industry: Settore dell'azienda
     current_ebitda: EBITDA attuale in € (se noto)
     """
+    require_finite(revenue=revenue)
+    if revenue <= 0:
+        raise ValueError("revenue must be positive for cost benchmarking")
+    require_nonnegative(**costs)
+    if current_ebitda is not None:
+        require_finite(current_ebitda=current_ebitda)
     bm = COST_BENCHMARKS.get(industry, COST_BENCHMARKS["Manifatturiero"])
     ebitda_target = bm["ebitda_target"]
     
     # EBITDA attuale
-    total_costs = sum(v for k, v in costs.items() if k != "ebitda_target")
+    total_costs = sum(v for k, v in costs.items()
+                      if k not in NON_EBITDA_COSTS | {"ebitda_target"})
     if current_ebitda is None:
         current_ebitda = revenue - total_costs
     current_ebitda_pct = current_ebitda / revenue if revenue > 0 else 0
@@ -230,7 +242,7 @@ def analyze_costs(
         total_savings += savings
         
         # Impatto sull'EBITDA
-        impact = gap_pct  # ogni punto % di risparmio = punto % di EBITDA
+        impact = gap_pct if key not in NON_EBITDA_COSTS else 0.0
         
         items_raw.append({
             "key": key,
@@ -270,7 +282,7 @@ def analyze_costs(
             quick_win=r["quick_win"],
         ))
     
-    ebitda_after = current_ebitda_pct + (total_savings / revenue if revenue > 0 else 0)
+    ebitda_after = current_ebitda_pct + sum(it.impact_on_ebitda for it in items)
     
     # Risk level
     danger_count = sum(1 for it in items if it.status == "danger")
@@ -300,12 +312,17 @@ def analyze_costs(
     # Waterfall data
     waterfall = [{"label": "📈 Ricavi", "value": revenue, "type": "total"}]
     for it in sorted(items, key=lambda x: x.value_eur, reverse=True):
+        if it.key in NON_EBITDA_COSTS:
+            continue
         waterfall.append({
             "label": it.label,
             "value": -it.value_eur,
             "type": "danger" if it.status == "danger" else ("warning" if it.status == "warning" else "ok"),
             "benchmark_value": -it.benchmark_pct * revenue,
         })
+    residual = current_ebitda - (revenue - sum(it.value_eur for it in items if it.key not in NON_EBITDA_COSTS))
+    if abs(residual) > 0.01:
+        waterfall.append({"label": "Altri costi/rettifiche EBITDA", "value": residual, "type": "warning"})
     waterfall.append({"label": "💰 EBITDA", "value": current_ebitda, "type": "ebitda"})
     
     # Simulation base: dict con % attuali per sliders
@@ -326,7 +343,7 @@ def analyze_costs(
         industry=industry,
         items=items,
         total_savings_eur=total_savings,
-        ebitda_after_fix=min(ebitda_after, 0.50),  # cap realistico
+        ebitda_after_fix=ebitda_after,
         top_problem=top,
         quick_wins=quick_wins,
         risk_level=risk_level,
@@ -344,8 +361,12 @@ def simulate_cost_reduction(
     Simula l'impatto di una riduzione dei costi sull'EBITDA e sul rating.
     reductions: {"key": pct_reduction} dove pct_reduction è 0-1
     """
+    require_finite(**reductions)
+    if any(not 0 <= reduction <= 1 for reduction in reductions.values()):
+        raise ValueError("Cost reductions must be between 0 and 1")
     revenue = result.revenue
     total_savings = 0.0
+    ebitda_savings = 0.0
     details = []
     
     for item in result.items:
@@ -353,6 +374,8 @@ def simulate_cost_reduction(
         if reduction > 0:
             saving = item.value_eur * reduction
             total_savings += saving
+            if item.key not in NON_EBITDA_COSTS:
+                ebitda_savings += saving
             details.append({
                 "label": item.label,
                 "saving_eur": saving,
@@ -360,12 +383,12 @@ def simulate_cost_reduction(
                 "benchmark_pct": item.benchmark_pct,
             })
     
-    new_ebitda_pct = result.current_ebitda_pct + (total_savings / revenue if revenue > 0 else 0)
+    new_ebitda_pct = result.current_ebitda_pct + (ebitda_savings / revenue if revenue > 0 else 0)
     new_ebitda_eur = new_ebitda_pct * revenue
     
     # Stima impatto sul credito (EBITDA × 3 = capacità di indebitamento)
-    loan_capacity_before = result.current_ebitda_pct * revenue * 3
-    loan_capacity_after = new_ebitda_pct * revenue * 3
+    loan_capacity_before = max(0, result.current_ebitda_pct * revenue * 3)
+    loan_capacity_after = max(0, new_ebitda_pct * revenue * 3)
     
     # Rating semplificato
     if new_ebitda_pct >= 0.20:

@@ -117,8 +117,9 @@ def _show_zscore_result(result, data_for_ratios, company_name, industry, access_
     for i, cat in enumerate(ratio_result.categories):
         cols[i].metric(f"{cat.icon} {cat.name.split()[0]}", f"{cat.score:.0f}/100")
 
-    # Salva su Supabase
-    saved = save_risk_analysis({
+    # Rendering/exporting a result must never insert history on every rerun.
+    if st.button("💾 Salva Analisi", key=f"zscore_save_{key_suffix}"):
+        saved = save_risk_analysis({
         "company_name": company_name,
         "model": result.model,
         "z_score": result.z_score,
@@ -128,9 +129,9 @@ def _show_zscore_result(result, data_for_ratios, company_name, industry, access_
         "total_assets": data_for_ratios.get("total_assets", 0),
         "revenue": data_for_ratios.get("revenue", 0),
         "ebit": data_for_ratios.get("ebit", 0),
-    }, access_token=access_token)
-    if saved:
-        st.toast("Analisi salvata nello storico", icon="💾")
+        }, access_token=access_token)
+        if saved:
+            st.toast("Analisi salvata nello storico", icon="💾")
 
     # Export
     st.divider()
@@ -297,6 +298,10 @@ def render_risk_analysis():
 
         submitted = st.form_submit_button("🔍 CALCOLA Z-SCORE", type="primary", use_container_width=True)
 
+    input_signature = (model, company_name, industry, total_assets, total_liabilities,
+                       equity, current_assets, current_liabilities, revenue, ebit,
+                       net_income, depreciation, interest_expense, retained_earnings,
+                       market_cap, inventory, accounts_receivable, accounts_payable)
     if submitted:
         if total_assets == 0:
             st.error("Inserisci almeno il Totale Attivo")
@@ -316,8 +321,6 @@ def render_risk_analysis():
             result = altman_z_prime(working_capital, ta_safe, retained_earnings,
                                      ebit, equity, tl_safe, revenue)
 
-        st.divider()
-        st.markdown("#### 📊 Risultato Analisi Manuale")
         data_for_ratios = dict(
             total_assets=total_assets, total_liabilities=total_liabilities,
             revenue=revenue, ebit=ebit, ebitda=ebit + depreciation,
@@ -327,4 +330,11 @@ def render_risk_analysis():
             accounts_payable=accounts_payable, interest_expense=interest_expense,
             retained_earnings=retained_earnings, depreciation=depreciation,
         )
+        st.session_state["zscore_manual_result"] = (input_signature, result, data_for_ratios)
+
+    stored = st.session_state.get("zscore_manual_result")
+    if stored and stored[0] == input_signature:
+        _, result, data_for_ratios = stored
+        st.divider()
+        st.markdown("#### 📊 Risultato Analisi Manuale")
         _show_zscore_result(result, data_for_ratios, company_name, industry, access_token, key_suffix="manual")
