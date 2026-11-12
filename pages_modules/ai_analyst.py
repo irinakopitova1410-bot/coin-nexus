@@ -338,8 +338,6 @@ zscore,2.1
             with st.spinner("🤖 AI Analyst sta elaborando la relazione..."):
                 relazione = genera_relazione_gestione(dati)
             _mostra_relazione(relazione)
-        else:
-            st.error("❌ File non riconosciuto. Usa il template CSV.")
 
 
 def _tab_manuale_ai():

@@ -123,8 +123,30 @@ def read_financial_data(uploaded_file):
         raise ValueError("File troppo grande: limite 10 MB.")
     if str(getattr(uploaded_file, "name", "")).lower().endswith((".xlsx", ".xls")):
         import pandas as pd
-        frame = pd.read_excel(io.BytesIO(raw), header=None, dtype=object, keep_default_na=False)
-        return data_from_rows(frame.values.tolist(), getattr(uploaded_file, "name", ""))
+        from utils.excel_balance import read_statement_sheets
+        filename = str(getattr(uploaded_file, "name", ""))
+        engine = "xlrd" if filename.lower().endswith(".xls") else "openpyxl"
+        workbook = pd.ExcelFile(io.BytesIO(raw), engine=engine)
+        if len(workbook.sheet_names) > 50:
+            raise ValueError("Excel: troppi fogli (massimo 50).")
+        sheets = {name: pd.read_excel(workbook, sheet_name=name, header=None, dtype=object, keep_default_na=False)
+                  for name in workbook.sheet_names}
+        if any(frame.size > 100_000 for frame in sheets.values()):
+            raise ValueError("Excel: un foglio supera il limite di 100.000 celle.")
+        result = read_statement_sheets(sheets, normalize_key, parse_number, is_blank, filename)
+        if result is not None:
+            return result
+        supported = []
+        for frame in sheets.values():
+            try:
+                supported.append(data_from_rows(frame.values.tolist(), filename))
+            except ValueError:
+                continue
+        if len(supported) == 1:
+            return supported[0]
+        if len(supported) > 1:
+            raise ValueError("Excel: più fogli dati riconosciuti. Carica un solo foglio per evitare di mescolare esercizi o aziende.")
+        raise ValueError("Excel non riconosciuto: usa fogli Stato Patrimoniale e Conto Economico con date, oppure una tabella campo/valore.")
     if isinstance(raw, str):
         text = raw
     else:
